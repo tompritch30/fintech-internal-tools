@@ -3,7 +3,7 @@
 Scope: research only (no stack choice, no prototype, no recommendation). Timeboxed to 40 min.
 Rules applied: every number is quoted from a linked source; arithmetic is shown; anything unavailable is marked "not published" or "not researched in timebox". Client-supplied inputs (not sourced): $250K/year spend, ~60 engineers, 3 apps today, 10+ planned.
 
-Sources are numbered [S1]–[S15]; full list at the bottom.
+Sources are numbered [S1]–[S20] (cap raised from 15 to 20); full list at the bottom.
 
 ---
 
@@ -15,7 +15,11 @@ Sources are numbered [S1]–[S15]; full list at the bottom.
   > "Power Apps Premium (with 2,000-seat minimum) | $12.00 | user/month, paid yearly"
 - A pay-as-you-go option also exists (usage billed via Azure); its per-unit price is **not published on the page reviewed**. [S1]
   > "Pay-as-you-go: Azure-based, pay only for usage - ideal for variable or seasonal app needs."
+- Microsoft's licensing FAQ gives the same Premium prices and lists a per-app plan at **$5/user/app/month**. [S20]
+  > "…for $20/user/month (or $12 per user/month with 2,000+ new user licenses)."
+  > "…based on the full capabilities of Power Apps for $5/user/app/month."
 - Dataverse database capacity add-on: **$40.00 per GB/month, paid yearly**. [S1]
+- **$22/user/month: not found in any Microsoft source checked** (pricing page, licensing FAQ, licensing overview, Partner Center announcements Nov 2025–Oct 2026). The pricing page shows $20.00. Treat $22 as unverified and don't use it.
   > "Dataverse Database Capacity add-on | $40.00 | GB/month, paid yearly"
 
 **Implied seat count (working):**
@@ -23,7 +27,7 @@ Sources are numbered [S1]–[S15]; full list at the bottom.
 - $250,000 ÷ $240.00 = **≈1,042 seats** (1,041.67)
 - Check against the $12 tier: 2,000 seats × $12.00 × 12 = $288,000/year minimum, which is above $250,000, so the $12 tier is not consistent with the stated spend at list price.
 
-**Tier ambiguity:** the $250K may include things other than Premium seats (Dataverse capacity add-ons, pay-as-you-go meters, Power Automate or Copilot Studio, negotiated EA discounts). Each of these would lower the implied seat count. The client's actual SKU mix is unknown.
+**Tier ambiguity:** if the client is on the per-app plan ($5/user/app/month) instead of Premium, the seat maths changes completely. Per-app is no longer sold to new customers (see Q6). The $250K may also include things other than Premium seats (Dataverse capacity add-ons, pay-as-you-go meters, Power Automate or Copilot Studio, negotiated EA discounts). Each of these would lower the implied seat count. The client's actual SKU mix is unknown.
 
 **Framing:** ≈1,042 seats is far more than ~60 engineers, so **the seat count implies the user base is mostly non-engineers. Verify the audience mix (ops/compliance/support vs. engineering) and the actual SKU breakdown with the client.**
 
@@ -74,6 +78,11 @@ So a bespoke build needs its own equivalents of: SSO plus role mapping, a data s
 - Approval flows and responses are stored in Dataverse, in an approvals history. [S6]
   > "When you create approval flows, they're saved in Dataverse."
   > "Users need this role for their responses to be processed and persisted in their approvals history."
+- **Self-approval (maker/checker):** nothing in Microsoft's Approvals docs says requesters are stopped from approving their own request. **Not published.** On the evidence below, the connector does not enforce this: `Assigned To` is any list of email addresses, and `Requestor` is a separate, optional, free-text email field. Separation of duties would have to be built into the flow logic (e.g. a check that requester ≠ approver) or the app, and then tested. [S18]
+  > "Assigned To | assignedTo | True | email | Email addresses, separated by a semicolon (;)"
+  > "Requestor | requestor | email | Add the email of the person generating this request"
+  - The connector's own "Known issues and limitations" list does not mention any self-approval restriction. The one identity safeguard it lists is about the sender: [S18]
+    > "The creator of the flow will always be shown in the Approval details (email content and all clients). This is to prevent spoofing of approval sender identities."
 - **Not researched in timebox:** whether approval history is immutable or tamper-evident, and its retention independent of Dataverse auditing. "Request more info" as a distinct audited action was also not researched.
 
 **Row-level access:** [S4]
@@ -124,8 +133,20 @@ So a bespoke build needs its own equivalents of: SSO plus role mapping, a data s
   > "Effective April 2026, Test Engine is deprecated."
   > "Effective March 2026, the Editable Grid control and the Power Apps Read-Only Grid control are deprecated in model-driven apps."
   > "Effective August 29, 2025, … will be deprecated and no longer supported." (Cards for Power Apps)
-- Licensing-SKU changes (e.g. Power Apps per app availability) and roadmap disclosure changes: candidate Microsoft pages were found but **left out to stay within the 15-source cap**, so they are not used as evidence here (see raw_notes.md).
-- Price-change history for Premium: **not researched in timebox**.
+- **Licence enforcement in managed environments (February 2027):** unlicensed users will be blocked from opening apps. Notifications started in 2026. [S16]
+  > "Starting February 2027, users who don't have an appropriate license are blocked from opening apps in the managed environment after receiving the final notification stage."
+  > "Administrative notifications began in March 2026 through the Microsoft 365 Message center and Power Platform admin center."
+  - What it applies to: [S16]
+    > "Every user running an app in a managed environment must have one of the following licenses: a Power Apps Premium, a Power Automate Premium license, or a Dynamics 365 Enterprise license"
+  - Implication (inference): if the client uses managed environments and has users running apps under Microsoft 365-included rights, the true seat need could exceed what they pay for today. Verify their licence assignment against active users.
+- **Power Apps per app end of sale (effective January 2, 2026):** [S17]
+  > "Effective January 2, 2026, the Power Apps per app SKU is no longer available for purchase by new customers."
+  > "Existing Enterprise customers using this license will see no disruption and can continue to use and renew this SKU after their current agreement ends."
+  - MPSA customers get a 60-day migration window when their agreement ends. CSP customers are not affected. [S17]
+    > "After that, they will have a 60-day window to migrate to an alternative solution." … "Existing and new CSP customers will not be impacted."
+- **Roadmap disclosure change (September 2026):** Microsoft is replacing its release plans with the "AI at Work" roadmap. [S19]
+  > "Release Plans will no longer be published starting in September 2026. New Dynamics 365, Power Platform, and Dataverse capabilities will be published to the AI at Work roadmap beginning in September 2026."
+- **Power Apps Premium price changes:** none found in the Microsoft sources checked. The current list price is $20.00 [S1], the same figure the licensing FAQ gives [S20]. Microsoft doesn't publish a price-change history, and no $22 figure was found.
 
 ---
 
@@ -160,7 +181,7 @@ So a bespoke build needs its own equivalents of: SSO plus role mapping, a data s
 
 ---
 
-## Sources (15)
+## Sources (20)
 
 | # | Source | Type |
 |---|---|---|
@@ -179,8 +200,13 @@ So a bespoke build needs its own equivalents of: SSO plus role mapping, a data s
 | S13 | https://launchdarkly.com/ | Vendor |
 | S14 | https://github.com/Unleash/unleash | Vendor (OSS repo) |
 | S15 | https://retool.com/ | Vendor |
+| S16 | https://learn.microsoft.com/en-us/power-platform/admin/managed-environment-licensing | Microsoft Learn |
+| S17 | https://www.microsoft.com/licensing/news/power-app-per-app-end-of-sale | Microsoft licensing news |
+| S18 | https://learn.microsoft.com/en-us/connectors/approvals/ | Microsoft Learn (connector reference) |
+| S19 | https://learn.microsoft.com/en-us/dynamics365/release-plans/ | Microsoft Learn |
+| S20 | https://learn.microsoft.com/en-us/power-platform/admin/powerapps-flow-licensing-faq | Microsoft Learn |
 
-All pages were accessed on 2026-10-14.
+All pages were accessed on 2026-10-14. (Second pass, the same day: S16–S20 added after the cap was raised to 20.)
 
 ## Not found / not researched in timebox
 
@@ -189,6 +215,8 @@ All pages were accessed on 2026-10-14.
 - Immutability and tamper-evidence of Dataverse audit logs and approval history: not researched.
 - Microsoft regulatory attestations (e.g. SOC/ISO scope for Dataverse audit): not researched.
 - Whether Dataverse Git integration is preview or GA, and canvas source diff quality: not researched.
-- Power Apps licensing/SKU changes and release-plan/roadmap disclosure changes: found, but excluded because of the source cap.
+- Self-approval prevention in Power Automate approvals: not published (S18 shows no built-in restriction).
+- "$22/user/month": not found in Microsoft sources; unverified.
+- Power Apps Premium price-change history: not published.
 - Internal-tool maintenance cost benchmark: no public benchmark found — assumption required.
 - US retention for non-bank fintechs (MSB rules, 31 CFR 1022): not researched.
