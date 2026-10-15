@@ -33,7 +33,7 @@ formal assessment.
 | 10 | Tamper with approval payloads | Holds | — |
 | 11a | Race conditions in approvals and refunds | Holds | — |
 | 11b | Split one refund to dodge approval | **Breaks** (found during the review) | [#18](https://github.com/tompritch30/fintech-internal-tools/pull/18) |
-| 12 | Insider bulk-unmasking customer data (rate limit / alert?) | **Breaks**: no limit, no alert | Fix PR 1 (core) |
+| 12 | Insider bulk-unmasking customer data (rate limit / alert?) | **Breaks**: no limit, no alert | [#17](https://github.com/tompritch30/fintech-internal-tools/pull/17) (core) |
 
 Fix PRs (red test first, then fix):
 
