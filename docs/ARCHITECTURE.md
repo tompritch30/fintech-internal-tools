@@ -151,7 +151,12 @@ The fix, set once in `docker-compose.yml`:
 - The IdP owns role *membership* (realm roles in Keycloak, app roles in Entra). Roles
   are synced to `user_roles` at each login.
 - `packages/core` owns the *role → permission* map in code, so a change to it is a
-  reviewed change to `packages/core`.
+  reviewed change to `packages/core`. The map lives in `PERMISSION_REGISTRY` (built
+  by `definePermissionRegistry`): every permission is a `domain:action` key with a
+  description and its granted roles, validated and frozen at module load — a bad
+  key, empty description, empty or duplicate role list, or unknown role throws
+  `ValidationError` at startup rather than silently misgranting access. `PERMISSIONS`,
+  the `Permission` union and `ROLE_PERMISSIONS` are all derived from the registry.
 - **Server actions use `defineAction(permission, fn)`.** The wrapper runs
   `requirePermission` before `fn`. A test scans every `"use server"` file in `apps/web`
   and fails if an exported action isn't built with `defineAction`.
@@ -301,7 +306,7 @@ Interface (`packages/core/src/approvals/approvals.ts`, exported from `@fit/core`
 
 ```ts
 defineApprovalKind<P>({ kind, subjectType, requestPermission, approvePermission,
-  onRequested?, onApproved? }): ApprovalKind<P>
+  onRequested?, onApproved?, onRejected? }): ApprovalKind<P>
 requestApproval(db, actor, kind, { subjectId, payload }): Promise<ApprovalRequest<P>>
 decideApproval(db, actor, kind, { id, decision: "approve"|"reject", note?, expectedVersion }): Promise<ApprovalRequest<P>>
 cancelApproval(db, actor, { id, note }): Promise<ApprovalRequest>
@@ -311,8 +316,9 @@ Deviations from the original sketch: the functions take `db`, not `tx` — denia
 (self-approval, requester-only cancel) write their `access.denied` row *before* the
 transaction opens, so it survives. `onRequested(tx, request)` runs inside the
 request's transaction so the app's record commits with the request; `onApproved(tx,
-request)` runs inside the approval's transaction so the effect commits with the
-decision.
+request)` / `onRejected(tx, request)` run inside the decision's transaction so the
+effect commits with the decision (a throwing hook rolls back the decision and its
+audit row). `cancelApproval` calls neither hook.
 
 Rules: the requester can never approve their own request (checked in code **and** by
 the `maker_is_not_checker` CHECK). The approver needs the kind's approve permission.

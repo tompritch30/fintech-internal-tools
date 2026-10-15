@@ -4,9 +4,11 @@ Use this for each business app (KYC, refunds, feature flags). One app per sessio
 [AGENTS.md](../AGENTS.md) and [ARCHITECTURE.md](ARCHITECTURE.md) first.
 
 ## 1. Permissions (needs human review)
-- [ ] Add the app's permissions to `PERMISSIONS` in `packages/core/src/rbac/permissions.ts`,
-      for example `refunds:read`, `refunds:approve`.
-- [ ] Map them to roles in `ROLE_PERMISSIONS`. New IdP roles also need a row in the `roles`
+- [ ] Add the app's permissions to `PERMISSION_REGISTRY` in
+      `packages/core/src/rbac/permissions.ts`, for example `refunds:read`,
+      `refunds:approve`. Each entry is `{ description, roles }`; `PERMISSIONS` and
+      `ROLE_PERMISSIONS` are derived from the registry, so don't edit them directly.
+- [ ] New IdP roles also need a row in the `roles`
       seed and in the Keycloak realm (`infra/keycloak/internal-tools-realm.json`).
 - [ ] Add tests in `packages/core/test/rbac.test.ts`: denied for the wrong role (with its
       `access.denied` row) and allowed for the right one (positive control).
