@@ -149,7 +149,7 @@ section:has(> ul, > ol):has(> p > img, > .visual, > table) > :is(p:has(> img), .
 .visual.flow {
   display: flex;
   align-self: start;
-  align-items: center;
+  align-items: stretch;
   gap: 48px;
 }
 .visual.flow > div {

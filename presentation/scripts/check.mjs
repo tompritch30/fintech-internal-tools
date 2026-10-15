@@ -6,6 +6,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { DIST, HEIGHT, WIDTH, launchBrowser, renderDeckPage } from "./lib.mjs";
+import { CHART_FONT } from "./chart.mjs";
 
 export const BANNED = [
   /\bleverag\w*/i,
@@ -14,7 +15,7 @@ export const BANNED = [
   /\bunlock\w*/i,
   /\bgame[\s-]?chang\w*/i,
 ];
-export const LIMITS = { bullets: 3, bulletWords: 12, paragraphWords: 20, titleChars: 70, minFontPx: 24, visuals: 1 };
+export const LIMITS = { bullets: 3, bulletWords: 12, paragraphWords: 20, titleChars: 70, minFontPx: 24, visuals: 1, chartFontPx: CHART_FONT };
 
 /** Runs in the page: measure each slide. Keep it self-contained (it is serialised). */
 function measure(limits) {
@@ -111,6 +112,15 @@ function measure(limits) {
 
     for (const img of s.querySelectorAll("img")) {
       if (!img.naturalWidth) fail.push(["missing-image", `image did not load: ${img.getAttribute("src")}`]);
+    }
+
+    // Chart text is inside the SVG, so scale the chart's font by how much the image is shrunk.
+    for (const img of s.querySelectorAll("img")) {
+      if (!/(^|\/)charts\//.test(img.getAttribute("src") ?? "") || !img.naturalWidth) continue;
+      const box = img.getBoundingClientRect();
+      // object-fit: contain shrinks the SVG to fit the tighter of width and height.
+      const px = Math.min(box.width / img.naturalWidth, box.height / img.naturalHeight) * limits.chartFontPx;
+      if (px < limits.minFontPx) fail.push(["chart-text-too-small", `chart labels render at ${px.toFixed(1)}px (min ${limits.minFontPx}px); give the chart more width or fewer bullets`]);
     }
 
     // Text size
