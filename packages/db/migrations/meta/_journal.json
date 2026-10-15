@@ -43,6 +43,13 @@
       "when": 1792094810139,
       "tag": "0005_refunds_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792097366739,
+      "tag": "0006_refunds_rejected",
+      "breakpoints": true
     }
   ]
 }

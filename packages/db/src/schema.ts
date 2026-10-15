@@ -169,7 +169,7 @@ export const payments = pgTable(
  * Stored refund state. 'rejected' / 'cancelled' are not stored here: they come from the
  * linked approval request, so there is one source of truth for the decision.
  */
-export const refundStatus = pgEnum("refund_status", ["pending", "succeeded"]);
+export const refundStatus = pgEnum("refund_status", ["pending", "succeeded", "rejected"]);
 
 /**
  * One refund against a payment. The id is generated when the request form is rendered and

@@ -119,13 +119,14 @@ export function parsePounds(input: string): number {
 }
 
 // ---------------------------------------------------------------------------
-// Masking: the customer email is masked server-side for every reader.
+// Masking: the customer email and name are masked server-side for every reader.
 
 const EMAIL_POLICY = { field: "customerEmail", style: "email", unmaskPermission: "pii:unmask" } as const;
+const NAME_POLICY = { field: "customerName", style: "name", unmaskPermission: "pii:unmask" } as const;
 
 const paymentEntity = defineMaskedEntity<PaymentRow>({
   entityType: "payment",
-  policies: [EMAIL_POLICY],
+  policies: [EMAIL_POLICY, NAME_POLICY],
   load: async (tx, id) => (await tx.select().from(payments).where(eq(payments.id, id)))[0] ?? null,
 });
 
@@ -134,8 +135,9 @@ export async function revealCustomerEmail(ctx: ActionContext, input: { paymentId
   return unmask(ctx.db, ctx.user, paymentEntity, { entityId: input.paymentId, field: "customerEmail", reason: input.reason });
 }
 
-export async function revealCustomerName(_ctx: ActionContext, _input: { paymentId: string; reason: string }): Promise<string | null> {
-  throw new Error("not implemented");
+export async function revealCustomerName(ctx: ActionContext, input: { paymentId: string; reason: string }): Promise<string | null> {
+  if (!UUID.test(input.paymentId)) throw new NotFoundError(`payment ${input.paymentId} not found`);
+  return unmask(ctx.db, ctx.user, paymentEntity, { entityId: input.paymentId, field: "customerName", reason: input.reason });
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +201,10 @@ export async function searchPayments(db: Db, query: ListQueryInput): Promise<{ r
   const rows = await db.select(listColumns).from(payments).where(where).orderBy(dir(sortCol), asc(payments.id)).limit(pageSize).offset(offset);
   const [total] = await db.select({ n: count() }).from(payments).where(where);
   return {
-    rows: rows.map(({ pendingPence, ...r }) => ({ ...r, availablePence: r.amountPence - r.refundedPence - pendingPence })),
+    rows: rows.map(({ pendingPence, ...r }) => ({
+      ...mask(r, [NAME_POLICY]),
+      availablePence: r.amountPence - r.refundedPence - pendingPence,
+    })),
     total: total?.n ?? 0,
   };
 }
@@ -211,8 +216,8 @@ export async function getPaymentView(db: Db, id: string): Promise<PaymentView | 
     .from(payments)
     .where(eq(payments.id, id));
   if (!row) return null;
-  const masked = mask(row, [EMAIL_POLICY]);
-  return { ...masked, customerEmail: masked.customerEmail, availablePence: row.amountPence - row.refundedPence - row.pendingPence };
+  const masked = mask(row, [EMAIL_POLICY, NAME_POLICY]);
+  return { ...masked, availablePence: row.amountPence - row.refundedPence - row.pendingPence };
 }
 
 const requester = alias(users, "requester");
@@ -245,8 +250,9 @@ type RefundViewRow = Awaited<ReturnType<ReturnType<typeof refundViewQuery>["exec
 function toRefundView(row: RefundViewRow): RefundView {
   const { refund, approval } = row;
   let status: RefundDisplayStatus = "pending_approval";
-  if (refund.status === "succeeded") status = "succeeded";
-  else if (approval?.status === "rejected" || approval?.status === "cancelled") status = approval.status;
+  if (refund.status === "succeeded" || refund.status === "rejected") status = refund.status;
+  // cancelApproval calls no hook, so a cancelled request still has a pending refund row.
+  else if (approval?.status === "cancelled") status = "cancelled";
   return {
     id: refund.id,
     paymentId: refund.paymentId,
@@ -282,7 +288,7 @@ export async function listPendingRefundApprovals(
   ctx: ActionContext,
   query: ListQueryInput,
 ): Promise<{ rows: PendingApprovalItem[]; total: number }> {
-  await requirePermission({ db: ctx.db, user: ctx.user, resource: "refunds:approvals-queue" }, "approvals:decide");
+  await requirePermission({ db: ctx.db, user: ctx.user, resource: "refunds:approvals-queue" }, "refunds:approve");
   const q = searchTerm(query);
   const where = and(
     eq(approvalRequests.kind, refundApproval.kind),
@@ -453,12 +459,35 @@ async function executeRefund(tx: Tx, ctx: ActionContext, refundId: string): Prom
   );
 }
 
+/** Rejection's effect, run by onRejected inside the decision's transaction. */
+async function markRejected(tx: Tx, ctx: ActionContext, refundId: string): Promise<void> {
+  await withAudit(
+    tx,
+    {
+      actor: actorRef(ctx),
+      action: "refund.rejected",
+      entityType: "refund",
+      entityId: refundId,
+      before: { status: "pending" },
+      after: { status: "rejected" },
+    },
+    async (t) => {
+      const updated = await t
+        .update(refunds)
+        .set({ status: "rejected" })
+        .where(and(eq(refunds.id, refundId), eq(refunds.status, "pending")))
+        .returning({ id: refunds.id });
+      if (updated.length !== 1) throw new ConflictError(`refund ${refundId} is no longer pending`);
+    },
+  );
+}
+
 /** Core calls the hooks with (tx, request) only, so each call builds its kind with the actor in scope. */
 export const refundApproval = defineApprovalKind<RefundPayload>({
   kind: "refund.issue",
   subjectType: "refund",
-  requestPermission: "approvals:request",
-  approvePermission: "approvals:decide",
+  requestPermission: "refunds:request",
+  approvePermission: "refunds:approve",
 });
 
 export async function requestRefund(
@@ -466,7 +495,7 @@ export async function requestRefund(
   rawInput: RefundRequestInput,
   config: RefundConfig = loadRefundConfig(),
 ): Promise<RefundView> {
-  await requirePermission({ db: ctx.db, user: ctx.user, resource: "refunds:request" }, "approvals:request");
+  await requirePermission({ db: ctx.db, user: ctx.user, resource: "refunds:request" }, "refunds:request");
   const input = validateRequest(rawInput);
   const resubmitted = await findResubmission(ctx.db, ctx, input);
   if (resubmitted) return resubmitted;
@@ -499,7 +528,11 @@ async function decide(
   const refund = await loadRefundView(ctx.db, input.refundId);
   if (!refund) throw new NotFoundError(`refund ${input.refundId} not found`);
   if (!refund.approval) throw new ConflictError(`refund ${refund.id} did not need approval`);
-  const kind = { ...refundApproval, onApproved: (tx: Tx, request: { subjectId: string }) => executeRefund(tx, ctx, request.subjectId) };
+  const kind = {
+    ...refundApproval,
+    onApproved: (tx: Tx, request: { subjectId: string }) => executeRefund(tx, ctx, request.subjectId),
+    onRejected: (tx: Tx, request: { subjectId: string }) => markRejected(tx, ctx, request.subjectId),
+  };
   await decideApproval(ctx.db, ctx.user, kind, {
     id: refund.approval.id,
     decision,
