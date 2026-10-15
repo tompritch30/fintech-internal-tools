@@ -3,6 +3,7 @@ import { ListView, PageHeader, linkClass, type ListColumn } from "@fit/ui";
 import { getDb, requirePagePermission } from "../../../../lib/auth.ts";
 import { formatPence, formatWhen } from "../format.ts";
 import { listPendingRefundApprovals, type PendingApprovalItem } from "../refunds.ts";
+import { parsePageParam } from "../../../../lib/page-param.ts";
 
 const PAGE_SIZE = 20;
 const SORTS = ["requestedAt", "amountPence", "paymentReference"];
@@ -35,7 +36,7 @@ export default async function RefundApprovalsPage({
     search: params.q,
     sort: params.sort && SORTS.includes(params.sort) ? params.sort : undefined,
     dir: params.dir === "desc" ? ("desc" as const) : ("asc" as const),
-    page: Math.max(1, Number(params.page) || 1),
+    page: parsePageParam(params.page),
   };
   const { rows, total } = await listPendingRefundApprovals({ db: getDb(), user }, { ...query, pageSize: PAGE_SIZE });
   return (

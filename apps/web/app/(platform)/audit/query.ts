@@ -24,7 +24,7 @@ function day(value: string | undefined): Date | undefined {
 
 /** A URL search param; repeated keys arrive as an array, and only the first is used. */
 export type SearchParam = string | string[] | undefined;
-const first = (v: SearchParam) => (Array.isArray(v) ? v[0] : v);
+export const first = (v: SearchParam) => (Array.isArray(v) ? v[0] : v);
 
 const text = (param: SearchParam) => {
   const v = first(param)?.trim().slice(0, MAX_LENGTH);

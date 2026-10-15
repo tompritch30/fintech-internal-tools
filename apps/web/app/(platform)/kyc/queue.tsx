@@ -3,6 +3,7 @@ import { ListView, PageHeader, StatusBadge, Tabs, linkClass, type ListColumn } f
 import { getDb, requirePagePermission } from "../../../lib/auth.ts";
 import { STATUS, formatWhen, riskBadges, statusOf } from "./format.ts";
 import { KYC_STATUSES, listKycCases, loadKycConfig, type KycCaseListItem, type KycStatus } from "./kyc.ts";
+import { parsePageParam } from "../../../lib/page-param.ts";
 
 const PAGE_SIZE = 20;
 const SORTS = ["reference", "riskRating", "status", "openedAt"];
@@ -54,7 +55,7 @@ export async function KycQueue({ status, searchParams }: { status?: KycStatus; s
     search: params.q,
     sort: params.sort && SORTS.includes(params.sort) ? params.sort : undefined,
     dir: params.dir === "desc" ? ("desc" as const) : ("asc" as const),
-    page: Math.max(1, Number(params.page) || 1),
+    page: parsePageParam(params.page),
   };
   const { rows, total } = await listKycCases({ db: getDb(), user }, { ...query, status, pageSize: PAGE_SIZE });
   const filters = [{ value: undefined, label: "All" }, ...KYC_STATUSES.map((s) => ({ value: s, label: STATUS[s]?.label ?? s }))];

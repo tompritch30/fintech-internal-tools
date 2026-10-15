@@ -1,7 +1,8 @@
 import type { AuditListItem } from "@fit/core";
 import { FilterBar, ListView, PageHeader, StatusBadge, type ListColumn } from "@fit/ui";
 import { getDb, requirePagePermission } from "../../../lib/auth.ts";
-import { auditFilterOptions, parseAuditFilters, searchAudit, type SearchParam } from "./query.ts";
+import { auditFilterOptions, first, parseAuditFilters, searchAudit, type SearchParam } from "./query.ts";
+import { parsePageParam } from "../../../lib/page-param.ts";
 
 const PAGE_SIZE = 25;
 
@@ -22,7 +23,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   const query = {
     sort: params.sort === "occurredAt" ? "occurredAt" : undefined,
     dir: params.dir === "asc" ? ("asc" as const) : ("desc" as const),
-    page: Math.max(1, Number(params.page) || 1),
+    page: parsePageParam(first(params.page)),
   };
   const db = getDb();
   const [{ rows, total }, options] = await Promise.all([
