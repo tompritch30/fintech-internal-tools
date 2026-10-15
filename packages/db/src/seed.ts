@@ -2,7 +2,7 @@
 import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import { createDb, type Db } from "./index.ts";
-import { auditLog, payments, roles, userRoles, users } from "./schema.ts";
+import { auditLog, kycCases, kycDocuments, payments, roles, userRoles, users } from "./schema.ts";
 
 export const SEED_ROLES = [
   { name: "analyst", description: "Works the queues; can create requests" },
@@ -58,6 +58,66 @@ export function seedPayments(count = 40): (typeof payments.$inferInsert)[] {
   });
 }
 
+const STREETS = ["Example Lane", "Sample Road", "Placeholder Street", "Fictional Avenue", "Testing Close", "Demo Crescent"];
+const TOWNS = ["Testford", "Mockbury", "Sampleton", "Dummyhampton", "Fakely"];
+const NATIONALITIES = ["GB", "IE", "FR", "DE", "PL", "IN", "NG", "ES"];
+
+export interface SeedKycCase {
+  kase: typeof kycCases.$inferInsert & { reference: string };
+  documents: Omit<typeof kycDocuments.$inferInsert, "caseId">[];
+}
+
+/**
+ * 30 synthetic KYC cases, all open and unclaimed. Invented names, ID numbers (TST- prefix),
+ * addresses (fictional streets, ZZ postcodes) and documents. Every fifth case is a PEP, every
+ * seventh a sanctions hit, and both are high-risk; a few more are high-risk on rating alone.
+ */
+export function seedKycCases(count = 30): SeedKycCase[] {
+  const rand = prng(20261016);
+  const pick = <T>(items: readonly T[]) => items[Math.floor(rand() * items.length)] as T;
+  const anchor = Date.UTC(2026, 9, 15, 8, 0, 0);
+  return Array.from({ length: count }, (_, i) => {
+    const name = `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
+    const pep = i % 5 === 3;
+    const sanctionsHit = i % 7 === 5;
+    const riskRating = pep || sanctionsHit || i % 9 === 8 ? "high" : i % 3 === 0 ? "medium" : "low";
+    const year = 1950 + Math.floor(rand() * 55);
+    const month = String(1 + Math.floor(rand() * 12)).padStart(2, "0");
+    const day = String(1 + Math.floor(rand() * 28)).padStart(2, "0");
+    const dateOfBirth = `${year}-${month}-${day}`;
+    const idNumber = `TST-${String(Math.floor(rand() * 1_000_000)).padStart(6, "0")}`;
+    const address = `${1 + Math.floor(rand() * 199)} ${pick(STREETS)}, ${pick(TOWNS)}, ZZ${1 + (i % 9)} ${1 + (i % 8)}TT`;
+    const idKind = i % 2 === 0 ? "passport" : "driving_licence";
+    const banner = "SYNTHETIC TEST DOCUMENT - not a real identity document";
+    return {
+      kase: {
+        reference: `KYC-${200001 + i}`,
+        applicantName: name,
+        dateOfBirth,
+        idNumber,
+        address,
+        nationality: pick(NATIONALITIES),
+        riskRating,
+        sanctionsHit,
+        pep,
+        openedAt: new Date(anchor - i * 5 * 3_600_000),
+      },
+      documents: [
+        {
+          kind: idKind,
+          fileName: `${idKind}.pdf`,
+          content: `${banner}\nType: ${idKind.replace("_", " ")}\nName: ${name}\nNumber: ${idNumber}\nDate of birth: ${dateOfBirth}`,
+        },
+        {
+          kind: "utility_bill",
+          fileName: "utility_bill.pdf",
+          content: `${banner}\nType: utility bill\nName: ${name}\nAddress: ${address}`,
+        },
+      ],
+    };
+  });
+}
+
 export async function seed(db: Db): Promise<void> {
   await db.transaction(async (tx) => {
     await tx.insert(roles).values([...SEED_ROLES]).onConflictDoNothing();
@@ -87,6 +147,12 @@ export async function seed(db: Db): Promise<void> {
 
     // Payments are inserted once; refunds made later only change refunded_pence.
     await tx.insert(payments).values(seedPayments()).onConflictDoNothing({ target: payments.reference });
+
+    // KYC cases are inserted once (documents with them); not audited: seeding is setup, not a business action.
+    for (const { kase, documents } of seedKycCases()) {
+      const [inserted] = await tx.insert(kycCases).values(kase).onConflictDoNothing({ target: kycCases.reference }).returning({ id: kycCases.id });
+      if (inserted) await tx.insert(kycDocuments).values(documents.map((d) => ({ ...d, caseId: inserted.id })));
+    }
 
     // audit_log is append-only, so sample rows are inserted once and never replaced.
     const existing = await tx

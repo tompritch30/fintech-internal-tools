@@ -48,8 +48,9 @@ All passwords are `demo-only-change-me` (fake, local only).
 | Permission checks on the server for every page, action and route | All data is fake and seeded. No real customer data or secrets |
 | Audit row written in the same transaction as every change; the database blocks edits and deletes of audit rows | The card provider is a mock (`mock_provider_refunds` table). No money moves |
 | Maker-checker approvals; masking on the server, with an audited, rate-limited reveal | No hosting, deploy pipeline, environments, monitoring or alerting |
-| The refunds app, with tests on real Postgres and end-to-end tests in CI | No email or Teams notifications; no Power Apps data migration |
-| | KYC and feature flags are still in open PRs (see #22 and #24), not on `main` |
+| The refunds and KYC review apps, with tests on real Postgres and end-to-end tests in CI | No email or Teams notifications; no Power Apps data migration |
+| | KYC cases and documents are seed data only: no case intake or document upload yet |
+| | Feature flags is still an open PR (see #24), not on `main` |
 
 ## Architecture
 

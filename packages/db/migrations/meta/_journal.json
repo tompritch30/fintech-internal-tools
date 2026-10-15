@@ -57,6 +57,20 @@
       "when": 1792100678769,
       "tag": "0007_elite_hydra",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792102190818,
+      "tag": "0008_kyc",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792102191570,
+      "tag": "0009_kyc_guard",
+      "breakpoints": true
     }
   ]
 }
