@@ -168,14 +168,13 @@ const PAYMENT_SORTS = {
 } as const;
 
 const MAX_SEARCH = 100;
-const MAX_PAGE = 10_000;
 const wholeIn = (n: number | undefined, min: number, max: number, fallback: number) =>
   n !== undefined && Number.isFinite(n) ? Math.min(Math.max(min, Math.trunc(n)), max) : fallback;
 
 /** URL values are untrusted: clamp to whole numbers so the SQL offset is always valid. */
 const page = (q: ListQueryInput) => {
   const pageSize = wholeIn(q.pageSize, 1, 1000, 20);
-  return { pageSize, offset: (wholeIn(q.page, 1, MAX_PAGE, 1) - 1) * pageSize };
+  return { pageSize, offset: (wholeIn(q.page, 1, Math.floor(Number.MAX_SAFE_INTEGER / pageSize), 1) - 1) * pageSize };
 };
 
 const searchTerm = (q: ListQueryInput) => q.search?.trim().slice(0, MAX_SEARCH) || undefined;

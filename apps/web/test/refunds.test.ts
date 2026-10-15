@@ -132,6 +132,7 @@ describe("rule 1: an analyst finds a payment and requests a refund with a reason
 
   it("serves a valid page for malformed page numbers and over-long searches", async () => {
     const payment = await newPayment(5_000);
+    expect(await searchPayments(db, { page: 10_001, pageSize: 5 })).toMatchObject({ rows: [] });
     for (const p of [1.01, Number.POSITIVE_INFINITY, Number.NaN, -3]) {
       await expect(searchPayments(db, { page: p, pageSize: 5 })).resolves.toMatchObject({ rows: expect.any(Array) });
     }
