@@ -114,7 +114,7 @@ export function RevealForm({ caseId }: { caseId: string }) {
           ))}
         </select>
       </label>
-      <Input id="reveal-reason" name="reason" label="Reason for revealing" required maxLength={500} className="w-72" />
+      <Input id="reveal-reason" name="reason" label="Reason for revealing" required minLength={10} maxLength={500} className="w-72" />
       <Button type="submit" disabled={pending}>
         Reveal
       </Button>
@@ -133,7 +133,7 @@ export function OpenDocumentForm({ documentId, fileName }: { documentId: string;
   return (
     <form action={action} className={formClass} aria-label={`Open ${fileName}`}>
       <input type="hidden" name="documentId" value={documentId} />
-      <Input id={`open-${documentId}-reason`} name="reason" label={`Reason for opening ${fileName}`} required maxLength={500} className="w-72" />
+      <Input id={`open-${documentId}-reason`} name="reason" label={`Reason for opening ${fileName}`} required minLength={10} maxLength={500} className="w-72" />
       <Button type="submit" disabled={pending}>
         Open {fileName}
       </Button>

@@ -118,9 +118,13 @@ flowchart LR
 - Server-side sessions in the `sessions` table. The cookie holds a random 256-bit
   token. The table stores only its SHA-256 hash, so a database read can't be replayed
   as a cookie.
-- Cookie: `httpOnly`, `SameSite=Lax`, `Secure` when `APP_URL` is HTTPS.
-- Sessions expire after `SESSION_TTL_HOURS`. Logout or deleting the row revokes a
-  session at once. That is the main reason to choose DB sessions over a JWT cookie.
+- Cookie: `__Host-fit_session`, `httpOnly`, `SameSite=Lax`, always `Secure`,
+  `Path=/`, and no `Domain`. Browsers treat `http://localhost` as secure.
+- Sessions expire after `SESSION_TTL_HOURS` (absolute) or `SESSION_IDLE_MINUTES`
+  (15 minutes by default, PCI DSS 8.2.8) without a request. Each authenticated
+  request updates `sessions.last_seen_at`. Logout clears the cookie with matching
+  attributes; deleting the row revokes a session at once. That is the main reason
+  to choose DB sessions over a JWT cookie.
 
 ### 3.3 Issuer fix (Docker Compose)
 
@@ -171,8 +175,9 @@ The fix, set once in `docker-compose.yml`:
   client-controlled and cannot suppress a denial audit row. The layout renders links
   only for actions the user may use, so false denial rows should remain rare.
 - **Roles can be stale.** Roles sync from the IdP only at login. If someone loses a
-  role in the IdP, they keep it until their session ends (at most
-  `SESSION_TTL_HOURS`). Revoking the session row ends access at once. See Known gaps.
+  role in the IdP, an idle user's stale role is limited by `SESSION_IDLE_MINUTES`;
+  an active user can keep it until the absolute `SESSION_TTL_HOURS`. Revoking the
+  session row ends access at once. See Known gaps.
 - A1 roles: `analyst`, `approver`, `admin`. A1 permissions: `platform:access` (any
   role) and `audit:read` (admin). A signed-in user with no role sees a "no access" page.
 
@@ -189,6 +194,19 @@ The fix, set once in `docker-compose.yml`:
   write action produces its audit row (rule in ADDING-AN-APP.md).
 - Login, logout and denied access also write audit rows (`auth.login`, `auth.logout`,
   `access.denied`).
+
+### Security headers
+
+- `proxy.ts` sets a per-request nonce CSP: `script-src 'self' 'nonce-…'
+  'strict-dynamic'` (plus `'unsafe-eval'` only in development), `style-src
+  'unsafe-inline'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`
+  plus the configured IdP origin, and `frame-ancestors 'none'`.
+- It also sets HSTS (two years, `includeSubDomains`, no `preload`), X-Frame-Options
+  `DENY`, `X-Content-Type-Options: nosniff`, Referrer-Policy
+  `strict-origin-when-cross-origin`, and Permissions-Policy for camera, microphone
+  and geolocation.
+- The root layout calls `connection()`, so pages render dynamically. Static
+  `_next` assets are outside the proxy matcher and do not receive these headers.
 
 ### 3.6 Append-only audit at the database level
 
@@ -399,7 +417,7 @@ setup, not a business action.
 
 Code: `apps/web/app/(platform)/kyc/` (issue #12). Business logic is in `kyc.ts` (tested in
 `apps/web/test/kyc.test.ts`, real Postgres); `actions.ts` wraps it with `defineAction`.
-Tables (migrations `0007_kyc`, `0008_kyc_guard`): `kyc_cases`, `kyc_documents`. Cases and
+Tables (migrations `0008_kyc`, `0009_kyc_guard`): `kyc_cases`, `kyc_documents`. Cases and
 documents are created only by the seed (`app_owner`); all of it is synthetic (`TST-` ID
 numbers, `ZZ` postcodes, documents stamped `SYNTHETIC TEST DOCUMENT`).
 
@@ -480,7 +498,7 @@ Out of A1 on purpose. Each needs its own decision.
 | **`Masked<T>` is compile-time only** | Casts/`any` bypass the brand; the backstops are REVIEW.md rule 3 and the `server-only` import | Accepted risk |
 | **Timeline doesn't apply masking** | `apps/web` audit Timeline shows `before`/`after` JSON unmasked; apply `mask` when a real sensitive record uses it | Refunds keeps the customer email and name out of every refund audit row instead (tested); fix in the Timeline when an app needs masked values in history |
 | **No `onCancelled` hook in the approvals engine** | `cancelApproval` can't update the app's record | Refunds has no cancel action and derives "cancelled" from the request; add the hook when an app lets makers cancel |
-| **Stale roles** (idle timeout, shorter TTL or back-channel logout) | Removing someone's role in the IdP takes effect only at their next login | Before production |
+| **Stale roles** (idle timeout, shorter TTL or back-channel logout) | Removing someone's role in the IdP takes effect only at their next login; idle timeout limits this for idle users, while active users retain stale roles until `SESSION_TTL_HOURS` | Active-session revocation or back-channel logout |
 | **Scheduled session cleanup** | `createSession` deletes a user's expired sessions when they sign in again; users who never come back keep one expired row (and its ID token) each | Before production |
 | **Correlation ID on audit rows** | Trace one user action across rows and logs | Later |
 | **Accessibility baseline** (keyboard, focus, labels; axe check in E2E) | Ops staff use these screens all day | Later |
@@ -512,6 +530,8 @@ Out of A1 on purpose. Each needs its own decision.
 | `OIDC_ROLES_CLAIM` | web | `roles` |
 | `OIDC_ALLOW_INSECURE_HTTP` | web | `true` locally; unset in production |
 | `SESSION_TTL_HOURS` | web | `8` |
+| `SESSION_IDLE_MINUTES` | web | `15` |
+| `UNMASK_RATE_LIMIT_PER_HOUR` | web | `20` |
 | `REFUND_APPROVAL_THRESHOLD_PENCE` | web (refunds) | `25000` (£250.00; refunds above it need approval) |
 | `KYC_RETENTION_YEARS` | web (KYC) | `5` (closed cases kept this many years; below 5 is refused) |
 | `POSTGRES_PASSWORD` | Postgres container (superuser bootstrap) | `demo-only-change-me` |

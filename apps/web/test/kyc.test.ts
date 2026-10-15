@@ -340,7 +340,7 @@ describe("rule 4: DOB, ID number and address are masked; revealing needs a reaso
   it("denies a reveal to an analyst (no pii:unmask) and writes access.denied", async () => {
     const { kase } = await newCase();
     const a = await analyst();
-    await expect(revealCaseField(a, { caseId: kase.id, field: "address", reason: "curious" })).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(revealCaseField(a, { caseId: kase.id, field: "address", reason: "Just curious about it" })).rejects.toBeInstanceOf(ForbiddenError);
     const rows = await db
       .select()
       .from(auditLog)
@@ -350,7 +350,7 @@ describe("rule 4: DOB, ID number and address are masked; revealing needs a reaso
 
   it("refuses to reveal a field that isn't masked", async () => {
     const { kase } = await newCase();
-    await expect(revealCaseField(await approver(), { caseId: kase.id, field: "ownerId" as never, reason: "x" })).rejects.toBeInstanceOf(
+    await expect(revealCaseField(await approver(), { caseId: kase.id, field: "ownerId" as never, reason: "Checking the owner field" })).rejects.toBeInstanceOf(
       ValidationError,
     );
   });
@@ -375,7 +375,7 @@ describe("rule 5: opening a document needs a reason and writes a field.unmask ro
 
   it("denies opening a document to an analyst (no pii:unmask)", async () => {
     const { doc } = await newCase();
-    await expect(openCaseDocument(await analyst(), { documentId: doc.id, reason: "check" })).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(openCaseDocument(await analyst(), { documentId: doc.id, reason: "Checking the document" })).rejects.toBeInstanceOf(ForbiddenError);
     expect(await auditFor(doc.id, "field.unmask")).toHaveLength(0);
   });
 });
@@ -439,7 +439,7 @@ describe("rule 7: the case page shows its full audit and approval history", () =
     const { kase, view } = await pendingSignOff();
     const checker = await approver();
     await openCaseDocument(checker, { documentId: view.documents[0]!.id, reason: "Verifying photo ID" });
-    await revealCaseField(checker, { caseId: kase.id, field: "dateOfBirth", reason: "Age check" });
+    await revealCaseField(checker, { caseId: kase.id, field: "dateOfBirth", reason: "Age check for onboarding" });
     await signOffCase(checker, { caseId: kase.id, decision: "approve", expectedVersion: view.approval?.version ?? 0 }, config);
     const history = await caseHistory(db, kase.id);
     const actions = history.map((h) => h.action);

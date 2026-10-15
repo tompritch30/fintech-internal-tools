@@ -54,6 +54,7 @@ export const sessions = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     /** Kept only to send as id_token_hint on logout. */
     idToken: text("id_token"),
@@ -234,7 +235,7 @@ export const kycCaseStatus = pgEnum("kyc_case_status", ["open", "in_review", "pe
  * KYC review cases (KYC app). Synthetic data only. Date of birth, ID number, address and name
  * are masked on the server (apps/web kyc module). Cases come from the seed (intake is out of scope):
  * app_runtime can SELECT and UPDATE only the workflow columns, never INSERT or DELETE
- * (0008_kyc_guard.sql). A closed case keeps a retention date and can't be deleted, even by app_owner.
+ * (0009_kyc_guard.sql). A closed case keeps a retention date and can't be deleted, even by app_owner.
  */
 export const kycCases = pgTable(
   "kyc_cases",
