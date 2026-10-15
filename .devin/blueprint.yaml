@@ -1,0 +1,26 @@
+# https://docs.devin.ai/onboard-devin/environment-yaml
+# Commands run from the repo root. Docker + Compose come with the base image.
+initialize:
+  - name: Node 24 (matches .nvmrc)
+    run: |
+      if ! node --version 2>/dev/null | grep -q '^v24\.'; then
+        curl -fsSL https://nodejs.org/dist/v24.22.0/node-v24.22.0-linux-x64.tar.xz | sudo tar -xJ -C /usr/local --strip-components=1
+      fi
+  - name: pnpm via Corepack (version from package.json packageManager)
+    run: sudo corepack enable && corepack install
+maintenance: |
+  pnpm install
+knowledge:
+  - name: startup
+    contents: |
+      Full stack: docker compose up --build (web :3000, Postgres :5432, Keycloak :8080; migrate + seed run automatically)
+      Host dev: cp .env.example .env; docker compose up -d postgres keycloak; pnpm db:migrate && pnpm db:seed; pnpm dev
+      If Docker Hub rate-limits node:24-slim: docker pull public.ecr.aws/docker/library/node:24-slim && docker tag public.ecr.aws/docker/library/node:24-slim node:24-slim
+  - name: lint
+    contents: pnpm lint && pnpm typecheck
+  - name: test
+    contents: |
+      pnpm test   # real Postgres (docker compose up -d postgres); migrates + seeds internal_tools_test itself
+      pnpm --filter @fit/web exec playwright install --with-deps chromium && pnpm test:e2e   # needs Postgres + Keycloak
+  - name: migrate
+    contents: pnpm db:migrate && pnpm db:seed   # as app_owner (DATABASE_OWNER_URL)
