@@ -37,7 +37,7 @@ export function getOidc(): Promise<Configuration> {
 
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  return getSessionUser(getDb(), token);
+  return getSessionUser(getDb(), token, getConfig().sessionIdleMinutes);
 }
 
 /** Signed-in user, or redirect to /login. */
@@ -68,7 +68,7 @@ export function sessionCookieOptions(expires: Date) {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: getConfig().appUrl.startsWith("https://"),
+    secure: true,
     path: "/",
     expires,
   };

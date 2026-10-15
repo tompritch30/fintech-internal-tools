@@ -7,11 +7,11 @@ import { requirePermission } from "../rbac/guards.ts";
 import { ForbiddenError, NotFoundError, ValidationError } from "../errors.ts";
 import type { Permission } from "../rbac/permissions.ts";
 import type { SessionUser } from "../session/session.ts";
-import { UNMASK_RATE_LIMIT } from "./rate-limit.ts";
+import { MIN_UNMASK_REASON_LENGTH } from "./reason.ts";
+import { unmaskRateLimit } from "./rate-limit.ts";
 
 export {
   DEFAULT_UNMASK_RATE_LIMIT_PER_HOUR,
-  UNMASK_RATE_LIMIT,
   unmaskRateLimit,
 } from "./rate-limit.ts";
 
@@ -114,8 +114,10 @@ export function defineMaskedEntity<T>(def: MaskedEntity<T>): MaskedEntity<T> {
 
 /**
  * Returns the raw value of one masked field. Requires the policy's unmask
- * permission and a non-empty reason; writes a `field.unmask` audit row in the
- * same transaction as the read. The value is never written to the audit row.
+ * permission and a reason of at least 10 characters; writes a `field.unmask`
+ * audit row in the same transaction as the read. The value is never written
+ * to the audit row. In production, require a ticket reference such as ABC-123
+ * when a ticket system is available.
  */
 export async function unmask<T>(
   db: Db,
@@ -134,6 +136,10 @@ export async function unmask<T>(
   );
   const reason = input.reason.trim();
   if (!reason) throw new ValidationError("unmasking requires a reason");
+  if ([...reason].length < MIN_UNMASK_REASON_LENGTH) {
+    throw new ValidationError("unmasking requires a reason of at least 10 characters");
+  }
+  const rateLimit = unmaskRateLimit();
   try {
     return await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext('unmask:' || ${actor.id}))`);
@@ -146,11 +152,11 @@ export async function unmask<T>(
             eq(auditLog.action, "field.unmask"),
             gte(
               auditLog.occurredAt,
-              sql`now() - (${UNMASK_RATE_LIMIT.windowMinutes} * interval '1 minute')`,
+              sql`now() - (${rateLimit.windowMinutes} * interval '1 minute')`,
             ),
           ),
         );
-      if ((usage?.total ?? 0) >= UNMASK_RATE_LIMIT.max) throw new UnmaskRateLimitExceeded();
+      if ((usage?.total ?? 0) >= rateLimit.max) throw new UnmaskRateLimitExceeded();
       return withAudit(
         tx,
         {

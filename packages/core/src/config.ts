@@ -25,12 +25,21 @@ function required(env: NodeJS.ProcessEnv, name: string): string {
   return value;
 }
 
+function positiveInteger(env: NodeJS.ProcessEnv, name: string, defaultValue: number): number {
+  const value = env[name];
+  if (value === undefined || value === "") return defaultValue;
+  if (!/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value))) {
+    throw new Error(`${name} must be a positive integer (see .env.example)`);
+  }
+  return Number(value);
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): CoreConfig {
   return {
     appUrl: required(env, "APP_URL").replace(/\/$/, ""),
     databaseUrl: required(env, "DATABASE_URL"),
     sessionTtlHours: Number(env.SESSION_TTL_HOURS ?? "8"),
-    sessionIdleMinutes: Number(env.SESSION_IDLE_MINUTES ?? "15"),
+    sessionIdleMinutes: positiveInteger(env, "SESSION_IDLE_MINUTES", 15),
     unmaskRateLimitPerHour: unmaskRateLimit(env).max,
     oidc: {
       issuer: required(env, "OIDC_ISSUER"),

@@ -77,9 +77,22 @@ export async function createSession(
 export async function getSessionUser(
   db: Db,
   token: string | undefined | null,
-  _idleMinutes: number,
+  idleMinutes: number,
 ): Promise<SessionUser | null> {
   if (!token) return null;
+  const [session] = await db
+    .update(sessions)
+    .set({ lastSeenAt: sql`now()` })
+    .where(
+      and(
+        eq(sessions.id, hashToken(token)),
+        gt(sessions.expiresAt, sql`now()`),
+        gt(sessions.lastSeenAt, sql`now() - (${idleMinutes} * interval '1 minute')`),
+      ),
+    )
+    .returning({ userId: sessions.userId });
+  if (!session) return null;
+
   const rows = await db
     .select({
       id: users.id,
@@ -92,7 +105,7 @@ export async function getSessionUser(
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
     .leftJoin(userRoles, eq(userRoles.userId, users.id))
-    .where(and(eq(sessions.id, hashToken(token)), gt(sessions.expiresAt, sql`now()`)));
+    .where(eq(users.id, session.userId));
   const first = rows[0];
   if (!first) return null;
   const roles = rows.map((r) => r.role).filter((r): r is string => r !== null);
