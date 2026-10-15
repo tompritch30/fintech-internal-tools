@@ -2,12 +2,12 @@ import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MIN_UNMASK_REASON_LENGTH } from "@fit/core";
-import { ActionDialog, ActionPanel, Input, RecordHeader, RecordSection, RevealButton, StatusBadge, Table, linkClass, type Column } from "@fit/ui";
+import { ActionDialog, ActionPanel, Input, RecordHeader, RecordSection, RevealButton, StatusBadge, Table, Timeline, linkClass, type Column } from "@fit/ui";
 import { getDb, requirePagePermission } from "../../../../../lib/auth.ts";
 import { requestRefundAction, revealEmailAction, revealNameAction } from "../../actions.ts";
 import { formatPence, formatWhen, statusOf } from "../../format.ts";
 import { paymentActions } from "../../record-actions.ts";
-import { getPaymentView, listRefundsForPayment, loadRefundConfig, type RefundView } from "../../refunds.ts";
+import { getPaymentView, listRefundsForPayment, loadRefundConfig, paymentHistory, type RefundView } from "../../refunds.ts";
 
 const refundColumns: Column<RefundView>[] = [
   {
@@ -32,7 +32,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ paymen
   const db = getDb();
   const payment = await getPaymentView(db, paymentId);
   if (!payment) notFound();
-  const refunds = await listRefundsForPayment(db, payment.id);
+  const [refunds, history] = await Promise.all([listRefundsForPayment(db, payment.id), paymentHistory(db, payment.id)]);
   const { approvalThresholdPence } = loadRefundConfig();
   const { actions, waiting } = paymentActions(user, payment);
   const canReveal = user.permissions.has("pii:unmask");
@@ -90,6 +90,17 @@ export default async function PaymentPage({ params }: { params: Promise<{ paymen
         ) : (
           <Table caption="Refunds on this payment" columns={refundColumns} rows={refunds} rowKey={(r) => r.id} />
         )}
+      </RecordSection>
+      <RecordSection title="History">
+        <Timeline
+          items={history.map((h) => ({
+            id: h.id,
+            occurredAt: h.occurredAt,
+            actor: h.actor ?? "card system",
+            action: h.action,
+            reason: h.reason,
+          }))}
+        />
       </RecordSection>
     </div>
   );
