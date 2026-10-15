@@ -28,7 +28,7 @@ const db = appDb();
 const authDb = createDb(TEST_DATABASE_URL, { max: 1 });
 afterAll(() => authDb.$client.end());
 
-const prefetchHeaders = [
+const prefetchHeaders: Record<string, string>[] = [
   { "sec-purpose": "prefetch" },
   { purpose: "prefetch" },
   { "next-router-prefetch": "1" },
