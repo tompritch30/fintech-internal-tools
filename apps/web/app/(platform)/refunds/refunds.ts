@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import {
   ConflictError,
@@ -345,6 +345,7 @@ interface RefundPayload {
 
 /** Thrown inside a transaction to roll it back when the same refund id was already submitted. */
 class AlreadySubmitted extends Error {}
+class DirectRefundThresholdExceeded extends Error {}
 
 const actorRef = (ctx: ActionContext) => ({ id: ctx.user.id, subject: ctx.user.subject });
 
@@ -507,10 +508,37 @@ export async function requestRefund(
         onRequested: (tx, request) => insertRefund(tx, ctx, input, request.id),
       }, { subjectId: input.refundId, payload: { paymentId: input.paymentId, amountPence: input.amountPence } });
     } else {
-      await ctx.db.transaction(async (tx) => {
-        await insertRefund(tx, ctx, input, null);
-        await executeRefund(tx, ctx, input.refundId);
-      });
+      try {
+        await ctx.db.transaction(async (tx) => {
+          const payment = await lockPayment(tx, input.paymentId);
+          const [direct] = await tx
+            .select({ amount: sql<number>`coalesce(sum(${refunds.amountPence}), 0)::int` })
+            .from(refunds)
+            .where(
+              and(
+                eq(refunds.paymentId, payment.id),
+                eq(refunds.requiresApproval, false),
+                inArray(refunds.status, ["pending", "succeeded"]),
+              ),
+            );
+          if ((direct?.amount ?? 0) + input.amountPence > config.approvalThresholdPence) {
+            throw new DirectRefundThresholdExceeded();
+          }
+          await insertRefund(tx, ctx, input, null);
+          await executeRefund(tx, ctx, input.refundId);
+        });
+      } catch (err) {
+        if (!(err instanceof DirectRefundThresholdExceeded)) throw err;
+        await requestApproval(
+          ctx.db,
+          ctx.user,
+          {
+            ...refundApproval,
+            onRequested: (tx, request) => insertRefund(tx, ctx, input, request.id),
+          },
+          { subjectId: input.refundId, payload: { paymentId: input.paymentId, amountPence: input.amountPence } },
+        );
+      }
     }
   } catch (err) {
     if (!(err instanceof AlreadySubmitted)) throw err;

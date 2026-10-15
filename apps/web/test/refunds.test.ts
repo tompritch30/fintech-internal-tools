@@ -218,6 +218,67 @@ describe("rule 2: refunds over the threshold need a different approver", () => {
   });
 });
 
+describe("rule 2b: refunds that skip approval can't be split past the threshold", () => {
+  it("routes a second £200 refund to approval after a £200 direct refund", async () => {
+    const payment = await newPayment(100_000);
+    const maker = await analyst();
+    const first = await requestRefund(maker, refundInput(payment.id, 20_000), config);
+    expect(first.status).toBe("succeeded");
+    expect(first.requiresApproval).toBe(false);
+
+    const second = await requestRefund(maker, refundInput(payment.id, 20_000), config);
+    expect(second.status).toBe("pending_approval");
+    expect(second.requiresApproval).toBe(true);
+    expect(await providerRows(first.id)).toHaveLength(1);
+    expect(await providerRows(second.id)).toHaveLength(0);
+  });
+
+  it("allows direct refunds whose total is exactly the threshold", async () => {
+    const payment = await newPayment(100_000);
+    const maker = await analyst();
+    const first = await requestRefund(maker, refundInput(payment.id, 20_000), config);
+    const second = await requestRefund(maker, refundInput(payment.id, 5_000), config);
+
+    expect(first.status).toBe("succeeded");
+    expect(first.requiresApproval).toBe(false);
+    expect(second.status).toBe("succeeded");
+    expect(second.requiresApproval).toBe(false);
+    expect(await providerRows(first.id)).toHaveLength(1);
+    expect(await providerRows(second.id)).toHaveLength(1);
+  });
+
+  it("tracks the direct-refund threshold separately for each payment", async () => {
+    const paymentA = await newPayment(100_000);
+    const paymentB = await newPayment(100_000);
+    const maker = await analyst();
+    const first = await requestRefund(maker, refundInput(paymentA.id, 20_000), config);
+    const second = await requestRefund(maker, refundInput(paymentB.id, 20_000), config);
+
+    expect(first.status).toBe("succeeded");
+    expect(first.requiresApproval).toBe(false);
+    expect(second.status).toBe("succeeded");
+    expect(second.requiresApproval).toBe(false);
+    expect(await providerRows(first.id)).toHaveLength(1);
+    expect(await providerRows(second.id)).toHaveLength(1);
+  });
+
+  it("serializes concurrent direct refunds at the threshold", async () => {
+    const payment = await newPayment(100_000);
+    const maker = await analyst();
+    const results = await Promise.all([
+      requestRefund(maker, refundInput(payment.id, 20_000), config),
+      requestRefund(maker, refundInput(payment.id, 20_000), config),
+    ]);
+    const direct = results.filter((refund) => refund.status === "succeeded" && !refund.requiresApproval);
+    const pending = results.filter((refund) => refund.status === "pending_approval" && refund.requiresApproval);
+
+    expect(direct).toHaveLength(1);
+    expect(pending).toHaveLength(1);
+    expect(await providerRows(direct[0]!.id)).toHaveLength(1);
+    expect(await providerRows(pending[0]!.id)).toHaveLength(0);
+  });
+});
+
 describe("rule 3: card numbers are never stored; the email is masked", () => {
   it("payments store only the card's last four digits", async () => {
     const cols = await db.execute<{ column_name: string }>(
@@ -479,4 +540,3 @@ describe("rule 6: approvers get a queue, and every refund shows its history", ()
     expect((await refundHistory(db, refund.id)).map((h) => h.action)).toEqual(["refund.succeeded", "refund.requested"]);
   });
 });
-
