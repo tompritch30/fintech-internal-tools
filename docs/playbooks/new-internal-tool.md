@@ -40,9 +40,9 @@ they win. Fix the playbook in a PR. Refunds is the reference app: copy its layou
   mutating-data, forms, error-handling) before writing routes.
 - The existing pattern: `app/(platform)/demo-record/`, `lib/auth.ts`, `lib/action.ts`.
 
-### 2. Send the plan with risks before building
-Thomas asks for this. Send one message listing each risk, the default you'll use and
-the decision needed. From refunds, the questions that will come up again:
+### 2. Post the plan in the PR and proceed
+Don't wait for an answer. Put each risk, the default chosen and why in the PR
+description, then build. From refunds, the questions that will come up again:
 - **Permissions come from the registry.** Add `<app>:read` (every role that opens the
   pages), `<app>:request` (maker) and `<app>:approve` (checker) to `PERMISSION_REGISTRY`
   in `packages/core/src/rbac/permissions.ts`, and update the core test that pins
@@ -138,6 +138,6 @@ screenshots in the PR body, and attach the recording when you report back.
 - Merging a PR that adds a migration or changes core, a playbook, `AGENTS.md` or
   `.devin/blueprint.yaml`.
 - Changing `packages/core` beyond the app's registry entries without raising it in the
-  plan. Engine changes (new hooks, styles) need a test and a line in the PR's summary.
+  PR plan. Engine changes (new hooks, styles) need a test and a line in the PR's summary.
 - Real PII, real secrets, or committing `.env`.
 - Mocking the database, snapshot tests, or more than 2 E2E tests per app.

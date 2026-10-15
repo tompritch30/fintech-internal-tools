@@ -70,7 +70,7 @@ export function RevealField({ paymentId, field }: { paymentId: string; field: ke
   return (
     <form action={action} className={formClass} aria-label={`Reveal customer ${label}`}>
       <input type="hidden" name="paymentId" value={paymentId} />
-      <Input id={`reveal-${field}-reason`} name="reason" label={`Reason for revealing the ${label}`} required maxLength={500} className="w-72" />
+      <Input id={`reveal-${field}-reason`} name="reason" label={`Reason for revealing the ${label}`} required minLength={10} maxLength={500} className="w-72" />
       <Button type="submit" disabled={pending}>
         Reveal {label}
       </Button>

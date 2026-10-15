@@ -330,8 +330,8 @@ describe("rule 3: card numbers are never stored; the email is masked", () => {
   it("an analyst can't reveal the email or the name", async () => {
     const payment = await newPayment(5_000);
     const maker = await analyst();
-    await expect(revealCustomerEmail(maker, { paymentId: payment.id, reason: "Curious" })).rejects.toBeInstanceOf(ForbiddenError);
-    await expect(revealCustomerName(maker, { paymentId: payment.id, reason: "Curious" })).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(revealCustomerEmail(maker, { paymentId: payment.id, reason: "Curious about customer" })).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(revealCustomerName(maker, { paymentId: payment.id, reason: "Curious about customer" })).rejects.toBeInstanceOf(ForbiddenError);
     expect(await auditFor(payment.id, "field.unmask")).toHaveLength(0);
   });
 
