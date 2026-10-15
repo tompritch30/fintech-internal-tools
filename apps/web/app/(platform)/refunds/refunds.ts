@@ -162,6 +162,7 @@ const PAYMENT_SORTS = {
   merchant: payments.merchant,
   amountPence: payments.amountPence,
   capturedAt: payments.capturedAt,
+  availablePence: sql`${payments.amountPence} - ${payments.refundedPence} - ${pendingPence}`,
 } as const;
 
 const page = (q: ListQueryInput) => {
