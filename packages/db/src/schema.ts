@@ -3,6 +3,7 @@ import {
   bigint,
   boolean,
   check,
+  date,
   index,
   integer,
   jsonb,
@@ -222,9 +223,86 @@ export const mockProviderRefunds = pgTable("mock_provider_refunds", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const kycRiskRating = pgEnum("kyc_risk_rating", ["low", "medium", "high"]);
+
+/**
+ * open → in_review (claimed) → approved | rejected (closed), or → escalated (back in the queue, unowned).
+ * High-risk approvals go in_review → pending_approval → approved (signed off) or back to in_review (refused).
+ */
+export const kycCaseStatus = pgEnum("kyc_case_status", ["open", "in_review", "pending_approval", "escalated", "approved", "rejected"]);
+
+/**
+ * KYC review cases (KYC app). Synthetic data only. Date of birth, ID number, address and name
+ * are masked on the server (apps/web kyc module). Cases come from the seed (intake is out of scope):
+ * app_runtime can SELECT and UPDATE only the workflow columns, never INSERT or DELETE
+ * (0009_kyc_guard.sql). A closed case keeps a retention date and can't be deleted, even by app_owner.
+ */
+export const kycCases = pgTable(
+  "kyc_cases",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Human-facing case reference, e.g. KYC-200001. */
+    reference: text("reference").notNull().unique(),
+    applicantName: text("applicant_name").notNull(),
+    dateOfBirth: date("date_of_birth", { mode: "string" }).notNull(),
+    idNumber: text("id_number").notNull(),
+    address: text("address").notNull(),
+    /** ISO 3166-1 alpha-2 country code. Not masked. */
+    nationality: text("nationality").notNull(),
+    riskRating: kycRiskRating("risk_rating").notNull(),
+    sanctionsHit: boolean("sanctions_hit").notNull().default(false),
+    pep: boolean("pep").notNull().default(false),
+    status: kycCaseStatus("status").notNull().default("open"),
+    /** The analyst who claimed the case. Only they can decide it. Null while open or escalated. */
+    ownerId: uuid("owner_id").references(() => users.id),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    /** Note from the latest decision or escalation (the full trail is in audit_log). */
+    decisionNote: text("decision_note"),
+    openedAt: timestamp("opened_at", { withTimezone: true }).notNull().defaultNow(),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    /** closed_at + KYC_RETENTION_YEARS. Set once, when the case closes. */
+    retentionUntil: timestamp("retention_until", { withTimezone: true }),
+  },
+  (t) => [
+    index("kyc_cases_status_idx").on(t.status),
+    index("kyc_cases_owner_id_idx").on(t.ownerId),
+    check("kyc_cases_owner_matches_status", sql`(${t.status} in ('open', 'escalated')) = (${t.ownerId} is null)`),
+    check("kyc_cases_claimed_at_with_owner", sql`(${t.ownerId} is null) = (${t.claimedAt} is null)`),
+    check(
+      "kyc_cases_closed_has_retention",
+      sql`(${t.status} in ('approved', 'rejected')) = (${t.closedAt} is not null and ${t.retentionUntil} is not null)`,
+    ),
+    check("kyc_cases_retention_at_least_5_years", sql`${t.retentionUntil} is null or ${t.retentionUntil} >= ${t.closedAt} + interval '5 years'`),
+    check("kyc_cases_rejection_has_note", sql`${t.status} <> 'rejected' or length(btrim(coalesce(${t.decisionNote}, ''))) > 0`),
+    check("kyc_cases_nationality_code", sql`${t.nationality} ~ '^[A-Z]{2}$'`),
+  ],
+);
+
+/** Synthetic identity documents attached to a case. Read-only for app_runtime; opening one is audited. */
+export const kycDocuments = pgTable(
+  "kyc_documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => kycCases.id),
+    kind: text("kind").notNull(),
+    fileName: text("file_name").notNull(),
+    /** The document's (synthetic) text. Masked in full; opening it needs a reason. */
+    content: text("content").notNull(),
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("kyc_documents_case_id_idx").on(t.caseId),
+    check("kyc_documents_kind", sql`${t.kind} in ('passport', 'driving_licence', 'utility_bill', 'bank_statement')`),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type AuditLogRow = typeof auditLog.$inferSelect;
 export type NewAuditLogRow = typeof auditLog.$inferInsert;
 export type ApprovalRequestRow = typeof approvalRequests.$inferSelect;
 export type PaymentRow = typeof payments.$inferSelect;
 export type RefundRow = typeof refunds.$inferSelect;
+export type KycCaseRow = typeof kycCases.$inferSelect;
+export type KycDocumentRow = typeof kycDocuments.$inferSelect;

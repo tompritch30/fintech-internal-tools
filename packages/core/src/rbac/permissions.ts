@@ -52,6 +52,9 @@ export const PERMISSION_REGISTRY = definePermissionRegistry({
   "refunds:read": { description: "View payments and refunds", roles: ["analyst", "approver"] },
   "refunds:request": { description: "Request a refund on a payment", roles: ["analyst"] },
   "refunds:approve": { description: "Approve or reject a refund over the approval threshold", roles: ["approver"] },
+  "kyc:read": { description: "View the KYC review queue and cases (masked)", roles: ["analyst", "approver"] },
+  "kyc:request": { description: "Claim a KYC case and approve, reject or escalate it", roles: ["analyst"] },
+  "kyc:approve": { description: "Give the four-eyes sign-off on a high-risk KYC approval", roles: ["approver"] },
 });
 
 export const PERMISSIONS = Object.keys(PERMISSION_REGISTRY) as readonly (keyof typeof PERMISSION_REGISTRY)[];

@@ -64,8 +64,8 @@ describe("definePermissionRegistry", () => {
 describe("permission registry", () => {
   it("ROLE_PERMISSIONS matches the registry's grants", () => {
     const sorted = (p: readonly string[]) => [...p].sort();
-    expect(sorted(ROLE_PERMISSIONS.analyst)).toEqual(sorted(["platform:access", "approvals:request", "refunds:read", "refunds:request"]));
-    expect(sorted(ROLE_PERMISSIONS.approver)).toEqual(sorted(["platform:access", "approvals:decide", "pii:unmask", "refunds:read", "refunds:approve"]));
+    expect(sorted(ROLE_PERMISSIONS.analyst)).toEqual(sorted(["platform:access", "approvals:request", "refunds:read", "refunds:request", "kyc:read", "kyc:request"]));
+    expect(sorted(ROLE_PERMISSIONS.approver)).toEqual(sorted(["platform:access", "approvals:decide", "pii:unmask", "refunds:read", "refunds:approve", "kyc:read", "kyc:approve"]));
     expect(sorted(ROLE_PERMISSIONS.admin)).toEqual(sorted(["platform:access", "audit:read"]));
   });
 
