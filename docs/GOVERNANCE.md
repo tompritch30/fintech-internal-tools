@@ -23,24 +23,39 @@ from the live ruleset with a read-only `GET /repos/{owner}/{repo}/rulesets/{id}`
 | Extra approval for unattributed changes | `require_extra_approval_for_unattributed_changes: true` | GitHub's default for new rulesets; kept as is |
 | Squash merges only | `allowed_merge_methods: ["squash"]` | One commit per PR on `main` |
 | Required checks | `required_status_checks`: `verify`, `e2e` (GitHub Actions) | Shown in the PR as `CI / verify` and `CI / e2e` |
-| Branch up to date before merge: **off** | `strict_required_status_checks_policy: false` | A PR doesn't have to be rebased on the latest `main` before it can merge. The merge queue tests it against the latest `main` instead (next row and §1.1) |
-| Merge queue | `merge_queue` | PRs merge through the queue. GitHub builds a temporary branch of the latest `main` plus the queued PRs, and `verify` and `e2e` must pass on it before `main` moves. CI runs on `merge_group` events for this |
+| Branch up to date before merge: **off** | `strict_required_status_checks_policy: false` | A PR doesn't have to be rebased on the latest `main` before it can merge. Its checks may have run against an older `main` (accepted risk, §1.1) |
 | Bypass | none listed | Nobody bypasses the ruleset |
 
-### 1.1 Why the merge queue, and strict up-to-date off
+### 1.1 Strict up-to-date off; merge queue planned, not yet enabled
 
-Stale-approval dismissal and strict up-to-date don't work well together. When one PR
-merged, every other open PR fell behind `main`, so it had to be updated. That update
-was a push, which dismissed its approval, so the code owner had to approve it again.
-With several code-owned PRs open, each merge set off another round of re-approvals.
-The merge queue does the job strict up-to-date did (no PR lands without its checks
-passing against the latest `main`), and it does it on the queue's own branch, without
-pushing to the PR. So strict up-to-date is off, and stale-approval dismissal stays on.
+**Why strict is off.** Stale-approval dismissal and strict up-to-date don't work well
+together. When one PR merged, every other open PR fell behind `main`, so it had to be
+updated. That update was a push, which dismissed its approval, so the code owner had to
+approve it again. With several code-owned PRs open, each merge set off another round of
+re-approvals. Stale-approval dismissal stays on.
 
-To merge: add the PR to the queue with **Merge when ready**, or `gh pr merge <n>`. With
-a required queue, gh needs no merge method: it queues the PR, or turns on auto-merge if
-checks haven't passed yet. A PR that fails in the queue is removed, and `main` doesn't
-change. Nobody uses `--admin` to skip the queue.
+**Accepted risk (proof of concept).** With strict off and no merge queue, a PR can
+merge on `verify`/`e2e` results from an older `main`. Two PRs that each pass alone can
+break `main` together. The next push to `main` runs CI, which shows the break, but only
+after it has landed. This is accepted for the proof of concept. Before production, turn
+on the merge queue.
+
+**Planned next step: merge queue.** Not yet enabled in GitHub, so the ruleset has no
+`merge_queue` rule. With the queue, GitHub builds a temporary branch of the latest
+`main` plus the queued PRs, and `verify` and `e2e` must pass on it before `main` moves.
+That brings back the guarantee strict gave, without pushing to the PR, so approvals
+survive. CI already runs on `merge_group` events, so the checks will report once the
+queue is on. GitHub only offers merge queues on
+[public repos owned by an organization, or private ones in an organization on
+Enterprise Cloud](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue).
+This repo is owned by the personal account `tompritch30`, so it has to move to an
+organization first. To enable it, a repo admin:
+1. Adds a `merge_queue` rule to the live `protect-main` ruleset (merge method: squash,
+   to match `allowed_merge_methods`).
+2. Exports the ruleset again with a read-only `GET` and commits the result to
+   `.github/rulesets/main.json`.
+3. Afterwards, merges by queueing: **Merge when ready**, or `gh pr merge <n>`. With a
+   queue, gh needs no merge method. Nobody uses `--admin` to skip the queue.
 
 Repo-level merge settings still allow merge commits and rebase merges; the ruleset
 overrides them for `main`.
