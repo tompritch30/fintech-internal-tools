@@ -19,10 +19,11 @@ they win. Fix the playbook in a PR. Refunds is the reference app: copy its layou
 
 ### 0. Set up (about 5 minutes)
 1. `source ~/.nvm/nvm.sh && nvm use 24 && corepack enable && pnpm install`.
-2. `cp .env.example .env && docker compose up -d --wait postgres keycloak`.
-3. Export the env into the shell (the scripts read `process.env`; nothing loads `.env`
-   for them): `set -a && . ./.env && set +a`. Repeat this in every new shell.
-   Then `pnpm db:migrate && pnpm db:seed`, and confirm the baseline is green:
+2. `cp .env.example .env && set -a && . ./.env && set +a`. The export matters: the
+   scripts read `process.env` (e.g. `DATABASE_OWNER_URL` for migrations) and nothing
+   loads `.env` for them. Repeat `set -a && . ./.env && set +a` in every new shell.
+3. `docker compose up -d --wait postgres keycloak && pnpm db:migrate && pnpm db:seed`,
+   then confirm the baseline is green:
    `pnpm lint && pnpm typecheck && pnpm test`.
 4. `pnpm --filter @fit/web exec playwright install --with-deps chromium` (the browsers
    are not in the snapshot), then `pnpm test:e2e`.
