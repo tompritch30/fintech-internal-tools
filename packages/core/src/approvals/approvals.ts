@@ -33,6 +33,8 @@ export interface ApprovalKind<P = unknown> {
   onRequested?: (tx: Tx, request: ApprovalRequest<P>) => Promise<void>;
   /** Runs in the approval's transaction: apply the effect so "approved" + effect commit together. */
   onApproved?: (tx: Tx, request: ApprovalRequest<P>) => Promise<void>;
+  /** Runs in the rejection's transaction: apply the effect so "rejected" + effect commit together. */
+  onRejected?: (tx: Tx, request: ApprovalRequest<P>) => Promise<void>;
 }
 
 type NonJson =
@@ -219,6 +221,7 @@ export async function decideApproval<P>(
       }
       const request = toRequest<P>(updated);
       if (status === "approved") await kind.onApproved?.(tx, request);
+      else await kind.onRejected?.(tx, request);
       return request;
     },
   );
