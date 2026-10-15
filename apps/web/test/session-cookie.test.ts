@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { SESSION_COOKIE } from "@fit/core/cookie";
 import { appDb, makeUser } from "../../../packages/core/test/helpers/db.ts";
 import { TEST_DATABASE_URL } from "../../../packages/core/test/helpers/env.ts";
@@ -46,8 +46,6 @@ beforeAll(async () => {
   ({ sessionCookieOptions } = await import("../lib/auth.ts"));
   ({ POST: logout } = await import("../app/auth/logout/route.ts"));
 });
-
-afterAll(async () => db.$client.end());
 
 describe("session cookie hardening", () => {
   it("uses a secure __Host- cookie with root path and no domain on localhost", () => {
