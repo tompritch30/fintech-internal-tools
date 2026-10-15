@@ -52,6 +52,12 @@ export const PERMISSION_REGISTRY = definePermissionRegistry({
   "refunds:read": { description: "View payments and refunds", roles: ["analyst", "approver"] },
   "refunds:request": { description: "Request a refund on a payment", roles: ["analyst"] },
   "refunds:approve": { description: "Approve or reject a refund over the approval threshold", roles: ["approver"] },
+  "flags:read": { description: "View feature flags and their history", roles: ["analyst", "approver"] },
+  "flags:request": {
+    description: "Change dev and staging flag values, request prod changes and use the prod kill switch",
+    roles: ["analyst"],
+  },
+  "flags:approve": { description: "Approve or reject a prod feature flag change", roles: ["approver"] },
 });
 
 export const PERMISSIONS = Object.keys(PERMISSION_REGISTRY) as readonly (keyof typeof PERMISSION_REGISTRY)[];
