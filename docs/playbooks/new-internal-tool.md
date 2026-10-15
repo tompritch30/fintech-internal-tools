@@ -19,7 +19,9 @@ they win. Fix the playbook in a PR.
 ### 0. Set up (about 5 minutes)
 1. `source ~/.nvm/nvm.sh && nvm use 24 && corepack enable && pnpm install`.
 2. `cp .env.example .env && docker compose up -d --wait postgres keycloak`.
-3. `pnpm db:migrate && pnpm db:seed`. Then confirm the baseline is green:
+3. Export the env into the shell (the scripts read `process.env`; nothing loads `.env`
+   for them): `set -a && . ./.env && set +a`. Repeat this in every new shell.
+   Then `pnpm db:migrate && pnpm db:seed`, and confirm the baseline is green:
    `pnpm lint && pnpm typecheck && pnpm test`.
 4. `pnpm --filter @fit/web exec playwright install --with-deps chromium` (the browsers
    are not in the snapshot), then `pnpm test:e2e`.
