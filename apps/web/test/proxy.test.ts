@@ -20,6 +20,14 @@ describe("proxy route gating", () => {
     expect(res.headers.get("x-middleware-next")).toBe("1");
   });
 
+  it("lets services reach the flags endpoint without a session; the route checks its own token", () => {
+    expect(proxy(request("/api/flags?environment=prod")).headers.get("location")).toBeNull();
+    // control: everything else is still gated
+    for (const path of ["/api/flagsx", "/api/other", "/flags"]) {
+      expect(proxy(request(path)).headers.get("location"), path).toBe("http://localhost:3000/login");
+    }
+  });
+
   it("does not gate the login page or auth routes", () => {
     for (const path of ["/login", "/auth/login", "/auth/callback?code=x"]) {
       expect(proxy(request(path)).headers.get("location")).toBeNull();
