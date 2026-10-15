@@ -38,7 +38,7 @@ formal assessment.
 Fix PRs (red test first, then fix):
 
 1. [PR #17](https://github.com/tompritch30/fintech-internal-tools/pull/17): unmask rate limit — `packages/core`, needs Thomas's approval.
-2. [PR #18](https://github.com/tompritch30/fintech-internal-tools/pull/18): refund split threshold — refunds app, stacked on PR #10's branch.
+2. [PR #18](https://github.com/tompritch30/fintech-internal-tools/pull/18): refund split threshold — refunds app, merged into PR #10's branch, which is now on main.
 3. [PR #19](https://github.com/tompritch30/fintech-internal-tools/pull/19): audit denied prefetch-header requests — `apps/web`. It reverses an A1 decision, so it is held for Thomas.
 
 ## Findings

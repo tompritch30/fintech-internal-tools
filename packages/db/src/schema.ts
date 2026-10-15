@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  boolean,
   check,
   index,
   integer,
@@ -10,6 +11,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -131,7 +133,97 @@ export const approvalRequests = pgTable(
   ],
 );
 
+/**
+ * Card payments that can be refunded (refunds app). Dummy data only.
+ * Card numbers are never stored: only the brand and last four digits (card_last4 CHECK).
+ * customer_email is masked on the server (apps/web refunds module).
+ * app_runtime can SELECT and UPDATE only refunded_pence (0005_refunds_guard.sql).
+ */
+export const payments = pgTable(
+  "payments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Human-facing payment reference, e.g. PAY-100001. */
+    reference: text("reference").notNull().unique(),
+    customerName: text("customer_name").notNull(),
+    customerEmail: text("customer_email").notNull(),
+    merchant: text("merchant").notNull(),
+    cardBrand: text("card_brand").notNull(),
+    cardLast4: text("card_last4").notNull(),
+    amountPence: integer("amount_pence").notNull(),
+    /** Sum of succeeded refunds. Never above amount_pence (payments_refund_within_amount). */
+    refundedPence: integer("refunded_pence").notNull().default(0),
+    currency: text("currency").notNull().default("GBP"),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    check("payments_card_last4_only", sql`${t.cardLast4} ~ '^[0-9]{4}$'`),
+    check("payments_amount_positive", sql`${t.amountPence} > 0`),
+    check("payments_refund_within_amount", sql`${t.refundedPence} >= 0 and ${t.refundedPence} <= ${t.amountPence}`),
+    check("payments_currency_gbp", sql`${t.currency} = 'GBP'`),
+    index("payments_captured_at_idx").on(t.capturedAt),
+  ],
+);
+
+/**
+ * Stored refund state. 'rejected' / 'cancelled' are not stored here: they come from the
+ * linked approval request, so there is one source of truth for the decision.
+ */
+export const refundStatus = pgEnum("refund_status", ["pending", "succeeded", "rejected"]);
+
+/**
+ * One refund against a payment. The id is generated when the request form is rendered and
+ * doubles as the idempotency key, so a double-submitted form creates one refund.
+ * A trigger (0005_refunds_guard.sql) makes content immutable and status one-way.
+ */
+export const refunds = pgTable(
+  "refunds",
+  {
+    id: uuid("id").primaryKey(),
+    paymentId: uuid("payment_id")
+      .notNull()
+      .references(() => payments.id),
+    amountPence: integer("amount_pence").notNull(),
+    reason: text("reason").notNull(),
+    status: refundStatus("status").notNull().default("pending"),
+    requiresApproval: boolean("requires_approval").notNull(),
+    approvalRequestId: uuid("approval_request_id").references(() => approvalRequests.id),
+    requestedBy: uuid("requested_by")
+      .notNull()
+      .references(() => users.id),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+    /** The mock provider's refund id, set when money moves. */
+    providerRefundId: text("provider_refund_id"),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("refunds_payment_id_idx").on(t.paymentId),
+    uniqueIndex("refunds_approval_request_id_idx").on(t.approvalRequestId),
+    check("refunds_amount_positive", sql`${t.amountPence} > 0`),
+    check("refunds_reason_present", sql`length(btrim(${t.reason})) > 0`),
+    check("refunds_approval_link", sql`${t.requiresApproval} = (${t.approvalRequestId} is not null)`),
+    check(
+      "refunds_succeeded_has_provider_ref",
+      sql`(${t.status} = 'succeeded') = (${t.providerRefundId} is not null and ${t.processedAt} is not null)`,
+    ),
+  ],
+);
+
+/**
+ * The mock payment provider's own ledger: one row per refund it has paid out.
+ * unique(refund_id) is the provider-side idempotency key, so a refund can move money once.
+ */
+export const mockProviderRefunds = pgTable("mock_provider_refunds", {
+  id: text("id").primaryKey(),
+  refundId: uuid("refund_id").notNull().unique(),
+  paymentReference: text("payment_reference").notNull(),
+  amountPence: integer("amount_pence").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type User = typeof users.$inferSelect;
 export type AuditLogRow = typeof auditLog.$inferSelect;
 export type NewAuditLogRow = typeof auditLog.$inferInsert;
 export type ApprovalRequestRow = typeof approvalRequests.$inferSelect;
+export type PaymentRow = typeof payments.$inferSelect;
+export type RefundRow = typeof refunds.$inferSelect;
