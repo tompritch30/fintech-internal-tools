@@ -19,6 +19,20 @@ describe("approval payload types", () => {
         requestPermission: "approvals:request",
         approvePermission: "approvals:decide",
       });
+      // @ts-expect-error one non-JSON property makes the whole payload unsafe
+      defineApprovalKind<{ amount: number; at: Date }>({
+        kind: "t.mixed",
+        subjectType: "t",
+        requestPermission: "approvals:request",
+        approvePermission: "approvals:decide",
+      });
+      // @ts-expect-error a non-JSON element nested in an array is still unsafe
+      defineApprovalKind<{ lines: { sku: string; at: Date }[] }>({
+        kind: "t.nested",
+        subjectType: "t",
+        requestPermission: "approvals:request",
+        approvePermission: "approvals:decide",
+      });
     };
     expect(compileCheck).toBeTypeOf("function");
   });
