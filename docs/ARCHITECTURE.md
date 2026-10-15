@@ -219,8 +219,14 @@ Built in A2 (`packages/core/src/masking/masking.ts`, exported as `@fit/core/mask
   (This closes the Dataverse gap in research Q3, where system administrators bypass
   column security.)
 - `mask(record, policies)` is a pure function: it takes no actor or role, returns a
-  shallow-copied `Masked<T>` and never mutates the input. Mask formats (bullet is
-  U+2022; `full` is always 8 bullets so length doesn't leak):
+  shallow-copied `Masked<T>` and never mutates the input. It **fails closed on nested
+  values**: an object or array field (or `unknown`) that isn't itself a policy field
+  is a compile-time error and a runtime `ValidationError`. This was chosen over
+  dot-path policies deliberately — a new nested field can't leak by default. `Date`
+  fields are allowed (they serialize as ISO strings); mask nested records separately
+  and combine the results. `Masked<T>` preserves `null` and `undefined` on masked
+  fields. Mask formats (bullet is U+2022; `full` is always 8 bullets so length
+  doesn't leak):
   - `last4`: length ≥ 8 → `"••••" + last 4`, else `"••••••••"`
   - `full`: `"••••••••"` always
   - `email`: local part ≥ 2 chars → `"a•••@domain"`; local part of 1 char →
@@ -322,6 +328,12 @@ trigger rejects inserts that don't start `pending`/v1, updates to non-pending ro
 (`already %`), and changes to id/kind/subject/payload/requester/requested_at
 (`content is immutable`). `app_runtime` has `SELECT, INSERT, UPDATE` only — no DELETE.
 
+Payloads must be JSON-safe (dates as ISO strings, money as integer minor units or a
+string): the `JsonPayload<P>` constraint refuses types JSON can't round-trip at
+compile time on `defineApprovalKind`/`requestApproval`, and `requestApproval`
+re-checks the runtime value with `isJsonSafe` before any DB access — a
+`ValidationError`, no row, no audit row.
+
 ### 4.3 Field masking
 
 Interface (`@fit/core/masking`):
@@ -336,6 +348,13 @@ unmask<T>(db, actor, entity, { entityId, field, reason }): Promise<string | null
 
 `unmask` takes the `MaskedEntity` definition (not raw entityType/field strings) so the
 permission and the row load come from the declared policy.
+
+`mask` additionally refuses records containing unpoliced nested objects, arrays or
+`unknown` fields — at compile time (`NestedKeys<T>` makes the field type `never`)
+and at runtime (`ValidationError`). The rule fails closed: a new nested field can't
+leak by default. `Date` fields are exempt; mask nested records separately and
+combine them (see ADDING-AN-APP.md). `Masked<T>` keeps `null`/`undefined` on masked
+fields.
 
 ## 5. UI kit (`packages/ui`)
 
