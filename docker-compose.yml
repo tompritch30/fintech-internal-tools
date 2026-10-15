@@ -1,0 +1,86 @@
+# LOCAL DEV ONLY. All passwords and secrets here are fake demo values.
+# Start everything: docker compose up --build
+name: internal-tools
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_PASSWORD: demo-only-change-me
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d internal_tools"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: demo-only-change-me
+      # Issuer fix: Keycloak always issues tokens as http://localhost:8080/realms/...,
+      # whether the caller is the browser (localhost:8080) or the web container
+      # (keycloak:8080). See docs/ARCHITECTURE.md §3.3.
+      KC_HOSTNAME: http://localhost:8080
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./infra/keycloak:/opt/keycloak/data/import:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000 &&
+          printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
+          grep -q '"UP"' <&3
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    command: ["sh", "-c", "pnpm db:migrate && pnpm db:seed"]
+    environment:
+      DATABASE_OWNER_URL: postgres://app_owner:demo-only-change-me@postgres:5432/internal_tools
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      APP_URL: http://localhost:3000
+      DATABASE_URL: postgres://app_runtime:demo-only-change-me@postgres:5432/internal_tools
+      OIDC_ISSUER: http://localhost:8080/realms/internal-tools
+      OIDC_INTERNAL_ISSUER: http://keycloak:8080/realms/internal-tools
+      OIDC_CLIENT_ID: internal-tools-web
+      OIDC_CLIENT_SECRET: demo-only-change-me
+      OIDC_ROLES_CLAIM: roles
+      OIDC_ALLOW_INSECURE_HTTP: "true"
+      SESSION_TTL_HOURS: "8"
+    ports:
+      - "3000:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 3s
+      timeout: 5s
+      retries: 60
+
+volumes:
+  pgdata:

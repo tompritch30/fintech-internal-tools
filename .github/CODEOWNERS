@@ -1,0 +1,7 @@
+# Changes here need a review from a human code owner (enable "Require review from Code Owners"
+# in branch protection for main). See AGENTS.md.
+/packages/core/   @tompritch30
+/AGENTS.md        @tompritch30
+/.devin/          @tompritch30
+/.github/         @tompritch30
+/packages/db/migrations/ @tompritch30

@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DATABASE_URL: postgres://app_runtime:demo-only-change-me@localhost:5432/internal_tools
+  DATABASE_OWNER_URL: postgres://app_owner:demo-only-change-me@localhost:5432/internal_tools
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - name: Start Postgres (roles and databases from infra/postgres/init)
+        run: docker compose up -d --wait postgres
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - name: Migrate and seed (as app_owner)
+        run: pnpm db:migrate && pnpm db:seed
+      - name: Server tests (real Postgres, test database)
+        run: pnpm test
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      APP_URL: http://localhost:3000
+      OIDC_ISSUER: http://localhost:8080/realms/internal-tools
+      OIDC_CLIENT_ID: internal-tools-web
+      OIDC_CLIENT_SECRET: demo-only-change-me
+      OIDC_ROLES_CLAIM: roles
+      OIDC_ALLOW_INSECURE_HTTP: "true"
+      SESSION_TTL_HOURS: "8"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - name: Start Postgres and Keycloak (realm import)
+        run: docker compose up -d --wait postgres keycloak
+      - name: Migrate and seed (as app_owner)
+        run: pnpm db:migrate && pnpm db:seed
+      - run: pnpm build
+      - run: pnpm --filter @fit/web exec playwright install --with-deps chromium
+      - name: Playwright (seeded Keycloak users)
+        run: pnpm test:e2e
+        env:
+          CI: "true"
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+          retention-days: 7
