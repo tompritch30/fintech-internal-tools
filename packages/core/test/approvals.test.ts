@@ -1,5 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
-import { afterAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { approvalRequests, auditLog, createDb, users } from "@fit/db";
 import {
   ConflictError,
@@ -205,21 +205,24 @@ describe("maker-checker approvals", () => {
   it("lets exactly one of two concurrent approvals win", async () => {
     const { request } = await newRequest();
     const pool = createDb(TEST_DATABASE_URL, { max: 4 });
-    afterAll(() => pool.$client.end());
-    const { user: a } = await approver();
-    const { user: b } = await approver();
-    const results = await Promise.allSettled([
-      decideApproval(pool, a, payoutKind, { id: request.id, decision: "approve", expectedVersion: 1 }),
-      decideApproval(pool, b, payoutKind, { id: request.id, decision: "approve", expectedVersion: 1 }),
-    ]);
-    const fulfilled = results.filter((r) => r.status === "fulfilled");
-    const rejected = results.filter((r) => r.status === "rejected");
-    expect(fulfilled).toHaveLength(1);
-    expect(rejected).toHaveLength(1);
-    expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(ConflictError);
-    const row = await requestRow(request.id);
-    expect(row).toMatchObject({ status: "approved", version: 2 });
-    expect(await auditRows(request.id, "approval.approved")).toHaveLength(1);
+    try {
+      const { user: a } = await approver();
+      const { user: b } = await approver();
+      const results = await Promise.allSettled([
+        decideApproval(pool, a, payoutKind, { id: request.id, decision: "approve", expectedVersion: 1 }),
+        decideApproval(pool, b, payoutKind, { id: request.id, decision: "approve", expectedVersion: 1 }),
+      ]);
+      const fulfilled = results.filter((r) => r.status === "fulfilled");
+      const rejected = results.filter((r) => r.status === "rejected");
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(ConflictError);
+      const row = await requestRow(request.id);
+      expect(row).toMatchObject({ status: "approved", version: 2 });
+      expect(await auditRows(request.id, "approval.approved")).toHaveLength(1);
+    } finally {
+      await pool.$client.end();
+    }
   });
 
   it("rejects deciding a request that does not exist", async () => {
@@ -328,12 +331,14 @@ describe("approval hooks", () => {
     ).rejects.toThrow("downstream write failed");
     const rows = await db.select().from(approvalRequests).where(eq(approvalRequests.subjectId, subjectId));
     expect(rows).toHaveLength(0);
+    // requester is a fresh user in this test, so filtering by actor id is enough.
     const audits = await db
       .select()
       .from(auditLog)
       .where(and(eq(auditLog.action, "approval.requested"), eq(auditLog.actorUserId, requester.id)));
-    expect(audits.map((r) => r.entityId)).not.toContain(subjectId);
+    expect(audits).toHaveLength(0);
     const [t] = await db.select({ n: users.displayName }).from(users).where(eq(users.id, target.id));
+    expect(t).toBeDefined();
     expect(t?.n).not.toBe("x");
   });
 
@@ -350,6 +355,9 @@ describe("approval hooks", () => {
     const request = await requestApproval(db, requester, kind, { subjectId, payload: { iban: IBAN } });
     const [t] = await db.select({ n: users.displayName }).from(users).where(eq(users.id, target.id));
     expect(t?.n).toBe(`record-for-${request.id}`);
+    const audits = await auditRows(request.id, "approval.requested");
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({ entityId: request.id });
   });
 
   it("rolls back the decision and its audit row when onApproved throws", async () => {
@@ -369,6 +377,7 @@ describe("approval hooks", () => {
     expect((await requestRow(request.id))).toMatchObject({ status: "pending", version: 1 });
     expect(await auditRows(request.id, "approval.approved")).toHaveLength(0);
     const [t] = await db.select({ n: users.displayName }).from(users).where(eq(users.id, target.id));
+    expect(t).toBeDefined();
     expect(t?.n).not.toBe("approved-effect");
   });
 
