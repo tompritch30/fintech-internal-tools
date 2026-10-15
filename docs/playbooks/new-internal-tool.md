@@ -5,12 +5,13 @@ one session, one branch, one PR. Written from the refunds session
 ([PR #10](https://github.com/tompritch30/fintech-internal-tools/pull/10)). The rules
 are in `AGENTS.md`, `docs/ADDING-AN-APP.md` and `REVIEW.md`. This playbook is the
 order of work and the traps found along the way. If it disagrees with those files,
-they win. Fix the playbook in a PR.
+they win. Fix the playbook in a PR. Refunds is the reference app: copy its layout
+(`apps/web/app/(platform)/refunds/`), its registry permissions and its approval hooks.
 
 ## What's needed from Thomas
 - The business rules, numbered. Each rule becomes a named test.
-- Whether `packages/core` may change. If it may not, the app reuses the existing
-  permissions (see step 2).
+- Sign-off that the PR touches `packages/core`: apps register their own permissions in
+  `PERMISSION_REGISTRY` (see step 2), so Thomas reviews and merges every app PR.
 - Thresholds and limits. Each one becomes an env var with a default.
 - Whether the PR adds a migration. If it does, Thomas merges it; Devin doesn't.
 
@@ -30,8 +31,9 @@ they win. Fix the playbook in a PR.
 ### 1. Read before planning
 - `AGENTS.md`, `docs/ADDING-AN-APP.md`, `docs/ARCHITECTURE.md` §4 (core APIs), `REVIEW.md`.
 - The core APIs you'll use, in the source: `packages/core/src/approvals/approvals.ts`
-  and `packages/core/src/masking/masking.ts`. Note what is missing. For example,
-  approvals has `onRequested`/`onApproved` but no `onRejected`.
+  and `packages/core/src/masking/masking.ts`. Note what is missing. Approvals has
+  `onRequested`/`onApproved`/`onRejected` but no `onCancelled`; masking styles are
+  `last4`, `email`, `full` and `name`.
 - `apps/web/AGENTS.md`: Next.js 16 differs from older versions. Read the relevant
   pages under `apps/web/node_modules/next/dist/docs/` (layouts-and-pages,
   mutating-data, forms, error-handling) before writing routes.
@@ -40,12 +42,19 @@ they win. Fix the playbook in a PR.
 ### 2. Send the plan with risks before building
 Thomas asks for this. Send one message listing each risk, the default you'll use and
 the decision needed. From refunds, the questions that will come up again:
-- **Permissions vs "don't touch core".** ADDING-AN-APP §1 says to add `<app>:*`
-  permissions in core. If core is off-limits, map the app onto existing ones
-  (`approvals:request` = maker, `approvals:decide` = checker, `pii:unmask` = reveal),
-  and say who loses what. In refunds, analysts can't reveal emails.
-- **Missing engine hooks.** If you need them, derive the state from the approval
-  request rather than storing it twice. Log it as a known gap.
+- **Permissions come from the registry.** Add `<app>:read` (every role that opens the
+  pages), `<app>:request` (maker) and `<app>:approve` (checker) to `PERMISSION_REGISTRY`
+  in `packages/core/src/rbac/permissions.ts`, and update the core test that pins
+  `ROLE_PERMISSIONS`. Guard pages with `requirePagePermission("<app>:read", …)`. Reveals
+  use the shared `pii:unmask`. Refunds: `refunds:read/request/approve`.
+- **Rejection.** The kind's `onRejected` marks the app's record rejected and audits it
+  in the rejection's transaction (refunds: `markRejected`, status `rejected`).
+  `cancelApproval` runs no hook: if the app needs "cancelled", derive it from the request.
+- **Masking personal data.** Mask names as well as emails. The `name` style shows
+  "Jane S."; reveal the full name with a reason, like the email. Search can still match
+  the full name server-side.
+- **Seed data isn't audited.** Seeding is setup, not a business action, so fixtures get
+  no audit rows.
 - **Testing self-approval.** The seeded analyst can't approve and the seeded approver
   can't request, so add a user with both roles to `infra/keycloak/internal-tools-realm.json`
   **and** the seed (refunds added `senior`).
@@ -127,6 +136,7 @@ screenshots in the PR body, and attach the recording when you report back.
 ## Forbidden
 - Merging a PR that adds a migration or changes core, a playbook, `AGENTS.md` or
   `.devin/blueprint.yaml`.
-- Changing `packages/core` when the brief says not to. Raise a separate core PR instead.
+- Changing `packages/core` beyond the app's registry entries without raising it in the
+  plan. Engine changes (new hooks, styles) need a test and a line in the PR's summary.
 - Real PII, real secrets, or committing `.env`.
 - Mocking the database, snapshot tests, or more than 2 E2E tests per app.
