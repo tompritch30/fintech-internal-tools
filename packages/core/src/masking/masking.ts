@@ -1,5 +1,8 @@
 import "server-only";
 import type { Db, Tx } from "@fit/db";
+import { withAudit } from "../audit/with-audit.ts";
+import { requirePermission } from "../rbac/guards.ts";
+import { NotFoundError, ValidationError } from "../errors.ts";
 import type { Permission } from "../rbac/permissions.ts";
 import type { SessionUser } from "../session/session.ts";
 
@@ -29,15 +32,43 @@ export type Masked<T, F extends keyof T> = {
     : T[K];
 } & { readonly [maskedBrand]: "Masked" };
 
+const BULLET = "•";
+/** Fixed length so the masked value doesn't leak the original's length. */
+const FULL = BULLET.repeat(8);
+
+function maskValue(value: string, style: MaskStyle): string {
+  switch (style) {
+    case "last4":
+      return value.length >= 8 ? BULLET.repeat(4) + value.slice(-4) : FULL;
+    case "full":
+      return FULL;
+    case "email": {
+      const at = value.indexOf("@");
+      if (at < 0) return FULL;
+      const local = value.slice(0, at);
+      const domain = value.slice(at + 1);
+      if (local.length >= 2) return `${local[0]}${BULLET.repeat(3)}@${domain}`;
+      if (local.length === 1) return `${BULLET.repeat(3)}@${domain}`;
+      return FULL;
+    }
+  }
+}
+
 /**
  * Masks the policy fields of `record` in a shallow copy; never mutates the input.
  * Takes no actor or role on purpose: masking always applies, there is no bypass.
  */
 export function mask<T extends object, const P extends readonly MaskPolicy<StringField<T>>[]>(
-  _record: T,
-  _policies: P,
+  record: T,
+  policies: P,
 ): Masked<T, P[number]["field"]> {
-  throw new Error("not implemented");
+  const out = { ...record } as Record<string, unknown>;
+  for (const policy of policies) {
+    const value = out[policy.field];
+    if (value === null || value === undefined) continue;
+    out[policy.field] = typeof value === "string" ? maskValue(value, policy.style) : FULL;
+  }
+  return out as Masked<T, P[number]["field"]>;
 }
 
 export interface MaskedEntity<T> {
@@ -57,10 +88,35 @@ export function defineMaskedEntity<T>(def: MaskedEntity<T>): MaskedEntity<T> {
  * same transaction as the read. The value is never written to the audit row.
  */
 export async function unmask<T>(
-  _db: Db,
-  _actor: SessionUser,
-  _entity: MaskedEntity<T>,
-  _input: { entityId: string; field: string; reason: string },
+  db: Db,
+  actor: SessionUser,
+  entity: MaskedEntity<T>,
+  input: { entityId: string; field: string; reason: string },
 ): Promise<string | null> {
-  throw new Error("not implemented");
+  const policy = entity.policies.find((p) => p.field === input.field);
+  if (!policy) {
+    throw new ValidationError(`no mask policy for field ${input.field} on ${entity.entityType}`);
+  }
+  await requirePermission(
+    { db, user: actor, resource: `unmask:${entity.entityType}:${input.entityId}:${input.field}` },
+    policy.unmaskPermission,
+  );
+  const reason = input.reason.trim();
+  if (!reason) throw new ValidationError("unmasking requires a reason");
+  return withAudit(
+    db,
+    {
+      actor: { id: actor.id, subject: actor.subject },
+      action: "field.unmask",
+      entityType: entity.entityType,
+      entityId: input.entityId,
+      reason,
+      metadata: { field: input.field },
+    },
+    async (tx) => {
+      const record = await entity.load(tx, input.entityId);
+      if (!record) throw new NotFoundError(`${entity.entityType} ${input.entityId} not found`);
+      return (record[input.field as keyof T] as string | null | undefined) ?? null;
+    },
+  );
 }
