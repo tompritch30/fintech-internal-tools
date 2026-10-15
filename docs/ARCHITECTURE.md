@@ -337,20 +337,6 @@ unmask<T>(db, actor, entity, { entityId, field, reason }): Promise<string | null
 `unmask` takes the `MaskedEntity` definition (not raw entityType/field strings) so the
 permission and the row load come from the declared policy.
 
-### 4.3 Field masking (A2 — design only)
-
-Interface sketch:
-
-```ts
-type MaskPolicy = { field: string; style: "last4" | "full" | "email"; unmaskPermission: Permission };
-
-mask<T>(record: T, policies: MaskPolicy[]): Masked<T>   // always masks; ignores role
-unmask(tx, actor, { entityType, entityId, field, reason }): Promise<string>
-  // requires unmaskPermission + non-empty reason; writes 'field.unmask' audit row
-```
-
-Policies are declared per entity in code, next to the app that owns the entity.
-
 ## 5. UI kit (`packages/ui`)
 
 Built once in A1 and reused by all three apps. The record components follow the
@@ -359,7 +345,7 @@ view → record form → command bar actions → timeline.
 
 | Component | Purpose | R2-Q2 equivalent |
 |---|---|---|
-| `AppShell` | Left nav (app sections), top bar with signed-in user and sign-out | Site map / navigator |
+| `AppShell` | Left nav with icons (app sections), top bar with an account menu (signed-in user, sign-out) | Site map / navigator |
 | `ListView` | The queue: columns, select rows, search, sort and filter, paging, with a `CommandBar` slot for actions on selected rows | List view |
 | `CommandBar` | Row of actions for a list or a record (e.g. Assign, Approve, Reject) | Command bar |
 | `RecordHeader` | Record title, status badge, owner and key fields | Form heading bar (status also stands in for the business process flow bar) |
@@ -373,8 +359,11 @@ Rules:
   server action still calls `requirePermission`.
 - `Timeline` reads from `audit_log` via a core query (`listAuditForEntity`). It shows
   masked values only (masking from A2).
-- Tokens are CSS variables in `tokens.css`. The palette is Cognition-inspired at most:
-  neutral ink and off-white with one accent. No logos.
+- Styling is Tailwind CSS v4 with shadcn/ui conventions (`cva` variants, `cn()` helper,
+  Radix primitives where a component needs behaviour, e.g. the `AppShell` account menu;
+  icons from `lucide-react`). Tokens are shadcn-named CSS variables in
+  `packages/ui/src/styles.css`, which also loads Tailwind and the Inter font. The palette is
+  neutral ink on white with one subtle indigo accent. No logos.
 - In A1 the audit viewer page uses `ListView`, and a demo record page under
   `(platform)` uses `RecordHeader`, `CommandBar` and `Timeline` with dummy data, so each
   component is exercised before the first business app.
@@ -543,7 +532,8 @@ Demo users (Keycloak realm `internal-tools`, password `demo-only-change-me`):
 │       ├── tsconfig.json
 │       └── src/
 │           ├── index.ts
-│           ├── styles.css       # CSS variables (tokens) and component styles
+│           ├── styles.css       # Tailwind entry + design tokens (CSS variables)
+│           ├── lib/cn.ts        # class-name helper (clsx + tailwind-merge)
 │           └── components/  # AppShell, Button, Input, Table, Badge, EmptyState,
 │                            # ListView, CommandBar, RecordHeader, Timeline
 └── docs/

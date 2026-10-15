@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { cn } from "../lib/cn.ts";
 import { buttonClass } from "./Button.tsx";
 import { EmptyState } from "./EmptyState.tsx";
+import { inputClass } from "./Input.tsx";
 import { Table, type Column } from "./Table.tsx";
 
 export interface ListColumn<T> extends Omit<Column<T>, "headerHref" | "ariaSort"> {
@@ -67,13 +70,25 @@ export function ListView<T>({
     };
   });
 
+  const pagerButton = cn(buttonClass(), "h-8 gap-1 px-2.5");
+
   return (
-    <section aria-label={label}>
-      <form className="fit-listview__toolbar" method="get" action={basePath} role="search">
-        <label htmlFor={`${basePath}-search`} className="fit-visually-hidden">
+    <section aria-label={label} className="flex flex-col gap-3">
+      <form className="flex items-center gap-2" method="get" action={basePath} role="search">
+        <label htmlFor={`${basePath}-search`} className="sr-only">
           Search {label}
         </label>
-        <input id={`${basePath}-search`} className="fit-input" type="search" name="q" defaultValue={query.search} placeholder="Search" />
+        <div className="relative w-full max-w-xs">
+          <Search aria-hidden className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            id={`${basePath}-search`}
+            className={cn(inputClass, "pl-8")}
+            type="search"
+            name="q"
+            defaultValue={query.search}
+            placeholder="Search"
+          />
+        </div>
         {query.sort ? <input type="hidden" name="sort" value={query.sort} /> : null}
         {query.sort && query.dir ? <input type="hidden" name="dir" value={query.dir} /> : null}
         <button type="submit" className={buttonClass()}>
@@ -92,10 +107,11 @@ export function ListView<T>({
           leading={
             selection
               ? {
-                  header: <span className="fit-visually-hidden">Select</span>,
+                  header: <span className="sr-only">Select</span>,
                   cell: (row) => (
                     <input
                       type="checkbox"
+                      className="size-4 cursor-pointer rounded border-input accent-primary"
                       form={selection.formId}
                       name={selection.name}
                       value={rowKey(row)}
@@ -107,20 +123,24 @@ export function ListView<T>({
           }
         />
       )}
-      <nav className="fit-listview__pager" aria-label={`${label} pages`}>
+      <nav className="flex items-center justify-between gap-2 text-sm text-muted-foreground" aria-label={`${label} pages`}>
         <span>
           Page {query.page} of {pages} ({total} total)
         </span>
-        {query.page > 1 ? (
-          <a className={buttonClass()} href={href({ page: query.page - 1 })}>
-            Previous
-          </a>
-        ) : null}
-        {query.page < pages ? (
-          <a className={buttonClass()} href={href({ page: query.page + 1 })}>
-            Next
-          </a>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {query.page > 1 ? (
+            <a className={pagerButton} href={href({ page: query.page - 1 })}>
+              <ChevronLeft aria-hidden />
+              Previous
+            </a>
+          ) : null}
+          {query.page < pages ? (
+            <a className={pagerButton} href={href({ page: query.page + 1 })}>
+              Next
+              <ChevronRight aria-hidden />
+            </a>
+          ) : null}
+        </div>
       </nav>
     </section>
   );

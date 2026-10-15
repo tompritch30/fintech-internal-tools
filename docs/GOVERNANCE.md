@@ -23,7 +23,7 @@ from the live ruleset with a read-only `GET /repos/{owner}/{repo}/rulesets/{id}`
 | Extra approval for unattributed changes | `require_extra_approval_for_unattributed_changes: true` | GitHub's default for new rulesets; kept as is |
 | Squash merges only | `allowed_merge_methods: ["squash"]` | One commit per PR on `main` |
 | Required checks | `required_status_checks`: `verify`, `e2e` (GitHub Actions) | Shown in the PR as `CI / verify` and `CI / e2e` |
-| Branch up to date before merge | `strict_required_status_checks_policy: false` | **Not enforced today.** Set to `true` in the JSON and re-apply to require it |
+| Branch up to date before merge | `strict_required_status_checks_policy: true` | A PR must be rebased on the latest `main` (and its checks re-run) before it can merge |
 | Bypass | none listed | Nobody bypasses the ruleset |
 
 Repo-level merge settings still allow merge commits and rebase merges; the ruleset
