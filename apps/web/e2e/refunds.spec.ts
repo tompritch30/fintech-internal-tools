@@ -50,7 +50,7 @@ test("analyst requests a large refund, approver approves it from the queue, and 
   await signOut(page);
 
   await signIn(page, "approver");
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Approvals" }).click();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Approvals", exact: true }).click();
   await page.getByRole("row").filter({ hasText: reason }).getByRole("link", { name: "Review" }).click();
   await approve(page, "Return confirmed by warehouse");
 
@@ -61,7 +61,7 @@ test("analyst requests a large refund, approver approves it from the queue, and 
   await expect(history).toContainText("approval.approved");
   await expect(page.getByRole("button", { name: "Approve refund" })).toHaveCount(0);
 
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Approvals" }).click();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Approvals", exact: true }).click();
   await expect(page.getByRole("row").filter({ hasText: reason })).toHaveCount(0);
 });
 

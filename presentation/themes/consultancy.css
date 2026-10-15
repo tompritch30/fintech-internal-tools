@@ -1,0 +1,230 @@
+/* @theme consultancy */
+/* @size 16:9 1920px 1080px */
+
+/*
+ * Clean consultancy theme, 1920x1080 (16:9).
+ * Palette: Cognition (cognition.ai) warm off-white + near-black ink with its electric-blue
+ * accent; Devin (devin.ai) blue as the secondary data colour. One family: Inter (SIL OFL,
+ * vendored in assets/fonts so every export renders the same, offline).
+ * Rules this theme supports are in .agents/skills/slides/SKILL.md.
+ */
+
+@font-face {
+  font-family: "Inter";
+  src: url("assets/fonts/inter-latin-wght-normal.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+
+:root {
+  --paper: #f7f6f5;      /* Cognition --color-background */
+  --ink: #191919;        /* Cognition --color-button */
+  --muted: #626870;      /* Cognition secondary text */
+  --rule: #e5e5e5;       /* Cognition --color-neutral-200 */
+  --surface: #ffffff;
+  --accent: #2200ff;     /* Cognition --color-accent (#20f) */
+  --accent-2: #317cff;   /* Devin --bg-accent-primary rgb(49 124 255) */
+  --accent-soft: #e2efff;/* Devin --bg-accent-secondary rgb(226 239 255) */
+  --margin-x: 112px;
+}
+
+section {
+  width: 1920px;
+  height: 1080px;
+  position: relative;
+  box-sizing: border-box;
+  padding: 152px var(--margin-x) 152px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Inter", sans-serif;
+  font-size: 36px;
+  line-height: 1.35;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  grid-template-rows: auto minmax(0, 1fr);
+  column-gap: 96px;
+  row-gap: 64px;
+  align-content: start;
+}
+
+section > * {
+  grid-column: 1 / -1;
+  margin: 0;
+  min-width: 0;
+}
+
+/* Action title: one line, one sentence. The check script fails a title that wraps. */
+section > h1 {
+  font-size: 50px;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  padding-bottom: 32px;
+  border-bottom: 2px solid var(--ink);
+}
+
+/* Bullets: at most three, 12 words each. */
+section > ul,
+section > ol {
+  padding-left: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  align-self: start;
+}
+section > ul > li,
+section > ol > li {
+  position: relative;
+  padding-left: 40px;
+}
+section > ul > li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.5em;
+  width: 16px;
+  height: 4px;
+  background: var(--accent);
+}
+section > ol { counter-reset: item; }
+section > ol > li { counter-increment: item; padding-left: 56px; }
+section > ol > li::before {
+  content: counter(item);
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+  font-weight: 600;
+}
+section strong { font-weight: 600; }
+section em { font-style: normal; color: var(--accent); }
+
+/* One visual: a chart/diagram image, a table, or a .visual block. */
+section > p:has(> img),
+section > .visual,
+section > table {
+  align-self: stretch;
+  min-height: 0;
+}
+section > p:has(> img) {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+section > p > img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* Bullets + visual side by side; either alone takes the full width. */
+section:has(> ul, > ol):has(> p > img, > .visual, > table) > :is(ul, ol) {
+  grid-column: 1;
+  grid-row: 2;
+}
+section:has(> ul, > ol):has(> p > img, > .visual, > table) > :is(p:has(> img), .visual, table) {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+/* Placeholder frame for a screenshot or diagram not yet supplied. */
+.visual.placeholder {
+  box-sizing: border-box;
+  border: 3px dashed var(--muted);
+  background: var(--surface);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px;
+  font-size: 32px;
+}
+
+/* Simple left-to-right process diagram: <div class="visual flow"><div>Step</div>…</div> */
+.visual.flow {
+  display: flex;
+  align-self: start;
+  align-items: center;
+  gap: 48px;
+}
+.visual.flow > div {
+  flex: 1;
+  background: var(--surface);
+  border-top: 6px solid var(--accent);
+  padding: 32px;
+  font-weight: 600;
+  position: relative;
+}
+.visual.flow > div:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: -36px;
+  top: 50%;
+  border: 12px solid transparent;
+  border-left: 16px solid var(--muted);
+  transform: translateY(-50%);
+}
+
+table {
+  border-collapse: collapse;
+  font-size: 28px;
+  align-self: start;
+  width: 100%;
+}
+th, td {
+  text-align: left;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+th {
+  font-weight: 600;
+  border-bottom: 2px solid var(--ink);
+}
+td:not(:first-child), th:not(:first-child) { font-variant-numeric: tabular-nums; }
+
+/* Wordmark (header), source line (footer) and slide number. */
+/* Out of the grid flow, so offsets are from the slide edge, not the grid area. */
+header,
+footer,
+section::after {
+  position: absolute;
+  grid-column: auto;
+  grid-row: auto;
+  font-size: 24px;
+  line-height: 1.3;
+  color: var(--muted);
+}
+header {
+  top: 56px;
+  left: var(--margin-x);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+section.appendix header::after {
+  content: "  ·  Appendix";
+  color: var(--accent);
+}
+footer {
+  bottom: 56px;
+  left: var(--margin-x);
+  right: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Marpit's default pagination style sets padding: inherit; reset it so offsets are exact. */
+section::after {
+  content: attr(data-marpit-pagination) " / " attr(data-marpit-pagination-total);
+  padding: 0;
+  bottom: 56px;
+  right: var(--margin-x);
+  font-variant-numeric: tabular-nums;
+}
