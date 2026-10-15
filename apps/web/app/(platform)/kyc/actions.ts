@@ -63,12 +63,14 @@ export const signOffCaseAction = defineAction("kyc:approve", "kyc.signOff", asyn
 });
 
 export const revealFieldAction = defineAction("pii:unmask", "kyc.reveal", async (ctx, _prev: FormState, form: FormData): Promise<FormState> => {
+  const caseId = field(form, "caseId");
   try {
     const value = await revealCaseField(ctx, {
-      caseId: field(form, "caseId"),
+      caseId,
       field: field(form, "field") as KycMaskedField,
       reason: field(form, "reason"),
     });
+    revalidatePath(`/kyc/cases/${caseId}`);
     return { revealed: value ?? "" };
   } catch (err) {
     return failure(err);
@@ -78,6 +80,7 @@ export const revealFieldAction = defineAction("pii:unmask", "kyc.reveal", async 
 export const openDocumentAction = defineAction("pii:unmask", "kyc.openDocument", async (ctx, _prev: FormState, form: FormData): Promise<FormState> => {
   try {
     const doc = await openCaseDocument(ctx, { documentId: field(form, "documentId"), reason: field(form, "reason") });
+    revalidatePath(`/kyc/cases/${doc.caseId}`);
     return { revealed: doc.content };
   } catch (err) {
     return failure(err);
