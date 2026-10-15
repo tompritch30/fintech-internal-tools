@@ -55,9 +55,9 @@ type HasNonJson<T> = T extends NonJson
   : T extends readonly (infer U)[]
     ? HasNonJson<U>
     : T extends object
-      ? false extends { [K in keyof T]-?: HasNonJson<NonNullable<T[K]>> }[keyof T]
-        ? false
-        : true
+      ? true extends { [K in keyof T]-?: HasNonJson<NonNullable<T[K]>> }[keyof T]
+        ? true
+        : false
       : false;
 
 /** Payloads are stored as JSONB; types JSON can't round-trip are refused. */
