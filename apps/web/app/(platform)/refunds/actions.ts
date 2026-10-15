@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { ConflictError, ForbiddenError, NotFoundError, SelfApprovalError, ValidationError } from "@fit/core";
 import { defineAction } from "../../../lib/auth.ts";
 import type { FormState } from "./format.ts";
-import { approveRefund, parsePounds, rejectRefund, requestRefund, revealCustomerEmail } from "./refunds.ts";
+import { approveRefund, parsePounds, rejectRefund, requestRefund, revealCustomerEmail, revealCustomerName } from "./refunds.ts";
 
 const field = (form: FormData, name: string) => String(form.get(name) ?? "");
 
@@ -19,7 +19,7 @@ function failure(err: unknown): FormState {
 }
 
 export const requestRefundAction = defineAction(
-  "approvals:request",
+  "refunds:request",
   "refunds.request",
   async (ctx, _prev: FormState, form: FormData): Promise<FormState> => {
     let target: string;
@@ -40,7 +40,7 @@ export const requestRefundAction = defineAction(
 );
 
 export const approveRefundAction = defineAction(
-  "approvals:decide",
+  "refunds:approve",
   "refunds.approve",
   async (ctx, _prev: FormState, form: FormData): Promise<FormState> => {
     const refundId = field(form, "refundId");
@@ -55,7 +55,7 @@ export const approveRefundAction = defineAction(
 );
 
 export const rejectRefundAction = defineAction(
-  "approvals:decide",
+  "refunds:approve",
   "refunds.reject",
   async (ctx, _prev: FormState, form: FormData): Promise<FormState> => {
     const refundId = field(form, "refundId");
@@ -75,7 +75,20 @@ export const revealEmailAction = defineAction(
   async (ctx, _prev: FormState, form: FormData): Promise<FormState> => {
     try {
       const email = await revealCustomerEmail(ctx, { paymentId: field(form, "paymentId"), reason: field(form, "reason") });
-      return { email: email ?? "" };
+      return { revealed: email ?? "" };
+    } catch (err) {
+      return failure(err);
+    }
+  },
+);
+
+export const revealNameAction = defineAction(
+  "pii:unmask",
+  "refunds.revealName",
+  async (ctx, _prev: FormState, form: FormData): Promise<FormState> => {
+    try {
+      const name = await revealCustomerName(ctx, { paymentId: field(form, "paymentId"), reason: field(form, "reason") });
+      return { revealed: name ?? "" };
     } catch (err) {
       return failure(err);
     }

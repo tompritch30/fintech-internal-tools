@@ -4,7 +4,7 @@ import type { BadgeTone } from "@fit/ui";
 export interface FormState {
   error?: string;
   message?: string;
-  email?: string;
+  revealed?: string;
 }
 
 const gbp = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" });

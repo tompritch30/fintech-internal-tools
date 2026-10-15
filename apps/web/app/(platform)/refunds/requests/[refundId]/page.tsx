@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { AuditListItem } from "@fit/core";
 import { CommandBar, RecordHeader, Timeline } from "@fit/ui";
-import { getDb, requirePageAnyPermission } from "../../../../../lib/auth.ts";
+import { getDb, requirePagePermission } from "../../../../../lib/auth.ts";
 import { DecisionForms } from "../../forms.tsx";
 import { formatPence, formatWhen, STATUS } from "../../format.ts";
 import { getRefundView, refundHistory } from "../../refunds.ts";
@@ -31,14 +31,14 @@ function summary(h: AuditListItem): string | undefined {
 
 export default async function RefundPage({ params }: { params: Promise<{ refundId: string }> }) {
   const { refundId } = await params;
-  const user = await requirePageAnyPermission(["approvals:request", "approvals:decide"], `/refunds/requests/${refundId}`);
+  const user = await requirePagePermission("refunds:read", `/refunds/requests/${refundId}`);
   const db = getDb();
   const refund = await getRefundView(db, refundId);
   if (!refund) notFound();
   const history = await refundHistory(db, refund.id);
   const status = STATUS[refund.status] ?? { label: refund.status, tone: "neutral" as const };
   const awaiting = refund.status === "pending_approval" && refund.approval?.status === "pending";
-  const canDecide = awaiting && user.permissions.has("approvals:decide");
+  const canDecide = awaiting && user.permissions.has("refunds:approve");
   const isRequester = refund.requestedBy === user.id;
 
   return (

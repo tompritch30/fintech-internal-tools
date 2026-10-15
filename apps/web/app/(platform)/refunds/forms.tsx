@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { Button, Input } from "@fit/ui";
-import { approveRefundAction, rejectRefundAction, requestRefundAction, revealEmailAction } from "./actions.ts";
+import { approveRefundAction, rejectRefundAction, requestRefundAction, revealEmailAction, revealNameAction } from "./actions.ts";
 import type { FormState } from "./format.ts";
 
 const initial: FormState = {};
@@ -59,18 +59,24 @@ export function DecisionForms({ refundId, version }: { refundId: string; version
   );
 }
 
-export function RevealEmail({ paymentId }: { paymentId: string }) {
-  const [state, action, pending] = useActionState(revealEmailAction, initial);
+const REVEAL = {
+  email: { action: revealEmailAction, label: "email" },
+  name: { action: revealNameAction, label: "full name" },
+} as const;
+
+export function RevealField({ paymentId, field }: { paymentId: string; field: keyof typeof REVEAL }) {
+  const { action: revealAction, label } = REVEAL[field];
+  const [state, action, pending] = useActionState(revealAction, initial);
   return (
-    <form action={action} className={formClass} aria-label="Reveal customer email">
+    <form action={action} className={formClass} aria-label={`Reveal customer ${label}`}>
       <input type="hidden" name="paymentId" value={paymentId} />
-      <Input id="reveal-reason" name="reason" label="Reason for revealing the email" required maxLength={500} className="w-72" />
+      <Input id={`reveal-${field}-reason`} name="reason" label={`Reason for revealing the ${label}`} required maxLength={500} className="w-72" />
       <Button type="submit" disabled={pending}>
-        Reveal email
+        Reveal {label}
       </Button>
-      {state.email ? (
+      {state.revealed ? (
         <p role="status" className="w-full text-sm">
-          Customer email: <strong data-testid="revealed-email">{state.email}</strong> (this read is audited)
+          Customer {label}: <strong data-testid={`revealed-${field}`}>{state.revealed}</strong> (this read is audited)
         </p>
       ) : null}
       <Feedback state={state} />

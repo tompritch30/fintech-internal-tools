@@ -29,7 +29,7 @@ export default async function RefundApprovalsPage({
 }: {
   searchParams: Promise<{ q?: string; page?: string; sort?: string; dir?: string }>;
 }) {
-  const user = await requirePagePermission("approvals:decide", "/refunds/approvals");
+  const user = await requirePagePermission("refunds:approve", "/refunds/approvals");
   const params = await searchParams;
   const query = {
     search: params.q,

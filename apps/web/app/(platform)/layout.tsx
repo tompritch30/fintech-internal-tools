@@ -17,10 +17,10 @@ export default async function PlatformLayout({ children }: { children: ReactNode
       { href: "/demo-record", label: "Demo record", icon: <SquareKanban /> },
     );
   }
-  if (user.permissions.has("approvals:request") || user.permissions.has("approvals:decide")) {
+  if (user.permissions.has("refunds:read")) {
     nav.push({ href: "/refunds", label: "Refunds", icon: <Banknote /> });
   }
-  if (user.permissions.has("approvals:decide")) nav.push({ href: "/refunds/approvals", label: "Approvals", icon: <ClipboardCheck /> });
+  if (user.permissions.has("refunds:approve")) nav.push({ href: "/refunds/approvals", label: "Approvals", icon: <ClipboardCheck /> });
   if (user.permissions.has("audit:read")) nav.push({ href: "/audit", label: "Audit log", icon: <ScrollText /> });
 
   return (

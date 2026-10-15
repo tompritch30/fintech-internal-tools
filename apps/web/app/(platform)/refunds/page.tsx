@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ListView, type ListColumn } from "@fit/ui";
-import { getDb, requirePageAnyPermission } from "../../../lib/auth.ts";
+import { getDb, requirePagePermission } from "../../../lib/auth.ts";
 import { formatPence, formatWhen } from "./format.ts";
 import { searchPayments, type PaymentListItem } from "./refunds.ts";
 
@@ -32,7 +32,7 @@ export default async function RefundsPage({
 }: {
   searchParams: Promise<{ q?: string; page?: string; sort?: string; dir?: string }>;
 }) {
-  await requirePageAnyPermission(["approvals:request", "approvals:decide"], "/refunds");
+  await requirePagePermission("refunds:read", "/refunds");
   const params = await searchParams;
   const query = {
     search: params.q,

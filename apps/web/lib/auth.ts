@@ -61,13 +61,6 @@ export async function requirePagePermission(permission: Permission, resource: st
   }
 }
 
-/** For pages any of several roles may read: allowed with any one permission, else denied (and audited) like requirePagePermission. */
-export async function requirePageAnyPermission(permissions: [Permission, ...Permission[]], resource: string): Promise<SessionUser> {
-  const user = await requireUser();
-  if (permissions.some((p) => user.permissions.has(p))) return user;
-  return requirePagePermission(permissions[0], resource);
-}
-
 /** Every exported server action must be built with this (enforced by test/actions-use-define-action.test.ts). */
 export const defineAction = createDefineAction(async () => ({ db: getDb(), user: await getCurrentUser() }));
 

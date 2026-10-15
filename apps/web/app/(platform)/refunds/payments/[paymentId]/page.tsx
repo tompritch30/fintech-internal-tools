@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge, CommandBar, RecordHeader, Table, type Column } from "@fit/ui";
-import { getDb, requirePageAnyPermission } from "../../../../../lib/auth.ts";
-import { RefundRequestForm, RevealEmail } from "../../forms.tsx";
+import { getDb, requirePagePermission } from "../../../../../lib/auth.ts";
+import { RefundRequestForm, RevealField } from "../../forms.tsx";
 import { formatPence, formatWhen, STATUS } from "../../format.ts";
 import { getPaymentView, listRefundsForPayment, loadRefundConfig, type RefundView } from "../../refunds.ts";
 
@@ -26,13 +26,13 @@ const refundColumns: Column<RefundView>[] = [
 
 export default async function PaymentPage({ params }: { params: Promise<{ paymentId: string }> }) {
   const { paymentId } = await params;
-  const user = await requirePageAnyPermission(["approvals:request", "approvals:decide"], `/refunds/payments/${paymentId}`);
+  const user = await requirePagePermission("refunds:read", `/refunds/payments/${paymentId}`);
   const db = getDb();
   const payment = await getPaymentView(db, paymentId);
   if (!payment) notFound();
   const refunds = await listRefundsForPayment(db, payment.id);
   const { approvalThresholdPence } = loadRefundConfig();
-  const canRequest = user.permissions.has("approvals:request") && payment.availablePence > 0;
+  const canRequest = user.permissions.has("refunds:request") && payment.availablePence > 0;
   const canReveal = user.permissions.has("pii:unmask");
   const fullyRefunded = payment.refundedPence === payment.amountPence;
 
@@ -63,7 +63,12 @@ export default async function PaymentPage({ params }: { params: Promise<{ paymen
                 </p>
               </>
             ) : null}
-            {canReveal ? <RevealEmail paymentId={payment.id} /> : null}
+            {canReveal ? (
+              <>
+                <RevealField paymentId={payment.id} field="name" />
+                <RevealField paymentId={payment.id} field="email" />
+              </>
+            ) : null}
           </div>
         </CommandBar>
       ) : null}
