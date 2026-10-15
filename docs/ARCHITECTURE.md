@@ -340,6 +340,7 @@ Out of A1 on purpose. Each needs its own decision.
 | **Audit export** (CSV, admin-only, audited) | Research Q3: Dataverse has no native audit export | A2 or later |
 | **Read audit for sensitive records** | Research Q3: Dataverse logs reads only in production, via Purview | A2, with masking |
 | **Stale roles** (idle timeout, shorter TTL or back-channel logout) | Removing someone's role in the IdP takes effect only at their next login | Before production |
+| **Scheduled session cleanup** | `createSession` deletes a user's expired sessions when they sign in again; users who never come back keep one expired row (and its ID token) each | Before production |
 | **Correlation ID on audit rows** | Trace one user action across rows and logs | Later |
 | **Accessibility baseline** (keyboard, focus, labels; axe check in E2E) | Ops staff use these screens all day | Later |
 | **Assign/ownership and bulk actions** | R2-Q2 Assign pattern; one audit row per record | With the first app that needs it |
