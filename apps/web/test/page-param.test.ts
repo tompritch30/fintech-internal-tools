@@ -22,6 +22,11 @@ describe("list pages only pass a safe page number to the database", () => {
     expect(parsePageParam("2.7")).toBe(2);
   });
 
+  it("keeps pages past 10,000 so a long audit log stays reachable", () => {
+    expect(parsePageParam("10001")).toBe(10_001);
+    expect(parsePageParam("2000000")).toBe(2_000_000);
+  });
+
   it("caps a huge page number so the offset stays in range", () => {
     expect(parsePageParam("1e300")).toBe(MAX_PAGE);
     expect(parsePageParam(String(Number.MAX_SAFE_INTEGER))).toBe(MAX_PAGE);
