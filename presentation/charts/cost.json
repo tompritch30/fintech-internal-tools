@@ -1,0 +1,10 @@
+{
+  "output": "assets/charts/cost.svg",
+  "alt": "Annual cost: Power Apps versus build with Devin (placeholder)",
+  "valuePrefix": "",
+  "valueSuffix": "",
+  "bars": [
+    { "label": "Power Apps", "value": null },
+    { "label": "Build with Devin", "value": null, "highlight": true }
+  ]
+}
