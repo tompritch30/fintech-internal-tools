@@ -3,9 +3,10 @@ import { describe, expect, it } from "vitest";
 import { auditLog, users } from "@fit/db";
 import { ForbiddenError, NotFoundError, ValidationError } from "../src/index.ts";
 import { defineMaskedEntity, mask, unmask } from "../src/masking/masking.ts";
-import { appDb, makeUser, uniqueId } from "./helpers/db.ts";
+import { appDb, makeUser, ownerDb, uniqueId } from "./helpers/db.ts";
 
 const db = appDb();
+const owner = ownerDb();
 
 const userEntity = defineMaskedEntity<{ id: string; email: string | null }>({
   entityType: "user",
@@ -200,5 +201,75 @@ describe("unmask", () => {
       unmask(db, approverUser, userEntity, { entityId: missing, field: "email", reason: "case work" }),
     ).rejects.toThrow(NotFoundError);
     expect(await unmaskAuditRows(missing)).toHaveLength(0);
+  });
+
+  it("refuses a 21st unmask by the same user within the hour and audits the denial", async () => {
+    const { id } = await userWithEmail();
+    const { user } = await makeUser(db, ["approver"]);
+    for (let i = 0; i < 20; i++) {
+      await unmask(db, user, userEntity, { entityId: id, field: "email", reason: "case work" });
+    }
+
+    await expect(unmask(db, user, userEntity, { entityId: id, field: "email", reason: "case work" }))
+      .rejects.toThrow(ForbiddenError);
+
+    const unmaskRows = await db.select().from(auditLog).where(
+      and(eq(auditLog.actorUserId, user.id), eq(auditLog.action, "field.unmask")),
+    );
+    expect(unmaskRows).toHaveLength(20);
+    const denied = await deniedRows(`unmask:user:${id}:email`);
+    expect(denied).toHaveLength(1);
+    expect(denied[0]).toMatchObject({
+      actorUserId: user.id,
+      metadata: { required: "unmask:rate-limit" },
+    });
+  });
+
+  it("allows a different user to unmask after another user hits the limit", async () => {
+    const { id, email } = await userWithEmail();
+    const { user: first } = await makeUser(db, ["approver"]);
+    const { user: second } = await makeUser(db, ["approver"]);
+    for (let i = 0; i < 20; i++) {
+      await unmask(db, first, userEntity, { entityId: id, field: "email", reason: "case work" });
+    }
+
+    await expect(unmask(db, second, userEntity, { entityId: id, field: "email", reason: "case work" }))
+      .resolves.toBe(email);
+  });
+
+  it("does not let concurrent unmasks overshoot the limit", async () => {
+    const { id } = await userWithEmail();
+    const { user } = await makeUser(db, ["approver"]);
+    const results = await Promise.allSettled(
+      Array.from({ length: 25 }, () =>
+        unmask(db, user, userEntity, { entityId: id, field: "email", reason: "case work" }),
+      ),
+    );
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(20);
+    const rows = await db.select().from(auditLog).where(
+      and(eq(auditLog.actorUserId, user.id), eq(auditLog.action, "field.unmask")),
+    );
+    expect(rows).toHaveLength(20);
+  });
+
+  it("does not count field.unmask rows older than the rate-limit window", async () => {
+    const { id, email } = await userWithEmail();
+    const { user } = await makeUser(db, ["approver"]);
+    await owner.insert(auditLog).values(
+      Array.from({ length: 20 }, () => ({
+        actorUserId: user.id,
+        actorSubject: user.subject,
+        action: "field.unmask",
+        entityType: "user",
+        entityId: id,
+        reason: "historic",
+        metadata: { field: "email" },
+        occurredAt: new Date(Date.now() - 61 * 60 * 1000),
+      })),
+    );
+
+    await expect(unmask(db, user, userEntity, { entityId: id, field: "email", reason: "case work" }))
+      .resolves.toBe(email);
   });
 });
