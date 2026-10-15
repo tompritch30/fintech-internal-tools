@@ -49,6 +49,9 @@ export const PERMISSION_REGISTRY = definePermissionRegistry({
   "approvals:request": { description: "Raise an approval request", roles: ["analyst"] },
   "approvals:decide": { description: "Approve or reject an approval request", roles: ["approver"] },
   "pii:unmask": { description: "Unmask a masked field with a recorded reason", roles: ["approver"] },
+  "refunds:read": { description: "View payments and refunds", roles: ["analyst", "approver"] },
+  "refunds:request": { description: "Request a refund on a payment", roles: ["analyst"] },
+  "refunds:approve": { description: "Approve or reject a refund over the approval threshold", roles: ["approver"] },
 });
 
 export const PERMISSIONS = Object.keys(PERMISSION_REGISTRY) as readonly (keyof typeof PERMISSION_REGISTRY)[];

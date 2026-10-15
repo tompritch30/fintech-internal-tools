@@ -2,7 +2,7 @@
 import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import { createDb, type Db } from "./index.ts";
-import { auditLog, roles, userRoles, users } from "./schema.ts";
+import { auditLog, payments, roles, userRoles, users } from "./schema.ts";
 
 export const SEED_ROLES = [
   { name: "analyst", description: "Works the queues; can create requests" },
@@ -15,7 +15,48 @@ export const SEED_USERS = [
   { subject: "22222222-2222-4222-8222-222222222222", username: "approver", displayName: "Parker Approver", roles: ["approver"] },
   { subject: "33333333-3333-4333-8333-333333333333", username: "admin", displayName: "Morgan Admin", roles: ["admin"] },
   { subject: "44444444-4444-4444-8444-444444444444", username: "norole", displayName: "Nico Norole", roles: [] },
+  // Holds both roles, so the E2E test can show a requester being blocked from approving their own refund.
+  { subject: "55555555-5555-4555-8555-555555555555", username: "senior", displayName: "Sam Senior", roles: ["analyst", "approver"] },
 ] as const;
+
+const FIRST_NAMES = ["Olivia", "Harry", "Amelia", "Jack", "Isla", "George", "Ava", "Noah", "Mia", "Leo", "Freya", "Arthur", "Poppy", "Oscar", "Sophie", "Charlie", "Grace", "Alfie", "Evie", "Theo"];
+const LAST_NAMES = ["Patel", "Thompson", "Hughes", "Okafor", "Walsh", "Clarke", "Nowak", "Bennett", "Khan", "Murphy", "Evans", "Fraser", "Lewis", "Ahmed", "Reid", "Turner", "Shah", "Doyle", "Price", "Morgan"];
+const MERCHANTS = ["Northwind Rail", "Bramble & Co Homeware", "Lumen Electronics", "Harbour Street Cafe", "Peak Outdoor Gear", "Cobalt Mobile", "Willow Books", "Fenwick Travel", "Oakline Furniture", "Brightside Gym"];
+const BRANDS = ["Visa", "Mastercard", "Amex"] as const;
+
+/** Deterministic PRNG (mulberry32) so the seed gives the same dummy payments every time. */
+function prng(seedValue: number): () => number {
+  let a = seedValue;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** 40 fake card payments. Cards are brand + last four digits only; no card number exists anywhere. */
+export function seedPayments(count = 40): (typeof payments.$inferInsert)[] {
+  const rand = prng(20261015);
+  const pick = <T>(items: readonly T[]) => items[Math.floor(rand() * items.length)] as T;
+  const anchor = Date.UTC(2026, 9, 14, 9, 0, 0);
+  return Array.from({ length: count }, (_, i) => {
+    const first = pick(FIRST_NAMES);
+    const last = pick(LAST_NAMES);
+    // Mostly everyday amounts, with every fourth payment large enough to need approval to refund.
+    const amountPence = i % 4 === 0 ? 30_000 + Math.floor(rand() * 150_000) : 499 + Math.floor(rand() * 24_000);
+    return {
+      reference: `PAY-${100001 + i}`,
+      customerName: `${first} ${last}`,
+      customerEmail: `${first}.${last}${i}@example.test`.toLowerCase(),
+      merchant: pick(MERCHANTS),
+      cardBrand: pick(BRANDS),
+      cardLast4: String(Math.floor(rand() * 10_000)).padStart(4, "0"),
+      amountPence,
+      capturedAt: new Date(anchor - i * 31 * 3_600_000 - Math.floor(rand() * 3_600_000)),
+    };
+  });
+}
 
 export async function seed(db: Db): Promise<void> {
   await db.transaction(async (tx) => {
@@ -43,6 +84,9 @@ export async function seed(db: Db): Promise<void> {
           .onConflictDoNothing();
       }
     }
+
+    // Payments are inserted once; refunds made later only change refunded_pence.
+    await tx.insert(payments).values(seedPayments()).onConflictDoNothing({ target: payments.reference });
 
     // audit_log is append-only, so sample rows are inserted once and never replaced.
     const existing = await tx
