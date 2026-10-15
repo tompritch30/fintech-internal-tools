@@ -11,6 +11,7 @@ const C = { ink: "#191919", muted: "#626870", rule: "#e5e5e5", accent: "#2200ff"
 const W = 1000;
 const LABEL_W = 300;
 const VALUE_W = 160;
+const MIN_TRACK = 400;
 const BAR_H = 96;
 const GAP = 56;
 const FONT = 30;
@@ -24,7 +25,9 @@ export function barChart(spec, fontBase64) {
   const fmt = (b) => `${spec.valuePrefix ?? ""}${b.value.toLocaleString("en-GB")}${spec.valueSuffix ?? ""}`;
   // Reserve room for the longest value label (Inter semibold is about 0.65 em per character).
   const valueW = Math.max(VALUE_W, ...known.map((b) => 24 + fmt(b).length * FONT * 0.65));
-  const track = W - LABEL_W - valueW;
+  // Long labels widen the chart (it scales to fit its box) rather than squeezing the bars.
+  const width = Math.max(W, LABEL_W + MIN_TRACK + valueW);
+  const track = width - LABEL_W - valueW;
   const H = bars.length * BAR_H + (bars.length - 1) * GAP;
   const rows = bars.map((b, i) => {
     const y = i * (BAR_H + GAP);
@@ -40,7 +43,7 @@ export function barChart(spec, fontBase64) {
     return `${label}<rect x="${LABEL_W}" y="${y}" width="${w}" height="${BAR_H}" fill="${b.highlight ? C.accent : C.muted}"/>
 <text x="${LABEL_W + w + 24}" y="${cy}" dominant-baseline="middle" font-weight="600">${esc(value)}</text>`;
   });
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(spec.alt ?? "Bar chart")}">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${H}" width="${width}" height="${H}" role="img" aria-label="${esc(spec.alt ?? "Bar chart")}">
 <style>@font-face{font-family:Inter;src:url(data:font/woff2;base64,${fontBase64}) format("woff2");font-weight:100 900}
 text{font-family:Inter,sans-serif;font-size:${FONT}px;fill:${C.ink}}</style>
 ${rows.join("\n")}

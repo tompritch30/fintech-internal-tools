@@ -32,6 +32,13 @@ try {
   const pass = clipped.length === 0;
   ok &&= pass;
   console.log(`${pass ? "✓" : "✗"} chart: value labels fit inside the chart${pass ? "" : ` (clipped: ${clipped.join(", ")})`}`);
+
+  const huge = barChart({ valueSuffix: " per user per month, before discounts and VAT", bars: [{ label: "Priced", value: 42 }, { label: "Unknown", value: null }] }, await fontBase64());
+  await page.setContent(huge);
+  const tooNarrow = await page.evaluate(() => [...document.querySelectorAll("rect")].filter((r) => r.width.baseVal.value < 100).length);
+  const barsOk = tooNarrow === 0;
+  ok &&= barsOk;
+  console.log(`${barsOk ? "✓" : "✗"} chart: long value labels keep every bar visible${barsOk ? "" : ` (${tooNarrow} bars under 100px)`}`);
 } finally {
   await browser.close();
 }
