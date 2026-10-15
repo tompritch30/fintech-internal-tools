@@ -1,18 +1,20 @@
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Badge, CommandBar, RecordHeader, Table, type Column } from "@fit/ui";
+import { MIN_UNMASK_REASON_LENGTH } from "@fit/core";
+import { ActionDialog, ActionPanel, Input, RecordHeader, RecordSection, RevealButton, StatusBadge, Table, Timeline, linkClass, type Column } from "@fit/ui";
 import { getDb, requirePagePermission } from "../../../../../lib/auth.ts";
-import { RefundRequestForm, RevealField } from "../../forms.tsx";
-import { formatPence, formatWhen, STATUS } from "../../format.ts";
-import { getPaymentView, listRefundsForPayment, loadRefundConfig, type RefundView } from "../../refunds.ts";
+import { requestRefundAction, revealEmailAction, revealNameAction } from "../../actions.ts";
+import { formatPence, formatWhen, statusOf } from "../../format.ts";
+import { paymentActions } from "../../record-actions.ts";
+import { getPaymentView, listRefundsForPayment, loadRefundConfig, paymentHistory, type RefundView } from "../../refunds.ts";
 
 const refundColumns: Column<RefundView>[] = [
   {
     key: "id",
     label: "Refund",
     render: (r) => (
-      <Link className="font-medium underline-offset-4 hover:underline" href={`/refunds/requests/${r.id}`}>
+      <Link className={linkClass} href={`/refunds/requests/${r.id}`}>
         {r.id.slice(0, 8)}
       </Link>
     ),
@@ -21,7 +23,7 @@ const refundColumns: Column<RefundView>[] = [
   { key: "requestedBy", label: "By", render: (r) => r.requestedByName },
   { key: "amount", label: "Amount", render: (r) => formatPence(r.amountPence) },
   { key: "reason", label: "Reason", render: (r) => r.reason },
-  { key: "status", label: "Status", render: (r) => <Badge tone={STATUS[r.status]?.tone}>{STATUS[r.status]?.label}</Badge> },
+  { key: "status", label: "Status", render: (r) => <StatusBadge {...statusOf(r.status)} /> },
 ];
 
 export default async function PaymentPage({ params }: { params: Promise<{ paymentId: string }> }) {
@@ -30,20 +32,50 @@ export default async function PaymentPage({ params }: { params: Promise<{ paymen
   const db = getDb();
   const payment = await getPaymentView(db, paymentId);
   if (!payment) notFound();
-  const refunds = await listRefundsForPayment(db, payment.id);
+  const [refunds, history] = await Promise.all([listRefundsForPayment(db, payment.id), paymentHistory(db, payment.id)]);
   const { approvalThresholdPence } = loadRefundConfig();
-  const canRequest = user.permissions.has("refunds:request") && payment.availablePence > 0;
+  const { actions, waiting } = paymentActions(user, payment);
   const canReveal = user.permissions.has("pii:unmask");
   const fullyRefunded = payment.refundedPence === payment.amountPence;
+  const masked = (value: string, what: string, action: typeof revealNameAction) =>
+    canReveal ? (
+      <RevealButton what={what} masked={value} action={action} hidden={{ paymentId: payment.id }} minReasonLength={MIN_UNMASK_REASON_LENGTH} />
+    ) : (
+      value
+    );
 
   return (
     <div className="stack">
       <RecordHeader
-        title={`${payment.reference} · ${payment.merchant}`}
-        status={fullyRefunded ? { label: "Fully refunded", tone: "neutral" } : { label: "Captured", tone: "info" }}
-        owner={payment.customerName}
+        back={{ href: "/refunds", label: "Payments" }}
+        title={`${payment.reference} · ${formatPence(payment.amountPence)}`}
+        status={fullyRefunded ? { label: "Fully refunded", kind: "done" } : { label: "Captured" }}
+        owner={payment.merchant}
+        ownerLabel="Merchant"
+      />
+      <ActionPanel
+        label="Payment actions"
+        waiting={waiting}
+        note={actions.length ? `Refunds over ${formatPence(approvalThresholdPence)} need approval from a different approver.` : undefined}
+      >
+        {actions.includes("request") ? (
+          <ActionDialog
+            label="Request refund"
+            variant="primary"
+            description={`Up to ${formatPence(payment.availablePence)} can be refunded.`}
+            action={requestRefundAction}
+            hidden={{ paymentId: payment.id, refundId: randomUUID() }}
+          >
+            <Input id="amount" name="amount" label="Amount (£)" inputMode="decimal" required placeholder={`up to ${formatPence(payment.availablePence)}`} />
+            <Input id="reason" name="reason" label="Reason" required maxLength={500} />
+          </ActionDialog>
+        ) : null}
+      </ActionPanel>
+      <RecordSection
+        title="Details"
         fields={[
-          { label: "Customer email", value: payment.customerEmail },
+          { label: "Customer", value: masked(payment.customerName, "customer name", revealNameAction) },
+          { label: "Customer email", value: masked(payment.customerEmail, "customer email", revealEmailAction) },
           { label: "Card", value: `${payment.cardBrand} •••• ${payment.cardLast4}` },
           { label: "Captured", value: formatWhen(payment.capturedAt) },
           { label: "Amount", value: formatPence(payment.amountPence) },
@@ -52,32 +84,24 @@ export default async function PaymentPage({ params }: { params: Promise<{ paymen
           { label: "Refundable", value: formatPence(payment.availablePence) },
         ]}
       />
-      {canRequest || canReveal ? (
-        <CommandBar label="Payment actions">
-          <div className="flex w-full flex-col gap-3">
-            {canRequest ? (
-              <>
-                <RefundRequestForm paymentId={payment.id} refundId={randomUUID()} maxPounds={formatPence(payment.availablePence)} />
-                <p className="text-xs text-muted-foreground">
-                  Refunds over {formatPence(approvalThresholdPence)} need approval from a different approver.
-                </p>
-              </>
-            ) : null}
-            {canReveal ? (
-              <>
-                <RevealField paymentId={payment.id} field="name" />
-                <RevealField paymentId={payment.id} field="email" />
-              </>
-            ) : null}
-          </div>
-        </CommandBar>
-      ) : null}
-      <h2>Refunds</h2>
-      {refunds.length === 0 ? (
-        <p>No refunds on this payment yet.</p>
-      ) : (
-        <Table caption="Refunds on this payment" columns={refundColumns} rows={refunds} rowKey={(r) => r.id} />
-      )}
+      <RecordSection title="Refunds">
+        {refunds.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No refunds on this payment yet.</p>
+        ) : (
+          <Table caption="Refunds on this payment" columns={refundColumns} rows={refunds} rowKey={(r) => r.id} />
+        )}
+      </RecordSection>
+      <RecordSection title="History">
+        <Timeline
+          items={history.map((h) => ({
+            id: h.id,
+            occurredAt: h.occurredAt,
+            actor: h.actor ?? "card system",
+            action: h.action,
+            reason: h.reason,
+          }))}
+        />
+      </RecordSection>
     </div>
   );
 }

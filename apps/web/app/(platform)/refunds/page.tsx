@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ListView, type ListColumn } from "@fit/ui";
+import { ListView, PageHeader, linkClass, type ListColumn } from "@fit/ui";
 import { getDb, requirePagePermission } from "../../../lib/auth.ts";
 import { formatPence, formatWhen } from "./format.ts";
 import { searchPayments, type PaymentListItem } from "./refunds.ts";
@@ -14,7 +14,7 @@ const columns: ListColumn<PaymentListItem>[] = [
     label: "Payment",
     sortable: true,
     render: (p) => (
-      <Link className="font-medium underline-offset-4 hover:underline" href={`/refunds/payments/${p.id}`}>
+      <Link className={linkClass} href={`/refunds/payments/${p.id}`}>
         {p.reference}
       </Link>
     ),
@@ -44,8 +44,7 @@ export default async function RefundsPage({
   const { rows, total } = await searchPayments(getDb(), { ...query, pageSize: PAGE_SIZE });
   return (
     <div className="stack">
-      <h1 className="page-title">Refunds</h1>
-      <p>Find a payment by reference, customer, merchant or card last four, then open it to request a refund.</p>
+      <PageHeader title="Refunds" description="Find a payment by reference, customer, merchant or card last four, then open it to request a refund." />
       <ListView
         label="Payments"
         basePath="/refunds"

@@ -22,6 +22,8 @@ export interface ListQuery {
  * State lives in the URL (GET form + links), so it works from server components with no client JS.
  * When `selection` is set, rows get checkboxes named `selection.name` bound to the form `selection.formId`,
  * so CommandBar buttons in that form submit the selected ids to a server action.
+ * Pages with labelled filters (a FilterBar) set `search={false}` and pass the filter values as `params`
+ * so sorting and paging links keep them.
  */
 export function ListView<T>({
   label,
@@ -34,6 +36,8 @@ export function ListView<T>({
   total,
   commandBar,
   selection,
+  search = true,
+  params = {},
   emptyTitle = "Nothing to show",
 }: {
   label: string;
@@ -46,16 +50,19 @@ export function ListView<T>({
   total: number;
   commandBar?: ReactNode;
   selection?: { formId: string; name: string };
+  search?: boolean;
+  params?: Record<string, string | undefined>;
   emptyTitle?: string;
 }) {
   const href = (patch: Partial<ListQuery>) => {
     const next = { ...query, ...patch };
-    const params = new URLSearchParams();
-    if (next.search) params.set("q", next.search);
-    if (next.sort) params.set("sort", next.sort);
-    if (next.sort && next.dir) params.set("dir", next.dir);
-    if (next.page > 1) params.set("page", String(next.page));
-    const qs = params.toString();
+    const qp = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v) qp.set(k, v);
+    if (next.search) qp.set("q", next.search);
+    if (next.sort) qp.set("sort", next.sort);
+    if (next.sort && next.dir) qp.set("dir", next.dir);
+    if (next.page > 1) qp.set("page", String(next.page));
+    const qs = qp.toString();
     return qs ? `${basePath}?${qs}` : basePath;
   };
   const pages = Math.max(1, Math.ceil(total / pageSize));
@@ -74,6 +81,7 @@ export function ListView<T>({
 
   return (
     <section aria-label={label} className="flex flex-col gap-3">
+      {search ? (
       <form className="flex items-center gap-2" method="get" action={basePath} role="search">
         <label htmlFor={`${basePath}-search`} className="sr-only">
           Search {label}
@@ -95,6 +103,7 @@ export function ListView<T>({
           Search
         </button>
       </form>
+      ) : null}
       {commandBar}
       {rows.length === 0 ? (
         <EmptyState title={emptyTitle} />

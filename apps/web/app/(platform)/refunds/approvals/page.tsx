@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ListView, type ListColumn } from "@fit/ui";
+import { ListView, PageHeader, linkClass, type ListColumn } from "@fit/ui";
 import { getDb, requirePagePermission } from "../../../../lib/auth.ts";
 import { formatPence, formatWhen } from "../format.ts";
 import { listPendingRefundApprovals, type PendingApprovalItem } from "../refunds.ts";
@@ -18,7 +18,7 @@ const columns: ListColumn<PendingApprovalItem>[] = [
     key: "open",
     label: "",
     render: (r) => (
-      <Link className="font-medium underline-offset-4 hover:underline" href={`/refunds/requests/${r.refundId}`}>
+      <Link className={linkClass} href={`/refunds/requests/${r.refundId}`}>
         Review
       </Link>
     ),
@@ -41,8 +41,7 @@ export default async function RefundApprovalsPage({
   const { rows, total } = await listPendingRefundApprovals({ db: getDb(), user }, { ...query, pageSize: PAGE_SIZE });
   return (
     <div className="stack">
-      <h1 className="page-title">Refund approvals</h1>
-      <p>Refunds over the approval threshold, oldest first. You cannot approve a refund you requested.</p>
+      <PageHeader title="Refund approvals" description="Refunds over the approval threshold, oldest first. You cannot approve a refund you requested." />
       <ListView
         label="Pending refund approvals"
         basePath="/refunds/approvals"
