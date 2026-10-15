@@ -40,7 +40,7 @@ export async function insertAuditRow(executor: Executor, entry: AuditEntry): Pro
  */
 export async function withAudit<T>(
   executor: Executor,
-  entry: AuditEntry | ((result: T) => AuditEntry),
+  entry: AuditEntry | ((result: NoInfer<T>) => AuditEntry),
   fn: (tx: Tx) => Promise<T>,
 ): Promise<T> {
   return executor.transaction(async (tx) => {

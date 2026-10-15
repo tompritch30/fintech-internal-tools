@@ -1,0 +1,4 @@
+.page-title { margin-top: 0; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.login-card { max-width: 380px; margin: 15vh auto; padding: 32px; background: #fff; border: 1px solid var(--fit-border); border-radius: var(--fit-radius); }
+.error { color: var(--fit-danger); }

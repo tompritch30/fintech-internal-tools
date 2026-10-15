@@ -19,3 +19,4 @@ blob-report/
 
 .DS_Store
 *.log
+apps/web/next-env.d.ts

@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ilike, or, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, or, type SQL } from "drizzle-orm";
 import { auditLog, users, type Db } from "@fit/db";
 
 export interface AuditListItem {
@@ -25,7 +25,7 @@ const columns = {
 
 export async function listAudit(
   db: Db,
-  opts: { search?: string; page?: number; pageSize?: number } = {},
+  opts: { search?: string; page?: number; pageSize?: number; dir?: "asc" | "desc" } = {},
 ): Promise<{ rows: AuditListItem[]; total: number }> {
   const pageSize = opts.pageSize ?? 25;
   const page = Math.max(1, opts.page ?? 1);
@@ -43,7 +43,7 @@ export async function listAudit(
     .from(auditLog)
     .leftJoin(users, eq(users.id, auditLog.actorUserId))
     .where(where)
-    .orderBy(desc(auditLog.id))
+    .orderBy(opts.dir === "asc" ? asc(auditLog.id) : desc(auditLog.id))
     .limit(pageSize)
     .offset((page - 1) * pageSize);
   const [totalRow] = await db

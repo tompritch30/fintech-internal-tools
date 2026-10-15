@@ -4,7 +4,7 @@ import { roles as rolesTable, sessions, userRoles, users, type Db, type Executor
 import type { IdentityClaims } from "../auth/oidc.ts";
 import { permissionsFor, type Permission } from "../rbac/permissions.ts";
 
-export const SESSION_COOKIE = "fit_session";
+export { SESSION_COOKIE } from "./cookie.ts";
 
 export interface SessionUser {
   id: string;
