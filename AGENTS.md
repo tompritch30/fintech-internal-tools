@@ -7,7 +7,7 @@ Read this first. The critical rules are at the top. Detail lives in
 ## 1. Critical rules
 
 1. **One session = one branch = one PR.** Branch name: `devin/<timestamp>-<slug>`.
-2. **CI must be green** (`CI / verify`) before merge.
+2. **CI must be green** (`CI / verify` and `CI / e2e`) before merge.
 3. **You may merge your own PR** when CI is green and review raises no blocking issues.
    A human does not review every PR.
 4. **Exception: a human must review and merge** any PR that changes:
@@ -16,12 +16,15 @@ Read this first. The critical rules are at the top. Detail lives in
    - `AGENTS.md`;
    - `.devin/blueprint.yaml`.
    Do not merge these yourself. Say in the PR description that human review is needed.
+   `.github/CODEOWNERS` enforces this through branch protection.
 5. **Dummy data only.** No real PII. No real secrets. Never commit a `.env` file.
-6. **Every authorization check runs on the server.** Call `requirePermission` (or
-   `requireRole`) in every server action and route handler. Hiding a button in the UI
+6. **Every authorization check runs on the server.** Build every server action with
+   `defineAction(permission, fn)` (a test enforces it). Call `requirePermission` (or
+   `requireRole`) in every route handler and in pages that read data. Hiding a button in the UI
    is a convenience, never the control. A denial writes an `access.denied` audit row.
 7. **Every change to business data is audited in the same transaction**, via
-   `withAudit(tx, …)`. Never write to `audit_log` any other way. Never update or delete it.
+   `withAudit(tx, …)`. Never write to `audit_log` any other way (a test enforces it).
+   Never update or delete it. Each write action's test asserts its audit row.
 8. **Masked fields are masked on the server.** No admin bypass. Unmasking needs a
    reason and writes an audit row.
 9. **Log the session.** Append one row to [docs/DEVIN-LOG.md](docs/DEVIN-LOG.md).

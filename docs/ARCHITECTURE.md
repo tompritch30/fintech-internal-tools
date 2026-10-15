@@ -23,7 +23,7 @@ UI that ops staff already know).
 | Sessions | Server-side sessions in Postgres, opaque cookie |
 | Tests | Vitest on real Postgres; Playwright for 1–2 E2E tests per app |
 | Local stack | Docker Compose |
-| CI | GitHub Actions, one required job: `verify` |
+| CI | GitHub Actions, workflow `CI`, two required jobs: `verify` and `e2e` |
 
 Note: Node 26 becomes Active LTS on 2026-10-28 (Node release schedule). Moving to it
 is a one-line change in `.nvmrc`, `engines`, the Dockerfile and the blueprint.
@@ -152,11 +152,21 @@ The fix, set once in `docker-compose.yml`:
   are synced to `user_roles` at each login.
 - `packages/core` owns the *role → permission* map in code, so a change to it is a
   reviewed change to `packages/core`.
+- **Server actions use `defineAction(permission, fn)`.** The wrapper runs
+  `requirePermission` before `fn`. A test scans every `"use server"` file in `apps/web`
+  and fails if an exported action isn't built with `defineAction`.
 - **Denied access is audited.** When `requireRole` / `requirePermission` blocks a
   signed-in user, it writes an `access.denied` audit row (user, required permission or
   role, route or action name) and then throws. This row is written on its own, not
   inside a business transaction, so it survives the rejected request. Unauthenticated
   requests are redirected to `/login` and are not audited (there is no user to record).
+- **Prefetches are not audited.** Next.js prefetches pages behind links, which would
+  write false `access.denied` rows. Prefetch requests (`Next-Router-Prefetch` /
+  `Purpose: prefetch` headers) are still denied but write no row. Pages also don't
+  render links the user can't use.
+- **Roles can be stale.** Roles sync from the IdP only at login. If someone loses a
+  role in the IdP, they keep it until their session ends (at most
+  `SESSION_TTL_HOURS`). Revoking the session row ends access at once. See Known gaps.
 - A1 roles: `analyst`, `approver`, `admin`. A1 permissions: `platform:access` (any
   role) and `audit:read` (admin). A signed-in user with no role sees a "no access" page.
 
@@ -167,18 +177,26 @@ The fix, set once in `docker-compose.yml`:
   or the audit insert throws, both roll back.
 - Each row records: when, who (user id and IdP subject), action, entity type and id,
   before/after JSON, an optional reason, and request metadata.
+- **Only `packages/core` writes to `audit_log`.** A test fails if any file outside
+  `packages/core/src/audit/` references the `auditLog` table for writing.
+- **Every business write goes through `withAudit`.** Each app's tests assert that each
+  write action produces its audit row (rule in ADDING-AN-APP.md).
 - Login, logout and denied access also write audit rows (`auth.login`, `auth.logout`,
   `access.denied`).
 
 ### 3.6 Append-only audit at the database level
 
 - A `BEFORE UPDATE OR DELETE` row trigger and a `BEFORE TRUNCATE` statement trigger on
-  `audit_log` raise an exception. This blocks every role, including the owner.
+  `audit_log` raise an exception. At runtime this blocks every role, including the
+  owner.
+- The trigger is not absolute. `app_owner` owns the table, so a migration could drop
+  or disable the trigger. That change would be a SQL file in `packages/db/migrations/`,
+  so it would be visible in review and in git history. Proving that nothing was
+  altered needs tamper-evidence (see Known gaps).
 - `app_runtime` (the role the app uses) has only `SELECT` and `INSERT` on `audit_log`.
   `UPDATE`, `DELETE` and `TRUNCATE` are revoked.
-- A Postgres superuser can still disable triggers. In production, nobody uses a
-  superuser at runtime, and the owner role isn't used by the app. Tamper-evidence
-  (hash chaining) and export are later options, not in A1.
+- A Postgres superuser can also disable triggers. Nobody uses a superuser or the owner
+  role at runtime.
 
 ### 3.7 Database roles
 
@@ -199,6 +217,8 @@ first start; CI runs the same file with `psql`.
   gap in research Q3, where system administrators bypass column security.)
 - Unmasking needs a permission **and** a non-empty reason, and writes a `field.unmask`
   audit row in the same transaction as the read.
+- Guard against leaks by accident: masked data has a `Masked<T>` type, and modules that
+  load raw rows import `server-only`, so a full row can't be passed to a client component.
 
 ## 4. `packages/core` scope
 
@@ -221,7 +241,10 @@ Each with a named test against real Postgres and a positive control:
 - **OIDC login and session:** a seeded Keycloak user can log in end to end (Playwright),
   logout works, and unauthenticated requests are redirected to `/login`.
 - **RBAC:** `requireRole` / `requirePermission` deny a user without the role, and allow
-  a user with it. A denial writes an `access.denied` audit row; an allowed call writes none.
+  a user with it. A denial writes an `access.denied` audit row; an allowed call writes
+  none; a denied prefetch writes none.
+- **Guards on every action:** every exported server action is built with `defineAction`.
+- **Audit writes only via core:** nothing outside `packages/core/src/audit/` writes to `audit_log`.
 - **Audit:** `withAudit` writes the change and the audit row together, and a failure
   rolls both back. As `app_runtime`, `UPDATE` and `DELETE` on `audit_log` fail;
   `INSERT` succeeds.
@@ -287,8 +310,7 @@ view → record form → command bar actions → timeline.
 | `AppShell` | Left nav (app sections), top bar with signed-in user and sign-out | Site map / navigator |
 | `ListView` | The queue: columns, select rows, search, sort and filter, paging, with a `CommandBar` slot for actions on selected rows | List view |
 | `CommandBar` | Row of actions for a list or a record (e.g. Assign, Approve, Reject) | Command bar |
-| `RecordHeader` | Record title, status badge, owner and key fields | Form heading bar |
-| `StageBar` | Ordered status stages with the current one highlighted | Business process flow bar |
+| `RecordHeader` | Record title, status badge, owner and key fields | Form heading bar (status also stands in for the business process flow bar) |
 | `Timeline` | Record history in one stream, newest first: audit events with who, when, what changed, reason | Timeline |
 | `Button`, `Input`, `Table`, `Badge`, `EmptyState` | Base components | — |
 
@@ -302,10 +324,33 @@ Rules:
 - Tokens are CSS variables in `tokens.css`. The palette is Cognition-inspired at most:
   neutral ink and off-white with one accent. No logos.
 - In A1 the audit viewer page uses `ListView`, and a demo record page under
-  `(platform)` uses `RecordHeader`, `CommandBar`, `StageBar` and `Timeline` with dummy data,
-  so each component is exercised before the first business app.
+  `(platform)` uses `RecordHeader`, `CommandBar` and `Timeline` with dummy data, so each
+  component is exercised before the first business app.
+- Kept minimal on purpose. The kit is based on Microsoft's docs, not the client's real
+  apps. Add components when a real app needs them.
 
-## 6. Ports and environment variables
+## 6. Known gaps (not in A1)
+
+Out of A1 on purpose. Each needs its own decision.
+
+| Gap | Why it matters | Planned |
+|---|---|---|
+| **DB-trigger audit on business tables** (with `SET LOCAL app.user_id`) | App-written audit misses raw SQL and code that skips `withAudit`; before/after values are only as good as the caller passes | Production hardening |
+| **Tamper-evidence** (hash-chained audit rows, export to storage outside the DB) | An auditor can verify nothing was altered, even by the owner or a DBA | Production hardening |
+| **Audit export** (CSV, admin-only, audited) | Research Q3: Dataverse has no native audit export | A2 or later |
+| **Read audit for sensitive records** | Research Q3: Dataverse logs reads only in production, via Purview | A2, with masking |
+| **Stale roles** (idle timeout, shorter TTL or back-channel logout) | Removing someone's role in the IdP takes effect only at their next login | Before production |
+| **Correlation ID on audit rows** | Trace one user action across rows and logs | Later |
+| **Accessibility baseline** (keyboard, focus, labels; axe check in E2E) | Ops staff use these screens all day | Later |
+| **Assign/ownership and bulk actions** | R2-Q2 Assign pattern; one audit row per record | With the first app that needs it |
+| **Approval notifications** (email/Teams) | Replaces what Power Automate sends today | Later |
+| **Dataverse data migration and cutover plan** | Probably the biggest hidden cost of replacing Power Apps | Separate plan |
+| **Outbound integration allowlist; dev/test/prod; deploy pipeline** | Equivalent of Power Platform DLP and environments (research Q2) | Production |
+| **Observability** (health check, error tracking, structured logs) | Running it in production | Production |
+| **Real Entra ID test** | "Env vars only" is unproven without a tenant | Before production |
+| **Single Next.js app** | One bad release affects all three apps; logic is in packages, so a split stays possible | Revisit if needed |
+
+## 7. Ports and environment variables
 
 | Service | Port |
 |---|---|
@@ -333,7 +378,7 @@ All values above are fake and local-dev-only. `.env.example` is the source of tr
 Demo users (Keycloak realm `internal-tools`, password `demo-only-change-me`):
 `analyst` (analyst), `approver` (approver), `admin` (admin), `norole` (no roles).
 
-## 7. File tree (end state of the A1 PR)
+## 8. File tree (end state of the A1 PR)
 
 ```
 .
@@ -354,7 +399,8 @@ Demo users (Keycloak realm `internal-tools`, password `demo-only-change-me`):
 │   └── blueprint.yaml
 ├── .github/
 │   └── workflows/
-│       └── ci.yml               # workflow "CI": job verify (required), job e2e (optional)
+│       └── ci.yml               # workflow "CI": jobs verify and e2e (both required)
+│   └── CODEOWNERS               # packages/core, AGENTS.md, .devin/ → @tompritch30
 ├── infra/
 │   ├── keycloak/
 │   │   └── internal-tools-realm.json   # realm, client, roles, demo users
@@ -382,9 +428,12 @@ Demo users (Keycloak realm `internal-tools`, password `demo-only-change-me`):
 │       │       ├── page.tsx     # home: signed-in user and roles
 │       │       ├── no-access/page.tsx
 │       │       ├── audit/page.tsx   # admin-only, read-only audit viewer (ListView)
-│       │       └── demo-record/page.tsx  # UI kit demo: RecordHeader, CommandBar, StageBar, Timeline
+│       │       └── demo-record/page.tsx  # UI kit demo: RecordHeader, CommandBar, Timeline
 │       ├── lib/
 │       │   └── auth.ts          # Next glue: cookies → core session/rbac
+│       ├── test/
+│       │   ├── proxy.test.ts            # unauthenticated → /login
+│       │   └── actions-use-define-action.test.ts
 │       └── e2e/
 │           └── login.spec.ts
 ├── packages/
@@ -398,7 +447,8 @@ Demo users (Keycloak realm `internal-tools`, password `demo-only-change-me`):
 │   │   │   ├── auth/oidc.ts
 │   │   │   ├── session/session.ts
 │   │   │   ├── rbac/permissions.ts
-│   │   │   ├── rbac/guards.ts
+│   │   │   ├── rbac/guards.ts       # requireRole, requirePermission, access.denied audit
+│   │   │   ├── rbac/define-action.ts
 │   │   │   ├── audit/with-audit.ts
 │   │   │   ├── audit/queries.ts     # audit viewer + listAuditForEntity (Timeline)
 │   │   │   └── errors.ts
@@ -407,7 +457,8 @@ Demo users (Keycloak realm `internal-tools`, password `demo-only-change-me`):
 │   │       ├── session.test.ts
 │   │       ├── rbac.test.ts
 │   │       ├── audit.test.ts
-│   │       └── audit-append-only.test.ts
+│   │       ├── audit-append-only.test.ts
+│   │       └── audit-writes-only-via-core.test.ts
 │   ├── db/
 │   │   ├── package.json
 │   │   ├── tsconfig.json
@@ -434,7 +485,6 @@ Demo users (Keycloak realm `internal-tools`, password `demo-only-change-me`):
 │           ├── ListView.tsx
 │           ├── CommandBar.tsx
 │           ├── RecordHeader.tsx
-│           ├── StageBar.tsx
 │           └── Timeline.tsx
 └── docs/
     ├── ARCHITECTURE.md
