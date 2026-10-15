@@ -1,5 +1,5 @@
 /** Highest page a list will request; keeps `(page - 1) * pageSize` a safe database offset. */
-export const MAX_PAGE = 10_000;
+export const MAX_PAGE = 1_000_000_000;
 
 /** Parses a `?page=` value: a whole number from 1 to MAX_PAGE, else page 1. */
 export function parsePageParam(raw: string | undefined): number {
