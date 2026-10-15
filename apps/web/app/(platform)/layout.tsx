@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { headers } from "next/headers";
-import { House, LogOut, ScrollText, SquareKanban } from "lucide-react";
+import { Banknote, ClipboardCheck, House, LogOut, ScrollText, SquareKanban } from "lucide-react";
 import { AppShell, Button, type NavItem } from "@fit/ui";
 import { requireUser } from "../../lib/auth.ts";
 
@@ -17,6 +17,10 @@ export default async function PlatformLayout({ children }: { children: ReactNode
       { href: "/demo-record", label: "Demo record", icon: <SquareKanban /> },
     );
   }
+  if (user.permissions.has("refunds:read")) {
+    nav.push({ href: "/refunds", label: "Refunds", icon: <Banknote /> });
+  }
+  if (user.permissions.has("refunds:approve")) nav.push({ href: "/refunds/approvals", label: "Approvals", icon: <ClipboardCheck /> });
   if (user.permissions.has("audit:read")) nav.push({ href: "/audit", label: "Audit log", icon: <ScrollText /> });
 
   return (

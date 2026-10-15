@@ -69,6 +69,7 @@ services:
       OIDC_ROLES_CLAIM: roles
       OIDC_ALLOW_INSECURE_HTTP: "true"
       SESSION_TTL_HOURS: "8"
+      REFUND_APPROVAL_THRESHOLD_PENCE: "25000"
     ports:
       - "3000:3000"
     depends_on:
