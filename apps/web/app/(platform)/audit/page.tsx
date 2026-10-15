@@ -1,6 +1,7 @@
 import { listAudit, type AuditListItem } from "@fit/core";
 import { Badge, ListView, type ListColumn } from "@fit/ui";
 import { getDb, requirePagePermission } from "../../../lib/auth.ts";
+import { parsePageParam } from "../../../lib/page-param.ts";
 
 const PAGE_SIZE = 25;
 
@@ -27,7 +28,7 @@ export default async function AuditPage({
     search: params.q,
     sort: params.sort === "occurredAt" ? "occurredAt" : undefined,
     dir: params.dir === "asc" ? ("asc" as const) : ("desc" as const),
-    page: Math.max(1, Number(params.page) || 1),
+    page: parsePageParam(params.page),
   };
   const { rows, total } = await listAudit(getDb(), { search: query.search, page: query.page, pageSize: PAGE_SIZE, dir: query.dir });
 

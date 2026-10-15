@@ -3,6 +3,7 @@ import { ListView, type ListColumn } from "@fit/ui";
 import { getDb, requirePagePermission } from "../../../../lib/auth.ts";
 import { listPendingFlagChanges, type FlagChangeView } from "../flags.ts";
 import { describeFlagValue, formatWhen } from "../format.ts";
+import { parsePageParam } from "../../../../lib/page-param.ts";
 
 const PAGE_SIZE = 20;
 
@@ -26,7 +27,7 @@ const columns: ListColumn<FlagChangeView>[] = [
 export default async function FlagApprovalsPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
   const user = await requirePagePermission("flags:approve", "/flags/approvals");
   const params = await searchParams;
-  const query = { search: params.q, page: Math.max(1, Math.floor(Number(params.page)) || 1) };
+  const query = { search: params.q, page: parsePageParam(params.page) };
   const all = await listPendingFlagChanges({ db: getDb(), user }, { q: query.search });
   return (
     <div className="stack">
