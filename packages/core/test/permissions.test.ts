@@ -62,16 +62,17 @@ describe("definePermissionRegistry", () => {
 });
 
 describe("permission registry", () => {
-  it("ROLE_PERMISSIONS is unchanged by the registry", () => {
+  it("ROLE_PERMISSIONS matches the registry's grants", () => {
     const sorted = (p: readonly string[]) => [...p].sort();
-    expect(sorted(ROLE_PERMISSIONS.analyst)).toEqual(sorted(["platform:access", "approvals:request"]));
-    expect(sorted(ROLE_PERMISSIONS.approver)).toEqual(sorted(["platform:access", "approvals:decide", "pii:unmask"]));
+    expect(sorted(ROLE_PERMISSIONS.analyst)).toEqual(sorted(["platform:access", "approvals:request", "refunds:read", "refunds:request"]));
+    expect(sorted(ROLE_PERMISSIONS.approver)).toEqual(sorted(["platform:access", "approvals:decide", "pii:unmask", "refunds:read", "refunds:approve"]));
     expect(sorted(ROLE_PERMISSIONS.admin)).toEqual(sorted(["platform:access", "audit:read"]));
   });
 
   it("admin holds no approve or unmask permission", () => {
     expect(ROLE_PERMISSIONS.admin).not.toContain("approvals:decide");
     expect(ROLE_PERMISSIONS.admin).not.toContain("pii:unmask");
+    expect(ROLE_PERMISSIONS.admin).not.toContain("refunds:approve");
   });
 
   it("the registry and role map can't be changed at runtime", () => {
@@ -83,10 +84,10 @@ describe("permission registry", () => {
   });
 
   it("isPermission accepts registered permissions and rejects others", () => {
-    for (const p of ["platform:access", "audit:read", "approvals:request", "approvals:decide", "pii:unmask"]) {
+    for (const p of ["platform:access", "audit:read", "approvals:request", "approvals:decide", "pii:unmask", "refunds:approve"]) {
       expect(isPermission(p)).toBe(true);
     }
-    for (const p of ["refunds:approve", "admin", "platform:acces", "", "approvals:decide "]) {
+    for (const p of ["refunds:delete", "admin", "platform:acces", "", "approvals:decide "]) {
       expect(isPermission(p)).toBe(false);
     }
   });

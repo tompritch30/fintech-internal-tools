@@ -11,7 +11,7 @@ import { UNMASK_RATE_LIMIT } from "./rate-limit.ts";
 
 export { UNMASK_RATE_LIMIT } from "./rate-limit.ts";
 
-export type MaskStyle = "last4" | "full" | "email";
+export type MaskStyle = "last4" | "full" | "email" | "name";
 
 /** Keys of T whose values are strings (or nullable/optional strings). */
 type StringField<T> = {
@@ -55,6 +55,15 @@ function maskValue(value: string, style: MaskStyle): string {
       if (local.length >= 2) return `${local[0]}${BULLET.repeat(3)}@${domain}`;
       if (local.length === 1) return `${BULLET.repeat(3)}@${domain}`;
       return FULL;
+    }
+    case "name": {
+      // First name + last name's initial ("Jane S."); a single-word name shows only its initial.
+      const parts = value.trim().split(/\s+/).filter(Boolean);
+      const first = parts[0];
+      const last = parts.at(-1);
+      if (!first || !last) return FULL;
+      if (parts.length === 1) return `${[...first][0]}${BULLET.repeat(3)}`;
+      return `${first} ${[...last][0]}.`;
     }
   }
 }

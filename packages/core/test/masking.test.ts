@@ -117,6 +117,22 @@ describe("mask", () => {
   });
 });
 
+describe("name style", () => {
+  const policy = [{ field: "name", style: "name", unmaskPermission: "pii:unmask" }] as const;
+  const masked = (name: string) => mask({ id: "1", name }, policy).name;
+
+  it("shows only the first name and the last name's initial", () => {
+    expect(masked("Jane Smith")).toBe("Jane S.");
+    expect(masked("  Mary Jo   van der Berg ")).toBe("Mary B.");
+    expect(masked("Siân O'Neill")).toBe("Siân O.");
+  });
+
+  it("never shows a single-word name in full", () => {
+    expect(masked("Cher")).toBe("C•••");
+    expect(masked("   ")).toBe("••••••••");
+  });
+});
+
 describe("unmask", () => {
   it("rejects unmask without the field's unmask permission", async () => {
     const { id } = await userWithEmail();
