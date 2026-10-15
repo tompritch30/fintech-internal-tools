@@ -22,16 +22,22 @@ function day(value: string | undefined): Date | undefined {
   return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== value ? undefined : d;
 }
 
-const text = (value: string | undefined) => {
-  const v = value?.trim().slice(0, MAX_LENGTH);
+/** A URL search param; repeated keys arrive as an array, and only the first is used. */
+export type SearchParam = string | string[] | undefined;
+const first = (v: SearchParam) => (Array.isArray(v) ? v[0] : v);
+
+const text = (param: SearchParam) => {
+  const v = first(param)?.trim().slice(0, MAX_LENGTH);
   return v ? v : undefined;
 };
 
 /** Keeps only well-formed filters; anything else is dropped rather than guessed at. */
-export function parseAuditFilters(params: Record<string, string | undefined>): AuditFilters {
+export function parseAuditFilters(params: Record<string, SearchParam>): AuditFilters {
+  const from = first(params.from);
+  const to = first(params.to);
   return {
-    from: day(params.from) ? params.from : undefined,
-    to: day(params.to) ? params.to : undefined,
+    from: day(from) ? from : undefined,
+    to: day(to) ? to : undefined,
     user: text(params.user),
     action: text(params.action),
     recordType: text(params.recordType),

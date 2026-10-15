@@ -31,12 +31,12 @@ const requesterName = sql<string>`coalesce(${users.displayName}, ${users.usernam
  * Pending approvals this user could decide: kinds they hold the approve permission for,
  * excluding ones they requested (the four-eyes rule would refuse those anyway).
  */
-export async function awaitingMyApproval(db: Db, user: Viewer, opts: { limit?: number } = {}): Promise<{ items: AwaitingItem[]; total: number }> {
+export async function awaitingMyApproval(db: Db, user: Viewer, opts: { limit?: number } = {}): Promise<{ items: AwaitingItem[]; total: number; byKind: { refunds: number; kyc: number } }> {
   const limit = opts.limit ?? LIMIT;
   const pendingFromOthers = (kind: string) =>
     and(eq(approvalRequests.kind, kind), eq(approvalRequests.status, "pending"), ne(approvalRequests.requestedBy, user.id));
   const items: AwaitingItem[] = [];
-  let total = 0;
+  const byKind = { refunds: 0, kyc: 0 };
   if (user.permissions.has(refundApproval.approvePermission)) {
     const where = pendingFromOthers(refundApproval.kind);
     const rows = await db
@@ -49,7 +49,7 @@ export async function awaitingMyApproval(db: Db, user: Viewer, opts: { limit?: n
       .orderBy(approvalRequests.requestedAt)
       .limit(limit);
     const [n] = await db.select({ n: count() }).from(approvalRequests).where(where);
-    total += n?.n ?? 0;
+    byKind.refunds = n?.n ?? 0;
     for (const r of rows) {
       items.push({
         id: r.id,
@@ -72,13 +72,13 @@ export async function awaitingMyApproval(db: Db, user: Viewer, opts: { limit?: n
       .orderBy(approvalRequests.requestedAt)
       .limit(limit);
     const [n] = await db.select({ n: count() }).from(approvalRequests).where(where);
-    total += n?.n ?? 0;
+    byKind.kyc = n?.n ?? 0;
     for (const r of rows) {
       items.push({ id: r.id, kind: "KYC sign-off", title: r.reference, href: `/kyc/cases/${r.id}`, requestedByName: r.requestedByName, requestedAt: r.requestedAt });
     }
   }
   items.sort((a, b) => a.requestedAt.getTime() - b.requestedAt.getTime());
-  return { items: items.slice(0, limit), total };
+  return { items: items.slice(0, limit), total: byKind.refunds + byKind.kyc, byKind };
 }
 
 const RECORD_LINKS: Record<string, { permission: string; href: (id: string) => string }> = {

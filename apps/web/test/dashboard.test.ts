@@ -36,6 +36,18 @@ describe("dashboard: items waiting for my approval", () => {
     expect(item).toMatchObject({ kind: "Refund", href: `/refunds/requests/${refund.id}` });
   });
 
+  it("counts each kind separately, so a full list of sign-offs can't hide waiting refunds", async () => {
+    await pendingRefundBy(["analyst"]);
+    const { user } = await as(["approver"]);
+    const all = await awaitingMyApproval(db, user, ALL);
+    const one = await awaitingMyApproval(db, user, { limit: 1 });
+    expect(one.items).toHaveLength(1);
+    const refunds = all.items.filter((i) => i.kind === "Refund").length;
+    expect(refunds).toBeGreaterThan(0);
+    expect(one.byKind).toEqual({ refunds, kyc: all.items.length - refunds });
+    expect(one.total).toBe(all.items.length);
+  });
+
   it("leaves out a refund the approver requested themselves", async () => {
     const { maker, refund } = await pendingRefundBy(["analyst", "approver"]);
     expect(await ids(maker.user)).not.toContain(refund.id);
@@ -45,7 +57,7 @@ describe("dashboard: items waiting for my approval", () => {
 
   it("shows nothing to a user without approver rights", async () => {
     await pendingRefundBy(["analyst"]);
-    expect(await awaitingMyApproval(db, (await as(["analyst"])).user, ALL)).toEqual({ items: [], total: 0 });
+    expect(await awaitingMyApproval(db, (await as(["analyst"])).user, ALL)).toEqual({ items: [], total: 0, byKind: { refunds: 0, kyc: 0 } });
   });
 
   it("lists a high-risk KYC sign-off for a different approver, not for the analyst-approver who asked", async () => {

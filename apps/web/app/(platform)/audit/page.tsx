@@ -1,7 +1,7 @@
 import type { AuditListItem } from "@fit/core";
 import { FilterBar, ListView, PageHeader, StatusBadge, type ListColumn } from "@fit/ui";
 import { getDb, requirePagePermission } from "../../../lib/auth.ts";
-import { auditFilterOptions, parseAuditFilters, searchAudit } from "./query.ts";
+import { auditFilterOptions, parseAuditFilters, searchAudit, type SearchParam } from "./query.ts";
 
 const PAGE_SIZE = 25;
 
@@ -15,7 +15,7 @@ const columns: ListColumn<AuditListItem>[] = [
 
 const opts = (values: string[]) => values.map((v) => ({ value: v, label: v }));
 
-export default async function AuditPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+export default async function AuditPage({ searchParams }: { searchParams: Promise<Record<string, SearchParam>> }) {
   await requirePagePermission("audit:read", "/audit");
   const params = await searchParams;
   const filters = parseAuditFilters(params);

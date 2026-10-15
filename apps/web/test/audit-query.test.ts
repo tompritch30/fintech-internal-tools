@@ -54,6 +54,10 @@ describe("audit log filters", () => {
     expect((await searchAudit(db, { recordId: "%" }, PAGE)).total).toBe(0);
   });
 
+  it("uses the first value when a filter is repeated in the URL", () => {
+    expect(parseAuditFilters({ action: ["refund.requested", "auth.login"], from: ["2026-10-01", "x"] })).toMatchObject({ action: "refund.requested", from: "2026-10-01" });
+  });
+
   it("drops malformed dates and blank values instead of guessing", () => {
     expect(parseAuditFilters({ from: "2026-02-30", to: "yesterday", user: "  ", action: "refund.requested" })).toEqual({
       from: undefined,
