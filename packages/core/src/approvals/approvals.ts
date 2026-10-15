@@ -35,8 +35,54 @@ export interface ApprovalKind<P = unknown> {
   onApproved?: (tx: Tx, request: ApprovalRequest<P>) => Promise<void>;
 }
 
+type NonJson =
+  | undefined
+  | bigint
+  | symbol
+  | Date
+  | Map<unknown, unknown>
+  | Set<unknown>
+  | RegExp
+  | ((...args: never[]) => unknown);
+
+/**
+ * Whether T (or a union member, element or property, recursively) can't round-trip
+ * through JSON. Optional properties are fine — an absent value stays absent.
+ * The array branch runs before the object branch so array methods aren't scanned.
+ */
+type HasNonJson<T> = T extends NonJson
+  ? true
+  : T extends readonly (infer U)[]
+    ? HasNonJson<U>
+    : T extends object
+      ? false extends { [K in keyof T]-?: HasNonJson<NonNullable<T[K]>> }[keyof T]
+        ? false
+        : true
+      : false;
+
+/** Payloads are stored as JSONB; types JSON can't round-trip are refused. */
+type JsonPayload<P> = true extends HasNonJson<P> ? { readonly payloadMustBeJsonSafe: never } : unknown;
+
+/** Runtime counterpart of JsonPayload: payloads must survive a JSON round-trip. */
+function isJsonSafe(value: unknown): boolean {
+  if (value === null) return true;
+  switch (typeof value) {
+    case "string":
+    case "boolean":
+      return true;
+    case "number":
+      return Number.isFinite(value);
+    case "object":
+      if (Array.isArray(value)) return value.every(isJsonSafe);
+      if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) return false;
+      return Object.values(value).every((v) => v === undefined || isJsonSafe(v));
+    default:
+      return false;
+  }
+}
+
 /** Declares an approval kind next to the app that owns the subject type. */
-export function defineApprovalKind<P>(def: ApprovalKind<P>): ApprovalKind<P> {
+export function defineApprovalKind<P>(def: ApprovalKind<P> & JsonPayload<P>): ApprovalKind<P> {
   return def;
 }
 
@@ -71,9 +117,13 @@ const actorRef = (actor: SessionUser) => ({ id: actor.id, subject: actor.subject
 export async function requestApproval<P>(
   db: Db,
   actor: SessionUser,
-  kind: ApprovalKind<P>,
+  kind: ApprovalKind<P> & JsonPayload<P>,
   input: { subjectId: string; payload: P },
 ): Promise<ApprovalRequest<P>> {
+  // Untrusted input: payloads go to JSONB, so refuse anything JSON can't round-trip.
+  if (!isJsonSafe(input.payload)) {
+    throw new ValidationError("approval payload must be JSON-safe (no Date, bigint, Map, class instances, NaN/Infinity)");
+  }
   await requirePermission({ db, user: actor, resource: `approval-kind:${kind.kind}` }, kind.requestPermission);
   return withAudit(
     db,

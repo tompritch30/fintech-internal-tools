@@ -23,14 +23,14 @@ export interface MaskPolicy<F extends string = string> {
 declare const maskedBrand: unique symbol;
 export type MaskedValue = string & { readonly [maskedBrand]: "MaskedValue" };
 export type Masked<T, F extends keyof T> = {
-  [K in keyof T]: K extends F
-    ? null extends T[K]
-      ? MaskedValue | null
-      : undefined extends T[K]
-        ? MaskedValue | undefined
-        : MaskedValue
-    : T[K];
+  [K in keyof T]: K extends F ? MaskedValue | Extract<T[K], null | undefined> : T[K];
 } & { readonly [maskedBrand]: "Masked" };
+
+type Primitive = string | number | boolean | bigint | symbol | null | undefined;
+/** Keys of T holding anything but primitives or Date (objects, arrays, unknown/jsonb). */
+type NestedKeys<T> = {
+  [K in keyof T]-?: NonNullable<T[K]> extends Primitive | Date ? never : K;
+}[keyof T];
 
 const BULLET = "•";
 /** Fixed length so the masked value doesn't leak the original's length. */
@@ -57,11 +57,21 @@ function maskValue(value: string, style: MaskStyle): string {
 /**
  * Masks the policy fields of `record` in a shallow copy; never mutates the input.
  * Takes no actor or role on purpose: masking always applies, there is no bypass.
+ * Fails closed on nested values: an object or array field that isn't a policy field
+ * is a compile-time error (`NestedKeys<T>` resolves to `never`) and a runtime
+ * ValidationError — mask nested records separately and combine them. Date fields
+ * pass through; they serialize as ISO strings.
  */
 export function mask<T extends object, const P extends readonly MaskPolicy<StringField<T>>[]>(
-  record: T,
+  record: T & { [K in NestedKeys<T>]: never },
   policies: P,
 ): Masked<T, P[number]["field"]> {
+  const policyFields = new Set<string>(policies.map((p) => p.field));
+  for (const [key, value] of Object.entries(record)) {
+    if (policyFields.has(key)) continue;
+    if (value === null || typeof value !== "object" || value instanceof Date) continue;
+    throw new ValidationError(`mask: field ${key} holds a nested value; mask it as its own record`);
+  }
   const out = { ...record } as Record<string, unknown>;
   for (const policy of policies) {
     const value = out[policy.field];
