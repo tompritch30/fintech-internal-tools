@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   sessionToken: "",
 }));
 
+vi.mock("server-only", () => ({}));
+
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (name: string) => (name === "fit_session" && mocks.sessionToken ? { value: mocks.sessionToken } : undefined),
