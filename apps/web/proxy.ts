@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@fit/core/cookie";
 
 export function isPublicPath(pathname: string): boolean {
-  return pathname === "/login" || pathname.startsWith("/auth/");
+  // /api/flags authenticates services with its own bearer token (app/api/flags/route.ts).
+  return pathname === "/login" || pathname.startsWith("/auth/") || pathname === "/api/flags";
 }
 
 /**

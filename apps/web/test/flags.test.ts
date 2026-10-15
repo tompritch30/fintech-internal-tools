@@ -12,6 +12,7 @@ import {
   changeFlag,
   flagHistory,
   getFlagView,
+  killFlag,
   listFlags,
   listPendingFlagChanges,
   loadFlagsServiceConfig,
@@ -161,7 +162,7 @@ describe("rule 2: engineers change dev and staging directly", () => {
     expect(outcome).toBe("applied");
     expect(await valueOf(flag.id, "dev")).toMatchObject({ enabled: true, rolloutPercentage: 50, updatedBy: maker.user.id });
     const [row] = await auditFor(flag.id, "flag.value_changed");
-    expect(row).toMatchObject({ actorId: maker.user.id, entityType: "flag", reason: "Rolling out to more traffic" });
+    expect(row).toMatchObject({ actorUserId: maker.user.id, entityType: "flag", reason: "Rolling out to more traffic" });
     expect(row?.before).toEqual({ environment: "dev", enabled: false, rolloutPercentage: 0 });
     expect(row?.after).toMatchObject({ environment: "dev", enabled: true, rolloutPercentage: 50 });
     expect(await changesFor(flag.id)).toHaveLength(0);
@@ -211,7 +212,7 @@ describe("rule 2: engineers change dev and staging directly", () => {
     const denied = await db
       .select()
       .from(auditLog)
-      .where(and(eq(auditLog.actorId, checker.user.id), eq(auditLog.action, "access.denied")));
+      .where(and(eq(auditLog.actorUserId, checker.user.id), eq(auditLog.action, "access.denied")));
     expect(denied).toHaveLength(1);
     expect(await valueOf(flag.id, "dev")).toMatchObject(OFF);
   });
@@ -257,7 +258,7 @@ describe("rule 3: turning a flag on or changing it in prod needs a different app
     expect(decided.status).toBe("applied");
     expect(await valueOf(flag.id, "prod")).toMatchObject({ enabled: true, rolloutPercentage: 25, updatedBy: checker.user.id });
     const [applied] = await auditFor(flag.id, "flag.change_applied");
-    expect(applied?.actorId).toBe(checker.user.id);
+    expect(applied?.actorUserId).toBe(checker.user.id);
     expect(applied?.before).toEqual({ environment: "prod", enabled: false, rolloutPercentage: 0 });
     expect(applied?.after).toMatchObject({ environment: "prod", enabled: true, rolloutPercentage: 25, changeId: change.id });
   });
@@ -369,7 +370,7 @@ describe("rule 4: turning a flag off in prod is an immediate, audited kill switc
     expect(await valueOf(flag.id, "prod")).toMatchObject({ enabled: false, rolloutPercentage: 40 });
     expect(await changesFor(flag.id)).toHaveLength(0);
     const [row] = await auditFor(flag.id, "flag.killed");
-    expect(row).toMatchObject({ actorId: maker.user.id, reason: "Errors spiking" });
+    expect(row).toMatchObject({ actorUserId: maker.user.id, reason: "Errors spiking" });
     expect(row?.before).toEqual({ environment: "prod", enabled: true, rolloutPercentage: 40 });
     expect(row?.after).toMatchObject({ environment: "prod", enabled: false, rolloutPercentage: 40 });
   });
@@ -379,6 +380,15 @@ describe("rule 4: turning a flag off in prod is an immediate, audited kill switc
     const kill = await input(flag.id, "prod", { enabled: false, rolloutPercentage: 40 }, { expectedVersion: 0 });
     expect((await changeFlag(await analyst(), kill)).outcome).toBe("killed");
     expect((await valueOf(flag.id, "prod")).enabled).toBe(false);
+  });
+
+  it("the kill switch button turns prod off whatever rollout the page showed", async () => {
+    const flag = await newFlag({ prod: { enabled: true, rolloutPercentage: 40 } });
+    const view = await killFlag(await analyst(), { flagId: flag.id, reason: "Incident" });
+    expect(view.values.prod).toMatchObject({ enabled: false, rolloutPercentage: 40 });
+    expect(await auditFor(flag.id, "flag.killed")).toHaveLength(1);
+    await expect(killFlag(await analyst(), { flagId: flag.id, reason: "Again" })).rejects.toThrow(ConflictError);
+    await expect(killFlag(await approver(), { flagId: flag.id, reason: "Not mine" })).rejects.toThrow(ForbiddenError);
   });
 
   it("still needs a reason", async () => {
@@ -411,7 +421,7 @@ describe("rule 4: turning a flag off in prod is an immediate, audited kill switc
     const denied = await db
       .select()
       .from(auditLog)
-      .where(and(eq(auditLog.actorId, checker.user.id), eq(auditLog.action, "access.denied")));
+      .where(and(eq(auditLog.actorUserId, checker.user.id), eq(auditLog.action, "access.denied")));
     expect(denied).toHaveLength(1);
   });
 });
@@ -459,6 +469,7 @@ describe("rule 5: rollout percentage is a whole number from 0 to 100", () => {
 });
 
 describe("rule 6: every flag has a change history with before and after values", () => {
+  // Within one transaction core writes the approval row after the app's hook, so it sorts first.
   it("lists dev changes, prod requests, decisions and kills newest first", async () => {
     const { flag, change } = await pendingProdChange();
     const maker = await analyst();
@@ -468,11 +479,11 @@ describe("rule 6: every flag has a change history with before and after values",
     const history = await flagHistory(db, flag.id);
     expect(history.map((h) => h.action)).toEqual([
       "flag.killed",
-      "flag.change_applied",
       "approval.approved",
+      "flag.change_applied",
       "flag.value_changed",
-      "flag.change_requested",
       "approval.requested",
+      "flag.change_requested",
     ]);
   });
 
