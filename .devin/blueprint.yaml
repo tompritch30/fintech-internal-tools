@@ -1,13 +1,15 @@
 # https://docs.devin.ai/onboard-devin/environment-yaml
 # Commands run from the repo root. Docker + Compose come with the base image.
 initialize:
+  # Install into /usr/local even if another Node 24 is on PATH (e.g. the base image's nvm):
+  # nvm's bin dir isn't in sudo's secure_path or in session shells, so it can't be relied on.
   - name: Node 24 (matches .nvmrc)
     run: |
-      if ! node --version 2>/dev/null | grep -q '^v24\.'; then
+      if ! /usr/local/bin/node --version 2>/dev/null | grep -q '^v24\.'; then
         curl -fsSL https://nodejs.org/dist/v24.22.0/node-v24.22.0-linux-x64.tar.xz | sudo tar -xJ -C /usr/local --strip-components=1
       fi
   - name: pnpm via Corepack (version from package.json packageManager)
-    run: sudo corepack enable && corepack install
+    run: sudo /usr/local/bin/corepack enable && /usr/local/bin/corepack install
 maintenance: |
   pnpm install
 knowledge:
