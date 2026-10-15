@@ -297,12 +297,13 @@ describe("rule 3: card numbers are never stored; the email is masked", () => {
     expect(JSON.stringify(row)).not.toContain(payment.customerName);
   });
 
-  it("refund audit rows never contain the customer email", async () => {
+  it("refund audit rows never contain the customer email or full name", async () => {
     const { payment, refund } = await pendingRefund();
     await approveRefund(await approver(), { refundId: refund.id, expectedVersion: 1 });
     const history = await refundHistory(db, refund.id);
     expect(history.length).toBeGreaterThan(0);
     expect(JSON.stringify(history)).not.toContain(payment.customerEmail);
+    expect(JSON.stringify(history)).not.toContain(payment.customerName);
   });
 });
 
