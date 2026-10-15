@@ -399,6 +399,21 @@ describe("approval hooks", () => {
 });
 
 describe("approval notes and cancellation", () => {
+  it("rejects a decision that is neither approve nor reject", async () => {
+    const { request } = await newRequest();
+    const { user: dec } = await approver();
+    await expect(
+      // Untrusted input can carry a non-literal decision past the type.
+      decideApproval(db, dec, payoutKind, {
+        id: request.id,
+        decision: "REJECT" as never,
+        expectedVersion: 1,
+      }),
+    ).rejects.toThrow(ValidationError);
+    expect((await requestRow(request.id))).toMatchObject({ status: "pending", version: 1 });
+    expect(await auditRows(request.id, "approval.rejected")).toHaveLength(0);
+  });
+
   it.each([undefined, "   "])("rejects a rejection without a note (%j)", async (note) => {
     const { request } = await newRequest();
     const { user: dec } = await approver();

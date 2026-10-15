@@ -105,6 +105,10 @@ export async function decideApproval<P>(
   kind: ApprovalKind<P>,
   input: { id: string; decision: "approve" | "reject"; note?: string; expectedVersion: number },
 ): Promise<ApprovalRequest<P>> {
+  // Untrusted input: anything but the two literal decisions is invalid, before any DB access.
+  if (input.decision !== "approve" && input.decision !== "reject") {
+    throw new ValidationError(`invalid approval decision: ${String(input.decision)}`);
+  }
   const note = input.note?.trim() || null;
   if (input.decision === "reject" && !note) throw new ValidationError("rejecting an approval requires a note");
   const row = await loadRow(db, input.id);
