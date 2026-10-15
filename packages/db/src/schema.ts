@@ -1,0 +1,87 @@
+import { sql } from "drizzle-orm";
+import {
+  bigint,
+  index,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
+
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  /** The IdP's stable subject (`sub`) for this user. */
+  subject: text("subject").notNull().unique(),
+  username: text("username").notNull(),
+  email: text("email"),
+  displayName: text("display_name"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+});
+
+export const roles = pgTable("roles", {
+  name: text("name").primaryKey(),
+  description: text("description").notNull(),
+});
+
+export const userRoles = pgTable(
+  "user_roles",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    roleName: text("role_name")
+      .notNull()
+      .references(() => roles.name),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.roleName] })],
+);
+
+export const sessions = pgTable(
+  "sessions",
+  {
+    /** SHA-256 (hex) of the session token. The token itself is only in the cookie. */
+    id: text("id").primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    /** Kept only to send as id_token_hint on logout. */
+    idToken: text("id_token"),
+  },
+  (t) => [index("sessions_user_id_idx").on(t.userId)],
+);
+
+/**
+ * Append-only. UPDATE/DELETE/TRUNCATE are blocked by triggers and grants
+ * (see migrations/0001_audit_append_only.sql). Write only via @fit/core audit.
+ */
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+    actorUserId: uuid("actor_user_id").references(() => users.id),
+    actorSubject: text("actor_subject"),
+    action: text("action").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    reason: text("reason"),
+    before: jsonb("before"),
+    after: jsonb("after"),
+    metadata: jsonb("metadata"),
+  },
+  (t) => [
+    index("audit_log_entity_idx").on(t.entityType, t.entityId),
+    index("audit_log_occurred_at_idx").on(t.occurredAt),
+  ],
+);
+
+export type User = typeof users.$inferSelect;
+export type AuditLogRow = typeof auditLog.$inferSelect;
+export type NewAuditLogRow = typeof auditLog.$inferInsert;

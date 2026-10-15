@@ -1,0 +1,141 @@
+{
+  "realm": "internal-tools",
+  "enabled": true,
+  "displayName": "Internal tools (LOCAL DEV ONLY)",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": false,
+  "accessTokenLifespan": 300,
+  "roles": {
+    "realm": [
+      {
+        "name": "analyst",
+        "description": "Works the queues"
+      },
+      {
+        "name": "approver",
+        "description": "Approves or rejects requests"
+      },
+      {
+        "name": "admin",
+        "description": "Platform admin"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "internal-tools-web",
+      "name": "Internal tools web (local dev)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "demo-only-change-me",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/auth/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/login"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm roles as roles claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "multivalued": "true",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "username": "analyst",
+      "enabled": true,
+      "email": "analyst@example.test",
+      "emailVerified": true,
+      "firstName": "Avery",
+      "lastName": "Analyst",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo-only-change-me",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "analyst"
+      ]
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "username": "approver",
+      "enabled": true,
+      "email": "approver@example.test",
+      "emailVerified": true,
+      "firstName": "Parker",
+      "lastName": "Approver",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo-only-change-me",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "approver"
+      ]
+    },
+    {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@example.test",
+      "emailVerified": true,
+      "firstName": "Morgan",
+      "lastName": "Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo-only-change-me",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "admin"
+      ]
+    },
+    {
+      "id": "44444444-4444-4444-8444-444444444444",
+      "username": "norole",
+      "enabled": true,
+      "email": "norole@example.test",
+      "emailVerified": true,
+      "firstName": "Nico",
+      "lastName": "Norole",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo-only-change-me",
+          "temporary": false
+        }
+      ],
+      "realmRoles": []
+    }
+  ]
+}
