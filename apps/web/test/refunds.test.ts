@@ -10,6 +10,7 @@ import {
   approveRefund,
   getPaymentView,
   listPendingRefundApprovals,
+  parsePounds,
   loadRefundConfig,
   refundHistory,
   rejectRefund,
@@ -117,6 +118,27 @@ describe("rule 1: an analyst finds a payment and requests a refund with a reason
       await expect(requestRefund(maker, refundInput(payment.id, amount), config)).rejects.toBeInstanceOf(ValidationError);
     }
     expect(await refundRows(payment.id)).toHaveLength(0);
+  });
+
+  it("refuses a misplaced comma in the amount instead of guessing", () => {
+    for (const bad of ["1,20", "12,0", ",120", "1,2000", "1,,200"]) expect(() => parsePounds(bad)).toThrow(ValidationError);
+  });
+
+  it("reads thousands separators and pence correctly (positive control)", () => {
+    expect(parsePounds("£1,200.50")).toBe(120_050);
+    expect(parsePounds("1,234,567")).toBe(123_456_700);
+    expect(parsePounds("250.01")).toBe(25_001);
+  });
+
+  it("serves a valid page for malformed page numbers and over-long searches", async () => {
+    const payment = await newPayment(5_000);
+    for (const p of [1.01, Number.POSITIVE_INFINITY, Number.NaN, -3]) {
+      await expect(searchPayments(db, { page: p, pageSize: 5 })).resolves.toMatchObject({ rows: expect.any(Array) });
+    }
+    const { rows } = await searchPayments(db, { search: payment.reference + "x".repeat(10_000) });
+    expect(rows).toEqual([]);
+    const control = await searchPayments(db, { search: payment.reference, page: 1 });
+    expect(control.rows.map((r) => r.id)).toEqual([payment.id]);
   });
 
   it("denies a user without approvals:request and audits the denial", async () => {

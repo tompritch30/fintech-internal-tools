@@ -108,8 +108,10 @@ const MAX_REASON = 500;
 
 /** "12.34", "£1,200" or "12" → pence. Throws ValidationError on anything else. */
 export function parsePounds(input: string): number {
-  const s = input.trim().replace(/^£/, "").replaceAll(",", "");
-  if (!/^\d+(\.\d{1,2})?$/.test(s)) throw new ValidationError("enter an amount in pounds, e.g. 12.50");
+  const raw = input.trim().replace(/^£/, "");
+  // Commas only as thousands separators: "1,200" is fine, "1,20" is refused.
+  if (!/^(\d{1,3}(,\d{3})+|\d+)(\.\d{1,2})?$/.test(raw)) throw new ValidationError("enter an amount in pounds, e.g. 12.50");
+  const s = raw.replaceAll(",", "");
   const [whole = "0", frac = ""] = s.split(".");
   const pence = Number(whole) * 100 + Number(frac.padEnd(2, "0"));
   if (!Number.isSafeInteger(pence)) throw new ValidationError("amount is too large");
@@ -165,13 +167,21 @@ const PAYMENT_SORTS = {
   availablePence: sql`${payments.amountPence} - ${payments.refundedPence} - ${pendingPence}`,
 } as const;
 
+const MAX_SEARCH = 100;
+const MAX_PAGE = 10_000;
+const wholeIn = (n: number | undefined, min: number, max: number, fallback: number) =>
+  n !== undefined && Number.isFinite(n) ? Math.min(Math.max(min, Math.trunc(n)), max) : fallback;
+
+/** URL values are untrusted: clamp to whole numbers so the SQL offset is always valid. */
 const page = (q: ListQueryInput) => {
-  const pageSize = Math.min(Math.max(1, q.pageSize ?? 20), 1000);
-  return { pageSize, offset: (Math.max(1, q.page ?? 1) - 1) * pageSize };
+  const pageSize = wholeIn(q.pageSize, 1, 1000, 20);
+  return { pageSize, offset: (wholeIn(q.page, 1, MAX_PAGE, 1) - 1) * pageSize };
 };
 
+const searchTerm = (q: ListQueryInput) => q.search?.trim().slice(0, MAX_SEARCH) || undefined;
+
 export async function searchPayments(db: Db, query: ListQueryInput): Promise<{ rows: PaymentListItem[]; total: number }> {
-  const q = query.search?.trim();
+  const q = searchTerm(query);
   const where = q
     ? or(
         ilike(payments.reference, `%${q}%`),
@@ -270,7 +280,7 @@ export async function listPendingRefundApprovals(
   query: ListQueryInput,
 ): Promise<{ rows: PendingApprovalItem[]; total: number }> {
   await requirePermission({ db: ctx.db, user: ctx.user, resource: "refunds:approvals-queue" }, "approvals:decide");
-  const q = query.search?.trim();
+  const q = searchTerm(query);
   const where = and(
     eq(approvalRequests.kind, refundApproval.kind),
     eq(approvalRequests.status, "pending"),
