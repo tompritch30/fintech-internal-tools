@@ -21,88 +21,107 @@ The audience is a VP. Every slide must be readable in five seconds.
 
 | Rule | Detail | Checked by script |
 |---|---|---|
-| Action title | One sentence stating the takeaway, not a topic ("Devin builds an app in a day", not "Build time"). | — |
-| Title fits one line | Roughly 70 characters max. | Fails if it wraps (warns over 70 chars) |
-| At most three bullets | Each 12 words or fewer. No paragraphs. | Fails on >3 bullets, >12 words, text blocks >20 words |
-| One visual | A chart, diagram, table or screenshot. No decorative clip art, icons or logos. | Fails on >1 visual (warns on none) |
-| Every number has a source | A `Source: …` footer on any slide with a number or chart. **Never invent numbers.** If a number isn't sourced, leave it out or write a bracketed placeholder such as `[not measured]`. | Fails on numbers or a chart without a `Source:` footer |
-| Only numbers that prove the title | Everything else goes in the appendix. | — |
-| Plain words | A VP can read it in five seconds. Explain any jargon on the slide, or cut it. | — |
-| Banned words | leverage, seamless, robust, unlock, game changing (any form, also in notes). | Fails |
-| Evidence on the slide, reasoning in notes | Speaker notes are what Thomas will say. | Warns if notes are missing |
-| Fits the slide | Nothing overflows the slide, the margins or the footer. Body text ≥24 px. | Fails |
+| Action title | One sentence stating the takeaway, not a topic ("Power Apps costs $250K a year", not "Cost"). | — |
+| Title fits one line | Roughly 70 characters max. | `title-wraps` (warns over 70 chars) |
+| At most three bullets | Each 12 words or fewer. No paragraphs. No single word alone on a bullet's last line. | `too-many-bullets`, `bullet-too-long`, `paragraph`, `orphan-word` |
+| One visual | A chart, diagram, table or screenshot. No clip art or icons; the theme's Cognition mark is the only logo. | `too-many-visuals` (warns on none) |
+| Every number has a source | A plain-words `Source: …` footer on any slide with a number or chart ("Source: client spend figure; Microsoft Power Apps pricing"). No codes like `S22`. **Never invent numbers.** | `number-without-source` |
+| Unmeasured stays unmeasured | Put it in a small table saying it is measured in the pilot. Never an empty box, guessed bar or `[TBD]` bar. | chart generator refuses a bar with no value |
+| Plain words | A VP can read it in five seconds. Banned: leverage, seamless, robust, unlock, game changing (also in notes). | `banned-word` |
+| Evidence on the slide, reasoning in notes | Speaker notes are what Thomas will say. | warns if notes are missing |
+| Fits the slide | Nothing overflows the slide, the margins or the footer. All text ≥24 px. | `overflow`, `text-too-small`, `chart-text-too-small` |
 
-## 3. How to write a slide
+## 3. Tool choice (decided 2026-10-15; don't re-litigate without a reason)
+
+- **Marp**, with our own `themes/cognition.css`. Markdown source, PNG/PDF/PPTX export, and our checker and
+  selftest already run on it. The "hand-drawn" look was our old theme, not Marp.
+- Rejected: **Slidev** (best-looking defaults, PNG/PDF/PPTX, but Vue + Vite and a checker rewrite for a ~10-slide deck);
+  **reveal.js** (HTML-first, PDF via browser print or decktape, no PPTX); **HTML slide skills** such as
+  frontend-slides (good looks, but no Markdown source and no export pipeline).
+- **Charts: Apache ECharts**, server-side SVG (`scripts/chart.mjs`, specs in `charts/*.json`). Never draw bars by hand.
+- **Cover art**: `art/title-art.py` draws our own SVG and refuses to write it if a label or block leaves the
+  margin or touches another. Never copy Cognition's artwork.
+
+## 4. Look: Cognition, from cognition.com (computed styles, 2026-10-15)
+
+- Paper `#f7f6f5`, ink `#000`, grey `rgba(25,25,25,.56)` for secondary text, one accent blue `#2200ff`.
+- Fonts: the site's NB International and stkBureauSerif are paid, so we use **Newsreader** (titles) and **Geist**
+  (everything else). That's the whole type system: two text styles per slide, serif title plus Geist regular in
+  black or grey. No mono labels, no bold, no italics.
+- Hairline column rules with small tick marks at the top, as on the site.
+- Small Cognition mark bottom left on every slide, linked to https://cognition.com (`header:` directive).
+- **Cover**: near-black, white mark, light line art in its own panel, blue corner marks exactly on the panel's
+  corners. Left column: big mark, title, one-line subtitle. "Prepared for … · Month Year" in the footer band.
+  No caveats on the cover ("draft", "dummy data"); those go on the demo slide or in the appendix. Big logo only here.
+
+## 5. Structure and conventions from real consulting decks
+
+Studied: McKinsey's USPS deck, Bain's Global PE Report 2023 and BCG's Dallas recommendations (via slideworks.io).
+
+- Main deck is short: **scene, business value, demo, cost**. Everything else is appendix, ending with a sources page.
+- Title states the takeaway, often with the number in it. One message per slide.
+- A small section label above the title ("04 · Cost", "Appendix"). No "DRAFT" in labels.
+- Charts: every bar grey except the one that proves the title, in blue. Units in a subtitle or the label, one unit
+  and period per chart. No gridlines.
+- Comparisons and recommendations are tables: column 1 the thing compared, column 2 the evidence, column 3 the so-what.
+  Short phrases, regular weight, at most 4 rows.
+- Cost slides: compare like with like. Not "60 Devin seats vs the licence": internal tools don't need every engineer
+  on Devin. Frame it as Power Apps today and next year vs the cost to build each app, with the date the price was checked.
+- Source line bottom left, page number bottom right.
+
+## 6. Layout checklist: think like a PowerPoint slide master
+
+Every slide uses the same placeholders: label, title and content start on **one left edge**, the content row
+fills the space between title and footer, and the footer band (logo, source, page number) is fixed. Check every
+rendered PNG, not just the slide you changed. The script catches most of this; the rest is by eye.
+
+| Check | Script code | By eye |
+|---|---|---|
+| Nothing touches or overlaps (≥24 px between blocks); no text over art | `elements-touch` | text over a drawing's own detail |
+| One left edge for label, title, content, logo | `off-left-edge` | chart labels and table text start on it too |
+| One spacing step (48 px): label→title equals title→content | `uneven-gaps` | even gaps inside diagrams and between table rows |
+| Content uses the space; no blank band at the bottom | `unused-space` | the slide doesn't look top-heavy |
+| Blue once per slide at most (one bar, one header, one step or the corner marks) | `too-many-accents` | no other colours anywhere |
+| Two text styles per slide | `too-many-text-styles` | — |
+| Readable: ≥24 px, contrast ≥3:1 | `text-too-small`, `low-contrast` | a VP gets it in five seconds |
+| Source line fits on one line | `overflow` (clipped footer) | it's plain words |
+| Drawings shown at their own shape, so frames and corner marks sit on the corners | `image-aspect` | corner marks are on the frame's corners |
+| Cover: one-line subtitle, no caveats | `subtitle-wraps`, `cover-caveat` | title first, then subtitle, then details |
+| No orphan word on a bullet's last line | `orphan-word` | also in table cells and placeholders |
+
+Mistakes this checklist came from (2026-10-15): a label indented past the title; uneven header gaps; blue on
+labels, bullets and headers at once; mono, bold, serif and sans on one slide; a clipped source line; "DRAFT" on
+every label; tables that stopped halfway down the slide; the cover title on top of the art; a drawing squashed into
+a box of a different shape, so its corner marks floated; chart labels inset from the left edge. When you find a new
+kind of mistake, add a check (with a fixture slide in `test/fixtures/violations.md`) or a by-eye row here.
+
+### Writing a slide
 
 ```markdown
 ---
 
-<!-- _footer: "Source: Microsoft, Power Apps pricing (research S16)" -->
+<!-- _footer: "Source: client spend figure; Microsoft Power Apps pricing and licensing pages" -->
 
-# Power Apps costs less for under fifty users
+###### 01 · The scene
 
-- First point, 12 words or fewer
-- Second point
-- Third point
+# Power Apps bills per user, so moving one app frees no seats
 
-![Annual cost by option](assets/charts/cost.svg)
+- At most three short bullets
 
-<!--
-VP question: What does each option cost us?
-What I'll say: the reasoning, step by step.
--->
+<div class="visual flow"><div><small>Today</small>Uses 3 apps, pays 1 seat</div>…</div>
+
+<!-- What Thomas says. -->
 ```
 
-- Title is the single `#` heading. Use `1.` lists for ordered next steps.
-- Visual options: an image (`![alt](assets/…)`), a Markdown table, `<div class="visual flow"><div>Step</div>…</div>`
-  for a simple process diagram, or `<div class="visual placeholder">…</div>` until the real one exists.
-  Bullets plus one visual sit side by side automatically.
-- Charts: edit `charts/<name>.json` and run `pnpm --filter @fit/presentation charts`.
-  A bar with `"value": null` is drawn as a dashed bar labelled `[TBD]` (or its `"placeholder"`). Never fill a value without a source.
-- Screenshots: 1920×1080, dummy data only, saved in `assets/`.
-- Appendix slides: add `<!-- _class: appendix -->`.
-- Don't change the theme per slide (no inline styles, fonts or colours). Theme changes go in
-  `themes/consultancy.css` and need a fresh check run.
+- Appendix slides: `<!-- _class: appendix -->`. Cover: `<!-- _class: title -->`.
+- One accent on a table: wrap one header in `*…*` (shows blue). Charts: `"highlight": true` on one bar.
+- Screenshots: 1920×1080, dummy data only, cropped to what proves the title. Until one exists, a
+  `<div class="visual placeholder">` saying why it's missing.
+- Write appendix facts from the source document, not memory, and keep the sources page in step with every number.
+- No inline styles. Theme changes go in `themes/cognition.css`, then re-run `check` and `check:selftest`.
+- Keep a copy of the first round's PNGs outside `dist/` so the PR can show before and after.
 
-## 4. Rules learned from the first full draft (round 1 failed these; the script passed them all)
-
-The check script passed all eight first-draft slides; a reviewer still found six problems. Check these by eye.
-
-**Charts**
-- Every bar in one chart uses the same unit and period (e.g. all per year). Never mix "per app" and "per year" bars.
-- Rendered chart text must be ≥24 px. `check` now fails `chart-text-too-small`: chart text is 36 px in the SVG and
-  shrinks with the image, so a chart beside bullets is about as narrow as it can go. Give it width, or fewer bullets.
-- Keep bar labels short (≤20 characters). The label column grows to fit the longest one, which shrinks the bars.
-- Grey for the baseline, accent blue for the option we recommend. No other colours, gridlines or axes.
-- Unknown values: `"value": null` with `"placeholder": "[not measured]"` (default `[TBD]`). Never a guessed bar.
-
-**Comparisons**
-- Compare options in a table of at most 4 rows × 3 columns, with no bullets beside it (a table plus a list is two visuals).
-- Column 1 is the thing compared, column 2 the evidence, column 3 the "so what" (e.g. "What we must add"). Avoid vague headers like "Gap".
-- Cells are short phrases that fit one line. If a cell wraps, cut words.
-- No `code` formatting on a VP slide. Describe the field in plain words.
-- Decision slides: put the decision in a **bold** cell, and move next steps to an appendix slide.
-
-**Diagrams (`visual flow`)**
-- At most 3 boxes, two short lines each (use `<br>`), ≤3 words per line. Boxes are equal height (theme).
-
-**Screenshots**
-- Until a real screenshot exists, use `<div class="visual placeholder">[Screenshot: what it shows, which user, the
-  state]</div>`. Say why it's missing (e.g. "video not recorded yet").
-- Real screenshots: 1920×1080, dummy data only, cropped to the part that proves the title, saved in `assets/`.
-
-**Numbers and facts**
-- An unsourced number is a bracketed placeholder: `[not measured]`, `[not costed]`, `owner: [TBD]`. Never a guess.
-- Write appendix tables from the source document, not from memory (round 1 invented a fix description). Quote the
-  section in the footer, e.g. `SECURITY-REVIEW.md §11b`.
-- A "sources" appendix must cover every number in the deck, including client-supplied figures (marked unverified) and DEVIN-LOG figures.
-- Mark draft decks in the header (`header: Cognition · Draft`) and start each slide's notes with `DRAFT.`
-
-**Review loop**
-- Run `check`, then open every `slide-NN.png` and score it against this section and section 2. Fix, then run it again. Two rounds at most.
-- Keep the round-1 screenshots before re-running (`dist/` is overwritten) so the PR can show before and after.
-
-## 5. Check, then export
+## 7. Check, then export
 
 Run from the repo root:
 
@@ -115,7 +134,7 @@ pnpm --filter @fit/presentation export          # dist/slides.html, slides.pdf, 
 ```
 
 - `check` renders every slide at 1920×1080, saves `slide-NN.png`, and exits non-zero on any failure.
-  Look at the screenshots too: the script can't judge whether the title is a real takeaway.
+  Then do the by-eye pass in section 6 on every PNG: the script can't judge everything.
 - Paste the storyline and the check output in the PR, and attach the screenshots.
 - The PPTX export is one image per slide with speaker notes (Marp default), so it isn't editable in
   PowerPoint. The PDF carries notes as annotations.
