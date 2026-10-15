@@ -2,7 +2,7 @@
 import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import { createDb, type Db } from "./index.ts";
-import { auditLog, payments, roles, userRoles, users } from "./schema.ts";
+import { auditLog, flagValues, flags, payments, roles, userRoles, users } from "./schema.ts";
 
 export const SEED_ROLES = [
   { name: "analyst", description: "Works the queues; can create requests" },
@@ -58,6 +58,22 @@ export function seedPayments(count = 40): (typeof payments.$inferInsert)[] {
   });
 }
 
+type SeedValue = { enabled: boolean; rolloutPercentage: number };
+const on = (rolloutPercentage: number): SeedValue => ({ enabled: true, rolloutPercentage });
+const off = (rolloutPercentage = 0): SeedValue => ({ enabled: false, rolloutPercentage });
+
+/** Fake feature flags with a value in every environment. Keys and descriptions are made up. */
+export const SEED_FLAGS: readonly { key: string; description: string; dev: SeedValue; staging: SeedValue; prod: SeedValue }[] = [
+  { key: "new-checkout-flow", description: "Single-page checkout with saved cards", dev: on(100), staging: on(50), prod: off() },
+  { key: "instant-payouts", description: "Pay merchants out within minutes instead of next day", dev: on(100), staging: on(100), prod: on(10) },
+  { key: "dispute-auto-triage", description: "Route new chargebacks to a queue by reason code", dev: on(100), staging: off(), prod: off() },
+  { key: "statement-pdf-v2", description: "New PDF layout for monthly statements", dev: on(100), staging: on(100), prod: on(100) },
+  { key: "fraud-score-shadow", description: "Score payments with the new fraud model without acting on it", dev: on(100), staging: on(25), prod: on(5) },
+  { key: "merchant-dashboard-beta", description: "Beta merchant dashboard with live charts", dev: on(50), staging: off(), prod: off() },
+  { key: "card-freeze-button", description: "Let cardholders freeze a card from the app", dev: on(100), staging: on(100), prod: off() },
+  { key: "e2e-sandbox-flag", description: "Used by the Playwright tests; changes freely", dev: off(), staging: off(), prod: off() },
+];
+
 export async function seed(db: Db): Promise<void> {
   await db.transaction(async (tx) => {
     await tx.insert(roles).values([...SEED_ROLES]).onConflictDoNothing();
@@ -87,6 +103,17 @@ export async function seed(db: Db): Promise<void> {
 
     // Payments are inserted once; refunds made later only change refunded_pence.
     await tx.insert(payments).values(seedPayments()).onConflictDoNothing({ target: payments.reference });
+
+    // Flags and their per-environment values are inserted once; later changes go through the app.
+    for (const f of SEED_FLAGS) {
+      await tx.insert(flags).values({ key: f.key, description: f.description }).onConflictDoNothing({ target: flags.key });
+      const [flag] = await tx.select({ id: flags.id }).from(flags).where(eq(flags.key, f.key));
+      if (!flag) throw new Error(`seed: could not insert flag ${f.key}`);
+      await tx
+        .insert(flagValues)
+        .values((["dev", "staging", "prod"] as const).map((environment) => ({ flagId: flag.id, environment, ...f[environment] })))
+        .onConflictDoNothing();
+    }
 
     // audit_log is append-only, so sample rows are inserted once and never replaced.
     const existing = await tx
