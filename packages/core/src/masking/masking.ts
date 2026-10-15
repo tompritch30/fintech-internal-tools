@@ -1,10 +1,15 @@
 import "server-only";
-import type { Db, Tx } from "@fit/db";
+import { and, count, eq, gte, sql } from "drizzle-orm";
+import { auditLog, type Db, type Tx } from "@fit/db";
 import { withAudit } from "../audit/with-audit.ts";
+import { recordAccessDenied } from "../rbac/denial.ts";
 import { requirePermission } from "../rbac/guards.ts";
-import { NotFoundError, ValidationError } from "../errors.ts";
+import { ForbiddenError, NotFoundError, ValidationError } from "../errors.ts";
 import type { Permission } from "../rbac/permissions.ts";
 import type { SessionUser } from "../session/session.ts";
+import { UNMASK_RATE_LIMIT } from "./rate-limit.ts";
+
+export { UNMASK_RATE_LIMIT } from "./rate-limit.ts";
 
 export type MaskStyle = "last4" | "full" | "email";
 
@@ -87,6 +92,8 @@ export interface MaskedEntity<T> {
   load: (tx: Tx, id: string) => Promise<T | null>;
 }
 
+class UnmaskRateLimitExceeded extends Error {}
+
 /** Declares a masked entity next to the app that owns it. */
 export function defineMaskedEntity<T>(def: MaskedEntity<T>): MaskedEntity<T> {
   return def;
@@ -107,26 +114,50 @@ export async function unmask<T>(
   if (!policy) {
     throw new ValidationError(`no mask policy for field ${input.field} on ${entity.entityType}`);
   }
+  const resource = `unmask:${entity.entityType}:${input.entityId}:${input.field}`;
   await requirePermission(
-    { db, user: actor, resource: `unmask:${entity.entityType}:${input.entityId}:${input.field}` },
+    { db, user: actor, resource },
     policy.unmaskPermission,
   );
   const reason = input.reason.trim();
   if (!reason) throw new ValidationError("unmasking requires a reason");
-  return withAudit(
-    db,
-    {
-      actor: { id: actor.id, subject: actor.subject },
-      action: "field.unmask",
-      entityType: entity.entityType,
-      entityId: input.entityId,
-      reason,
-      metadata: { field: input.field },
-    },
-    async (tx) => {
-      const record = await entity.load(tx, input.entityId);
-      if (!record) throw new NotFoundError(`${entity.entityType} ${input.entityId} not found`);
-      return (record[input.field as keyof T] as string | null | undefined) ?? null;
-    },
-  );
+  try {
+    return await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('unmask:' || ${actor.id}))`);
+      const [usage] = await tx
+        .select({ total: count() })
+        .from(auditLog)
+        .where(
+          and(
+            eq(auditLog.actorUserId, actor.id),
+            eq(auditLog.action, "field.unmask"),
+            gte(
+              auditLog.occurredAt,
+              sql`now() - (${UNMASK_RATE_LIMIT.windowMinutes} * interval '1 minute')`,
+            ),
+          ),
+        );
+      if ((usage?.total ?? 0) >= UNMASK_RATE_LIMIT.max) throw new UnmaskRateLimitExceeded();
+      return withAudit(
+        tx,
+        {
+          actor: { id: actor.id, subject: actor.subject },
+          action: "field.unmask",
+          entityType: entity.entityType,
+          entityId: input.entityId,
+          reason,
+          metadata: { field: input.field },
+        },
+        async (savepointTx) => {
+          const record = await entity.load(savepointTx, input.entityId);
+          if (!record) throw new NotFoundError(`${entity.entityType} ${input.entityId} not found`);
+          return (record[input.field as keyof T] as string | null | undefined) ?? null;
+        },
+      );
+    });
+  } catch (error) {
+    if (!(error instanceof UnmaskRateLimitExceeded)) throw error;
+    await recordAccessDenied(db, actor, resource, "unmask:rate-limit");
+    throw new ForbiddenError("unmask:rate-limit");
+  }
 }
