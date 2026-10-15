@@ -315,6 +315,28 @@ describe("rule 3: turning a flag on or changing it in prod needs a different app
     expect((await valueOf(flag.id, "prod")).version).toBe(2);
   });
 
+  it("resubmitting an approved prod request reports it applied and creates nothing new", async () => {
+    const flag = await newFlag();
+    const maker = await analyst();
+    const req = await input(flag.id, "prod", { enabled: true, rolloutPercentage: 15 });
+    const change = (await changeFlag(maker, req)).flag.pendingChange;
+    if (!change) throw new Error("expected a pending change");
+    await approveFlagChange(await approver(), { changeId: change.id, expectedVersion: change.approval.version });
+    expect((await changeFlag(maker, req)).outcome).toBe("applied");
+    expect(await changesFor(flag.id)).toHaveLength(1);
+  });
+
+  it("resubmitting a rejected prod request says it was rejected and creates nothing new", async () => {
+    const flag = await newFlag();
+    const maker = await analyst();
+    const req = await input(flag.id, "prod", { enabled: true, rolloutPercentage: 15 });
+    const change = (await changeFlag(maker, req)).flag.pendingChange;
+    if (!change) throw new Error("expected a pending change");
+    await rejectFlagChange(await approver(), { changeId: change.id, expectedVersion: change.approval.version, note: "Not now" });
+    await expect(changeFlag(maker, req)).rejects.toThrow(/rejected/);
+    expect(await changesFor(flag.id)).toHaveLength(1);
+  });
+
   it("allows one pending prod change per flag, and a new one once it is decided", async () => {
     const { flag, change } = await pendingProdChange();
     const maker = await analyst();
@@ -354,6 +376,15 @@ describe("rule 3: turning a flag on or changing it in prod needs a different app
     expect((await listPendingFlagChanges(checker)).map((c) => c.id)).toContain(change.id);
     await approveFlagChange(checker, { changeId: change.id, expectedVersion: change.approval.version });
     expect((await listPendingFlagChanges(checker)).map((c) => c.id)).not.toContain(change.id);
+  });
+
+  it("filters the approvals queue by flag key", async () => {
+    const { flag } = await pendingProdChange();
+    const { flag: other } = await pendingProdChange();
+    const ids = (await listPendingFlagChanges(await approver(), { q: flag.key.toUpperCase() })).map((c) => c.flagId);
+    expect(ids).toContain(flag.id);
+    expect(ids).not.toContain(other.id);
+    expect((await listPendingFlagChanges(await approver())).map((c) => c.flagId)).toEqual(expect.arrayContaining([flag.id, other.id]));
   });
 
   it("an analyst can't open the prod approvals queue", async () => {

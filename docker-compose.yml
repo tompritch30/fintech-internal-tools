@@ -70,7 +70,7 @@ services:
       OIDC_ALLOW_INSECURE_HTTP: "true"
       SESSION_TTL_HOURS: "8"
       REFUND_APPROVAL_THRESHOLD_PENCE: "25000"
-      FLAGS_SERVICE_TOKEN: demo-only-change-me-flags
+      FLAGS_SERVICE_TOKEN: ${FLAGS_SERVICE_TOKEN:-}
     ports:
       - "3000:3000"
     depends_on:

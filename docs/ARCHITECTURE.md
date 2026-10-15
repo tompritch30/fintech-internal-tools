@@ -517,7 +517,7 @@ Out of A1 on purpose. Each needs its own decision.
 | `SESSION_IDLE_MINUTES` | web | `15` |
 | `UNMASK_RATE_LIMIT_PER_HOUR` | web | `20` |
 | `REFUND_APPROVAL_THRESHOLD_PENCE` | web (refunds) | `25000` (£250.00; refunds above it need approval) |
-| `FLAGS_SERVICE_TOKEN` | web (flags service endpoint) | `demo-only-change-me-flags`; unset switches `GET /api/flags` off |
+| `FLAGS_SERVICE_TOKEN` | web (flags service endpoint) | empty (endpoint off, 503); set a random ≥16-char value to switch `GET /api/flags` on |
 | `POSTGRES_PASSWORD` | Postgres container (superuser bootstrap) | `demo-only-change-me` |
 | `KC_BOOTSTRAP_ADMIN_USERNAME` / `_PASSWORD` | Keycloak container | `admin` / `demo-only-change-me` |
 

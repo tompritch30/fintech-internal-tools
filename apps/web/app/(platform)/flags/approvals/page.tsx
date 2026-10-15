@@ -23,10 +23,11 @@ const columns: ListColumn<FlagChangeView>[] = [
   },
 ];
 
-export default async function FlagApprovalsPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+export default async function FlagApprovalsPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
   const user = await requirePagePermission("flags:approve", "/flags/approvals");
-  const page = Math.max(1, Number((await searchParams).page) || 1);
-  const all = await listPendingFlagChanges({ db: getDb(), user });
+  const params = await searchParams;
+  const query = { search: params.q, page: Math.max(1, Math.floor(Number(params.page)) || 1) };
+  const all = await listPendingFlagChanges({ db: getDb(), user }, { q: query.search });
   return (
     <div className="stack">
       <h1 className="page-title">Flag approvals</h1>
@@ -35,12 +36,12 @@ export default async function FlagApprovalsPage({ searchParams }: { searchParams
         label="Pending prod flag changes"
         basePath="/flags/approvals"
         columns={columns}
-        rows={all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)}
+        rows={all.slice((query.page - 1) * PAGE_SIZE, query.page * PAGE_SIZE)}
         rowKey={(c) => c.id}
-        query={{ page }}
+        query={query}
         pageSize={PAGE_SIZE}
         total={all.length}
-        emptyTitle="No prod flag changes are waiting for approval"
+        emptyTitle={query.search ? "No pending prod changes match" : "No prod flag changes are waiting for approval"}
       />
     </div>
   );

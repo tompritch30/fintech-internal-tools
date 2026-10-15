@@ -26,7 +26,7 @@ const columns: ListColumn<FlagListItem>[] = [
 export default async function FlagsPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
   await requirePagePermission("flags:read", "/flags");
   const params = await searchParams;
-  const query = { search: params.q, page: Math.max(1, Number(params.page) || 1) };
+  const query = { search: params.q, page: Math.max(1, Math.floor(Number(params.page)) || 1) };
   const all = await listFlags(getDb(), { q: query.search });
   const rows = all.slice((query.page - 1) * PAGE_SIZE, query.page * PAGE_SIZE);
   return (

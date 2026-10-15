@@ -235,9 +235,12 @@ export async function flagHistory(db: Db, flagId: string): Promise<AuditListItem
   return [...own, ...approvalRows].sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime() || b.id - a.id);
 }
 
-export async function listPendingFlagChanges(ctx: ActionContext): Promise<FlagChangeView[]> {
+export async function listPendingFlagChanges(ctx: ActionContext, query: { q?: string } = {}): Promise<FlagChangeView[]> {
   await requirePermission({ db: ctx.db, user: ctx.user, resource: "flags:approvals-queue" }, "flags:approve");
-  return loadChanges(ctx.db, eq(flagChanges.status, "pending"));
+  const pending = await loadChanges(ctx.db, eq(flagChanges.status, "pending"));
+  const term = query.q?.trim().toLowerCase();
+  if (!term) return pending;
+  return pending.filter((c) => [c.flagKey, c.reason, c.requestedByName].some((v) => v.toLowerCase().includes(term)));
 }
 
 /** What services see: current values only. Pending prod changes are not visible until applied. */
@@ -334,9 +337,10 @@ async function applyKill(ctx: ActionContext, flagId: string, reason: string): Pr
 }
 
 /** Returns true for a resubmitted change id, or throws if the id was used for something else. */
-async function isResubmission(db: Executor, ctx: ActionContext, input: FlagChangeInput): Promise<boolean> {
+/** The change this form already submitted (same `changeId`), if any. Different details are a conflict. */
+async function findResubmission(db: Executor, ctx: ActionContext, input: FlagChangeInput): Promise<FlagChangeView | null> {
   const existing = await loadChange(db, input.changeId);
-  if (!existing) return false;
+  if (!existing) return null;
   const same =
     existing.flagId === input.flagId &&
     existing.environment === input.environment &&
@@ -344,12 +348,19 @@ async function isResubmission(db: Executor, ctx: ActionContext, input: FlagChang
     existing.reason === input.reason &&
     existing.requestedBy === ctx.user.id;
   if (!same) throw new ConflictError(`change ${input.changeId} was already submitted with different details`);
-  return true;
+  return existing;
+}
+
+/** What a resubmitted prod request reports: where its change got to, not a fresh "pending". */
+function resubmittedOutcome(change: FlagChangeView): FlagChangeOutcome {
+  if (change.status === "applied") return "applied";
+  if (change.status === "rejected") throw new ConflictError("this prod request was rejected; prod is unchanged. Submit a new request.");
+  return "pending_approval";
 }
 
 async function insertProdChange(tx: Tx, ctx: ActionContext, input: FlagChangeInput, approvalRequestId: string): Promise<void> {
   const current = await lockValue(tx, input.flagId, "prod");
-  if (await isResubmission(tx, ctx, input)) throw new AlreadySubmitted();
+  if (await findResubmission(tx, ctx, input)) throw new AlreadySubmitted();
   const [pending] = await tx
     .select({ id: flagChanges.id })
     .from(flagChanges)
@@ -400,7 +411,8 @@ export async function changeFlag(ctx: ActionContext, rawInput: FlagChangeInput):
     return { outcome, flag };
   };
 
-  if (input.environment === "prod" && (await isResubmission(ctx.db, ctx, input))) return view("pending_approval");
+  const resubmitted = input.environment === "prod" ? await findResubmission(ctx.db, ctx, input) : null;
+  if (resubmitted) return view(resubmittedOutcome(resubmitted));
   const before = await getFlagView(ctx.db, input.flagId);
   if (!before) throw new NotFoundError(`flag ${input.flagId} not found`);
   const current = before.values[input.environment];
@@ -433,6 +445,8 @@ export async function changeFlag(ctx: ActionContext, rawInput: FlagChangeInput):
     );
   } catch (err) {
     if (!(err instanceof AlreadySubmitted)) throw err;
+    const existing = await loadChange(ctx.db, input.changeId);
+    if (existing) return view(resubmittedOutcome(existing));
   }
   return view("pending_approval");
 }
