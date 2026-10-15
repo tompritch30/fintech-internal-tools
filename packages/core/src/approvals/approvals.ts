@@ -221,6 +221,7 @@ export async function decideApproval<P>(
       }
       const request = toRequest<P>(updated);
       if (status === "approved") await kind.onApproved?.(tx, request);
+      else await kind.onRejected?.(tx, request);
       return request;
     },
   );

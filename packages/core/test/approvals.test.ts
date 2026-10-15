@@ -520,7 +520,7 @@ describe("approval hooks", () => {
   it("does not call onRejected when a request is cancelled", async () => {
     const { request, requester } = await newRequest();
     let called = false;
-    const kind = defineApprovalKind<{ iban: string }>({
+    const _kind = defineApprovalKind<{ iban: string }>({
       ...payoutKind,
       onRejected: async () => {
         called = true;
