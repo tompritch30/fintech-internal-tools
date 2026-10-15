@@ -11,12 +11,15 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 
-vi.mock("next/headers", () => ({
-  cookies: async () => ({
-    get: (name: string) => (name === "fit_session" && mocks.sessionToken ? { value: mocks.sessionToken } : undefined),
-  }),
-  headers: async () => new Headers(mocks.requestHeaders),
-}));
+vi.mock("next/headers", async () => {
+  const { SESSION_COOKIE } = await import("@fit/core/cookie");
+  return {
+    cookies: async () => ({
+      get: (name: string) => (name === SESSION_COOKIE && mocks.sessionToken ? { value: mocks.sessionToken } : undefined),
+    }),
+    headers: async () => new Headers(mocks.requestHeaders),
+  };
+});
 
 vi.mock("next/navigation", () => ({
   redirect: (destination: string): never => {

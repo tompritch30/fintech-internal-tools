@@ -53,6 +53,7 @@ export const sessions = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     /** Kept only to send as id_token_hint on logout. */
     idToken: text("id_token"),
@@ -239,7 +240,7 @@ export const flags = pgTable(
 
 /**
  * A flag's current value in one environment: exactly one row per (flag, environment), created
- * with the flag. app_runtime can UPDATE only the value columns (0008_flags_guard.sql); every
+ * with the flag. app_runtime can UPDATE only the value columns (0009_flags_guard.sql); every
  * update must bump version by one, which gives optimistic concurrency and stale-approval checks.
  */
 export const flagValues = pgTable(
@@ -267,7 +268,7 @@ export const flagChangeStatus = pgEnum("flag_change_status", ["pending", "applie
 /**
  * A prod change waiting for (or decided by) a second person. The id is minted when the form
  * renders (idempotency key). One pending change per flag and environment; content is immutable
- * and status moves pending -> applied | rejected only (0008_flags_guard.sql).
+ * and status moves pending -> applied | rejected only (0009_flags_guard.sql).
  */
 export const flagChanges = pgTable(
   "flag_changes",
