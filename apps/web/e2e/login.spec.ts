@@ -10,6 +10,11 @@ async function signIn(page: Page, username: string) {
   await page.locator("#kc-login").click();
 }
 
+async function signOut(page: Page) {
+  await page.getByRole("button", { name: /account menu/i }).click();
+  await page.getByRole("button", { name: "Sign out" }).click();
+}
+
 test("analyst signs in through Keycloak, sees their roles, and signs out", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/login$/);
@@ -19,7 +24,7 @@ test("analyst signs in through Keycloak, sees their roles, and signs out", async
   await expect(page.getByText("analyst", { exact: true }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Audit log" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await signOut(page);
   await expect(page).toHaveURL(/\/login$/);
   await page.goto("/");
   await expect(page).toHaveURL(/\/login$/);
@@ -30,7 +35,7 @@ test("analyst is denied the audit log, and admin sees that denial in it", async 
   await expect(page.getByTestId("username")).toHaveText("analyst");
   await page.goto("/audit");
   await expect(page).toHaveURL(/\/no-access$/);
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await signOut(page);
   await expect(page).toHaveURL(/\/login$/);
 
   await signIn(page, "admin");
