@@ -136,6 +136,26 @@
         }
       ],
       "realmRoles": []
+    },
+    {
+      "id": "55555555-5555-4555-8555-555555555555",
+      "username": "senior",
+      "enabled": true,
+      "email": "senior@example.test",
+      "emailVerified": true,
+      "firstName": "Sam",
+      "lastName": "Senior",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo-only-change-me",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "analyst",
+        "approver"
+      ]
     }
   ]
 }
