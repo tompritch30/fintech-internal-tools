@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  PERMISSION_REGISTRY,
   ROLE_PERMISSIONS,
   ValidationError,
   definePermissionRegistry,
   isPermission,
+  permissionsFor,
+  type Permission,
   type PermissionDef,
+  type Role,
 } from "../src/index.ts";
 
 const def = (roles: readonly ("analyst" | "approver" | "admin")[] = ["analyst"]): PermissionDef => ({
@@ -41,6 +45,8 @@ describe("definePermissionRegistry", () => {
   it("accepts a valid registry and freezes it", () => {
     const registry = definePermissionRegistry({ "test:x": def(["analyst", "approver"]) });
     expect(Object.isFrozen(registry)).toBe(true);
+    expect(Object.isFrozen(registry["test:x"])).toBe(true);
+    expect(Object.isFrozen(registry["test:x"].roles)).toBe(true);
     expect(registry["test:x"].roles).toEqual(["analyst", "approver"]);
   });
 
@@ -66,6 +72,14 @@ describe("permission registry", () => {
   it("admin holds no approve or unmask permission", () => {
     expect(ROLE_PERMISSIONS.admin).not.toContain("approvals:decide");
     expect(ROLE_PERMISSIONS.admin).not.toContain("pii:unmask");
+  });
+
+  it("the registry and role map can't be changed at runtime", () => {
+    expect(() => (ROLE_PERMISSIONS.admin as Permission[]).push("pii:unmask")).toThrow(TypeError);
+    expect(() => (PERMISSION_REGISTRY["audit:read"].roles as Role[]).push("analyst")).toThrow(TypeError);
+    expect(() => ((ROLE_PERMISSIONS as Record<string, unknown>).analyst = [])).toThrow(TypeError);
+    expect(() => ((PERMISSION_REGISTRY["audit:read"] as { description: string }).description = "x")).toThrow(TypeError);
+    expect(permissionsFor(["admin"]).has("pii:unmask")).toBe(false);
   });
 
   it("isPermission accepts registered permissions and rejects others", () => {

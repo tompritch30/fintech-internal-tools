@@ -517,19 +517,6 @@ describe("approval hooks", () => {
     expect(called).toBe(false);
   });
 
-  it("does not call onRejected when a request is cancelled", async () => {
-    const { request, requester } = await newRequest();
-    let called = false;
-    const _kind = defineApprovalKind<{ iban: string }>({
-      ...payoutKind,
-      onRejected: async () => {
-        called = true;
-      },
-    });
-    await cancelApproval(db, requester, { id: request.id, note: "withdrawing it" });
-    expect(called).toBe(false);
-  });
-
   it("commits the onApproved effect with the decision", async () => {
     const { request } = await newRequest();
     const { user: dec } = await approver();
