@@ -15,7 +15,7 @@ export const BANNED = [
   /\bunlock\w*/i,
   /\bgame[\s-]?chang\w*/i,
 ];
-export const LIMITS = { bullets: 3, bulletWords: 12, paragraphWords: 20, titleChars: 70, minFontPx: 24, visuals: 1, chartFontPx: CHART_FONT };
+export const LIMITS = { bullets: 3, bulletWords: 12, paragraphWords: 20, titleChars: 70, minFontPx: 24, visuals: 1, chartFontPx: CHART_FONT, minGapPx: 24, maxEmptyPx: 120 };
 
 /** Runs in the page: measure each slide. Keep it self-contained (it is serialised). */
 function measure(limits) {
@@ -49,7 +49,8 @@ function measure(limits) {
       bottom: sr.bottom - parseFloat(cs.paddingBottom),
     };
     const chrome = (el) => el.closest("header, footer");
-    const all = [...s.querySelectorAll("*")].filter((el) => getComputedStyle(el).display !== "none");
+    const isTitle = s.classList.contains("title");
+    const all = [...s.querySelectorAll("*")].filter((el) => el.checkVisibility());
 
     // Title
     const titles = s.querySelectorAll(":scope > h1");
@@ -59,7 +60,7 @@ function measure(limits) {
     if (titles.length > 1) fail.push(["multiple-titles", `${titles.length} titles; one question per slide`]);
     if (h1) {
       const lines = lineCount(h1);
-      if (lines > 1) fail.push(["title-wraps", `title wraps onto ${lines} lines`]);
+      if (lines > 1 && !isTitle) fail.push(["title-wraps", `title wraps onto ${lines} lines`]);
       if (title.length > limits.titleChars) warn.push(`title is ${title.length} chars (aim for ≤${limits.titleChars})`);
     }
 
@@ -108,10 +109,18 @@ function measure(limits) {
     // One visual
     const visuals = s.querySelectorAll(":scope > p > img, :scope > .visual, :scope > table, :scope > figure, :scope > svg, :scope > pre");
     if (visuals.length > limits.visuals) fail.push(["too-many-visuals", `${visuals.length} visuals (max ${limits.visuals})`]);
-    if (visuals.length === 0) warn.push("no visual (chart, diagram, table or screenshot)");
+    if (visuals.length === 0 && !isTitle) warn.push("no visual (chart, diagram, table or screenshot)");
 
     for (const img of s.querySelectorAll("img")) {
       if (!img.naturalWidth) fail.push(["missing-image", `image did not load: ${img.getAttribute("src")}`]);
+    }
+
+    // A drawing shown at a different shape from its file letterboxes, so its frame and corner marks float.
+    for (const img of s.querySelectorAll("img")) {
+      if (!img.naturalWidth || getComputedStyle(img).objectFit === "contain" || chrome(img)) continue;
+      const r = img.getBoundingClientRect();
+      const drift = Math.abs(r.width / r.height - img.naturalWidth / img.naturalHeight) / (img.naturalWidth / img.naturalHeight);
+      if (drift > 0.01) fail.push(["image-aspect", `${img.getAttribute("src")} shown at ${Math.round(r.width)}×${Math.round(r.height)} but drawn at ${img.naturalWidth}×${img.naturalHeight}; match its shape`]);
     }
 
     // Chart text is inside the SVG, so scale the chart's font by how much the image is shrunk.
@@ -138,8 +147,89 @@ function measure(limits) {
     const footerText = footer ? footer.textContent.trim() : "";
     const body = [...s.children].filter((el) => !el.matches("header, footer")).map((el) => el.textContent).join(" ");
     const hasChart = [...s.querySelectorAll("img")].some((img) => /(^|\/)charts\//.test(img.getAttribute("src") ?? ""));
-    if ((/\d/.test(body) || hasChart) && !/^sources?\b/i.test(footerText)) {
+    if ((/\d/.test(body) || hasChart) && !isTitle && !/^sources?\b/i.test(footerText)) {
       fail.push(["number-without-source", "has numbers or a chart but no \"Source: …\" footer"]);
+    }
+
+    // Spacing: no two blocks (kicker, title, bullets, visual, logo, source line) touch or overlap.
+    const blocks = [...s.children]
+      .filter((el) => getComputedStyle(el).display !== "none" && el.getBoundingClientRect().width > 0)
+      .map((el) => ({ el, r: el.getBoundingClientRect() }));
+    const name = (el) => el.tagName.toLowerCase() + (el.className ? `.${String(el.className).split(" ")[0]}` : "");
+    for (let i = 0; i < blocks.length; i++) {
+      for (let j = i + 1; j < blocks.length; j++) {
+        const a = blocks[i].r, b = blocks[j].r;
+        const gapX = Math.max(b.left - a.right, a.left - b.right);
+        const gapY = Math.max(b.top - a.bottom, a.top - b.bottom);
+        if (Math.max(gapX, gapY) < limits.minGapPx) {
+          fail.push(["elements-touch", `<${name(blocks[i].el)}> and <${name(blocks[j].el)}> are ${Math.max(gapX, gapY).toFixed(0)}px apart (min ${limits.minGapPx}px)`]);
+        }
+      }
+    }
+
+    if (!isTitle) {
+      // Slide master: label, title, content and logo share one left edge.
+      const edge = box.left;
+      for (const { el, r } of blocks) {
+        if (el.matches("footer") || getComputedStyle(el).gridColumnStart === "2") continue;
+        if (Math.abs(r.left - edge) > 1) fail.push(["off-left-edge", `<${name(el)}> starts at ${Math.round(r.left)}px, not the ${Math.round(edge)}px left edge`]);
+      }
+      // One spacing step: label → title equals title → content.
+      const label = s.querySelector(":scope > h6");
+      const content = blocks.filter(({ el }) => !el.matches("h1, h6, header, footer"));
+      if (label && h1 && content.length) {
+        const g1 = h1.getBoundingClientRect().top - label.getBoundingClientRect().bottom;
+        const g2 = Math.min(...content.map(({ r }) => r.top)) - h1.getBoundingClientRect().bottom;
+        if (Math.abs(g1 - g2) > 2) fail.push(["uneven-gaps", `label→title gap ${Math.round(g1)}px but title→content gap ${Math.round(g2)}px`]);
+      }
+      // Use the space: content reaches the bottom of the content area.
+      if (content.length) {
+        const low = Math.max(...content.map(({ r }) => r.bottom));
+        if (box.bottom - low > limits.maxEmptyPx) fail.push(["unused-space", `content ends ${Math.round(box.bottom - low)}px above the content area's bottom (max ${limits.maxEmptyPx}px)`]);
+      }
+    }
+    // Blue is one accent per slide, at most (charts are checked in their spec: one highlighted bar).
+    const accent = /rgb\(34, 0, 255\)/;
+    const accented = all.filter((el) => [el, "::before", "::after"].some((pseudo) => {
+      const st = pseudo === el ? getComputedStyle(el) : getComputedStyle(el, pseudo);
+      if (pseudo !== el && st.content === "none") return false;
+      return [st.color, st.backgroundColor, st.backgroundImage, st.borderTopColor, st.borderLeftColor].some((v) => accent.test(v)) && (pseudo !== el || ownText(el) || st.backgroundImage !== "none" || st.borderTopWidth !== "0px" || st.borderLeftWidth !== "0px" || st.backgroundColor !== "rgba(0, 0, 0, 0)");
+    }));
+    if (accented.length > 1) fail.push(["too-many-accents", `blue used on ${accented.length} elements (max 1): ${accented.slice(0, 4).map(name).join(", ")}`]);
+    // At most two text styles (family + weight) on a slide.
+    const styles = new Set(all.filter((el) => ownText(el)).map((el) => { const st = getComputedStyle(el); return `${st.fontFamily.split(",")[0].replace(/"/g, "")} ${st.fontWeight}${st.fontStyle === "italic" ? " italic" : ""}`; }));
+    if (styles.size > 2) fail.push(["too-many-text-styles", `${styles.size} text styles (max 2): ${[...styles].join("; ")}`]);
+
+    // No orphans: a bullet that wraps must not leave one word alone on its last line.
+    const orphan = (el) => {
+      const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      const ws = [];
+      for (let n; (n = walk.nextNode());) for (const m of n.data.matchAll(/\S+/g)) ws.push([n, m.index, m.index + m[0].length]);
+      if (ws.length < 2) return false;
+      const top = ([n, a, b]) => { const r = document.createRange(); r.setStart(n, a); r.setEnd(n, b); return r.getClientRects()[0]?.top ?? 0; };
+      return Math.abs(top(ws.at(-1)) - top(ws.at(-2))) > 2;
+    };
+    for (const li of s.querySelectorAll(":scope > ul > li, :scope > ol > li")) {
+      if (orphan(li)) fail.push(["orphan-word", `"${li.textContent.trim().split(/\s+/).at(-1)}" sits alone on the last line of a bullet; reword it`]);
+    }
+    // Readable on its background: text of 24px and up needs a contrast ratio of at least 3:1 (WCAG large text).
+    const rgba = (v) => (v.match(/[\d.]+/g) || [0, 0, 0, 0]).map(Number);
+    const [br, bgG, bb] = rgba(getComputedStyle(s).backgroundColor);
+    const lum = (r, g, b) => [r, g, b].map((c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; })
+      .reduce((a, c, i) => a + c * [0.2126, 0.7152, 0.0722][i], 0);
+    for (const el of all.filter((e) => ownText(e))) {
+      const [r, g, b, a = 1] = rgba(getComputedStyle(el).color);
+      const mix = (c, k) => c * a + k * (1 - a);
+      const [l1, l2] = [lum(mix(r, br), mix(g, bgG), mix(b, bb)), lum(br, bgG, bb)].sort((x, y) => y - x);
+      const ratio = (l1 + 0.05) / (l2 + 0.05);
+      if (ratio < 3) { fail.push(["low-contrast", `<${name(el)}> text contrast ${ratio.toFixed(1)}:1 (min 3:1)`]); break; }
+    }
+    // Cover: title, then a one-line subtitle; no apologies or caveats on it.
+    if (isTitle) {
+      for (const p of s.querySelectorAll(":scope > p")) if (ownText(p) && lineCount(p) > 1) fail.push(["subtitle-wraps", "cover subtitle wraps; keep it to one line"]);
+      const coverText = [...s.children].map((el) => el.textContent).join(" ");
+      const caveat = coverText.match(/dummy data|draft|placeholder|work in progress|not final/i);
+      if (caveat) fail.push(["cover-caveat", `cover says "${caveat[0]}"; move caveats to the demo slide or appendix`]);
     }
 
     return { title, text: `${title} ${body}`, fail, warn };
@@ -161,8 +251,8 @@ export async function checkDeck(mdPath, { outDir } = {}) {
     const page = await browser.newPage({ viewport: { width: WIDTH, height: HEIGHT }, deviceScaleFactor: 1 });
     await page.goto(pathToFileURL(htmlPath).href, { waitUntil: "load" });
     await page.evaluate(() => document.fonts.ready);
-    const fontOk = await page.evaluate(() => document.fonts.check('36px "Inter"'));
-    if (!fontOk) throw new Error("Inter did not load; check assets/fonts and the theme @font-face.");
+    const fontOk = await page.evaluate(() => ["Geist", "Newsreader"].every((f) => document.fonts.check(`36px "${f}"`)));
+    if (!fontOk) throw new Error("Geist or Newsreader did not load; check assets/fonts and the theme @font-face.");
     await page.waitForFunction(() => [...document.images].every((i) => i.complete));
 
     const slides = await page.evaluate(measure, LIMITS);

@@ -1,6 +1,6 @@
 ---
 marp: true
-theme: consultancy
+theme: cognition
 paginate: true
 header: Selftest
 ---
@@ -19,6 +19,7 @@ header: Selftest
 ---
 
 <!-- expect: title-wraps -->
+<!-- also: unused-space -->
 
 # This title is far too long to fit on one line of the slide, so it wraps onto a second line below
 
@@ -29,6 +30,7 @@ header: Selftest
 ---
 
 <!-- expect: overflow -->
+<!-- also: elements-touch -->
 
 # Overflowing content is caught
 
@@ -50,6 +52,7 @@ header: Selftest
 ---
 
 <!-- expect: too-many-bullets -->
+<!-- also: unused-space -->
 
 # Four bullets are one too many
 
@@ -63,6 +66,7 @@ header: Selftest
 ---
 
 <!-- expect: bullet-too-long -->
+<!-- also: unused-space -->
 
 # Long bullets are caught
 
@@ -73,6 +77,7 @@ header: Selftest
 ---
 
 <!-- expect: banned-word -->
+<!-- also: unused-space -->
 
 # Banned words are caught
 
@@ -83,6 +88,7 @@ header: Selftest
 ---
 
 <!-- expect: banned-word -->
+<!-- also: unused-space -->
 
 # Banned words in speaker notes are caught
 
@@ -93,6 +99,7 @@ header: Selftest
 ---
 
 <!-- expect: too-many-visuals -->
+<!-- also: elements-touch too-many-accents -->
 
 # Two visuals are one too many
 
@@ -104,6 +111,7 @@ header: Selftest
 ---
 
 <!-- expect: number-without-source -->
+<!-- also: unused-space -->
 
 # A number needs a source line
 
@@ -137,6 +145,7 @@ This is a paragraph of prose that goes on well past twenty words, which is the l
 ---
 
 <!-- expect: missing-title -->
+<!-- also: unused-space -->
 
 - A slide with no title
 
@@ -145,6 +154,7 @@ This is a paragraph of prose that goes on well past twenty words, which is the l
 ---
 
 <!-- expect: text-too-small -->
+<!-- also: unused-space -->
 
 # Small text is caught
 
@@ -165,6 +175,7 @@ This is a paragraph of prose that goes on well past twenty words, which is the l
 ---
 
 <!-- expect: too-many-visuals -->
+<!-- also: elements-touch -->
 <!-- _footer: "Source: selftest fixture" -->
 
 # Two images in one paragraph are two visuals
@@ -184,6 +195,131 @@ This is a paragraph of prose that goes on well past twenty words, which is the l
 
 # A chart squeezed so small its labels can't be read
 
-![w:500](assets/charts/cost.svg)
+![w:500](assets/charts/refund-tests.svg)
 
 <!-- Notes. -->
+
+---
+
+<!-- expect: unused-space -->
+
+# Content that stops halfway down is caught
+
+- One short bullet
+
+<!-- Notes. -->
+
+---
+
+<!-- expect: off-left-edge -->
+
+# A block off the shared left edge is caught
+
+<div class="visual placeholder" style="margin-left:40px">Diagram</div>
+
+<!-- Notes. -->
+
+---
+
+<!-- expect: uneven-gaps -->
+
+###### Section label
+
+# Label-to-title and title-to-content gaps must match
+
+<div class="visual placeholder" style="margin-top:40px">Diagram</div>
+
+<!-- Notes. -->
+
+---
+
+<!-- expect: too-many-accents -->
+
+# Blue is one accent per slide
+
+- A bullet in *blue*
+
+<div class="visual placeholder">Diagram</div>
+
+<!-- Notes. -->
+
+---
+
+<!-- expect: too-many-text-styles -->
+
+# Three text styles are one too many
+
+- A bullet with `code` in it
+
+<div class="visual placeholder">Diagram</div>
+
+<!-- Notes. -->
+
+---
+
+<!-- expect: low-contrast -->
+
+# Pale text is caught
+
+- <span style="color:#dddddd">Hard to read</span>
+
+<div class="visual placeholder">Diagram</div>
+
+<!-- Notes. -->
+
+---
+
+<!-- expect: elements-touch -->
+
+# A visual pushed up into the title is caught
+
+<div class="visual placeholder" style="margin-top:-60px">Diagram</div>
+
+<!-- Notes. -->
+
+---
+
+<!-- expect: orphan-word -->
+<!-- _footer: "Source: fixture" -->
+
+# A bullet that leaves one word alone on its last line
+
+- 34 refund rule tests, 30 shown failing first
+
+<div class="visual placeholder">Diagram</div>
+
+<!-- Notes. -->
+
+---
+
+<!-- _class: title -->
+<!-- expect: cover-caveat -->
+
+# Cover title
+
+Draft, dummy data only
+
+<!-- Notes. -->
+
+---
+
+<!-- _class: title -->
+<!-- expect: subtitle-wraps -->
+
+# Cover title
+
+A subtitle that goes on far too long to fit on one line beside the art
+
+<!-- Notes. -->
+
+---
+
+<!-- expect: image-aspect -->
+<!-- also: unused-space -->
+
+# A drawing squashed out of shape is caught
+
+<img src="assets/cognition-mark.svg" alt="Squashed" style="width:300px;height:100px">
+
+<!-- Notes. -->
+

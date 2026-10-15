@@ -1,0 +1,17 @@
+{
+  "output": "assets/charts/refund-tests.svg",
+  "alt": "Refunds app: 34 business-rule tests written, 30 of them shown failing before the code was written",
+  "bars": [
+    {
+      "label": "Rule tests written",
+      "value": 34
+    },
+    {
+      "label": "Shown failing first",
+      "value": 30,
+      "highlight": true
+    }
+  ],
+  "width": 1680,
+  "height": 480
+}

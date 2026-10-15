@@ -1,6 +1,6 @@
 # Presentation
 
-Marp deck in `slides.md`, 16:9 at 1920×1080, with the `consultancy` theme in `themes/`.
+Marp deck in `slides.md`, 16:9 at 1920×1080, with the `cognition` theme in `themes/`.
 The rules for writing slides, and the workflow, are in
 [`.agents/skills/slides/SKILL.md`](../.agents/skills/slides/SKILL.md).
 
@@ -18,5 +18,5 @@ The rules for writing slides, and the workflow, are in
 - Font: Inter (SIL Open Font License, `assets/fonts/OFL.txt`), vendored so every export looks the same offline.
 - Palette: Cognition's off-white `#f7f6f5`, ink `#191919` and accent `#2200ff` (from cognition.ai's CSS),
   plus Devin's blue `#317cff` (from devin.ai's CSS). No logos; the wordmark is the `header:` text.
-- Live preview in VS Code: the Marp extension, with `markdown.marp.themes` set to `./presentation/themes/consultancy.css`
+- Live preview in VS Code: the Marp extension, with `markdown.marp.themes` set to `./presentation/themes/cognition.css`
   and `markdown.marp.enableHtml` on.
