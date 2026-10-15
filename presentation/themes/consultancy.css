@@ -220,13 +220,11 @@ footer {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Chrome resolves this pseudo-element against the grid area (content box), so span the
-   whole grid explicitly and offset from the content edge into the bottom margin. */
+/* Marpit's default pagination style sets padding: inherit; reset it so offsets are exact. */
 section::after {
   content: attr(data-marpit-pagination) " / " attr(data-marpit-pagination-total);
-  grid-column: 1 / -1;
-  grid-row: 1 / -1;
-  bottom: calc(56px - 152px);
-  right: 0;
+  padding: 0;
+  bottom: 56px;
+  right: var(--margin-x);
   font-variant-numeric: tabular-nums;
 }
