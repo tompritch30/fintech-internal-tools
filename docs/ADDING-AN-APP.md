@@ -89,6 +89,10 @@ Use this for each business app (KYC, refunds, feature flags). One app per sessio
 - [ ] Use the kit: `ListView` for queues, `RecordHeader` + `CommandBar` + `Timeline`
       (`listAuditForEntity`) for records. Show only commands the user may run.
 - [ ] Add a component to `packages/ui` only when a real app needs it.
+- [ ] Pages several roles may read (e.g. a record both makers and checkers open) can use
+      `requirePagePermission`'s sibling `requirePageAnyPermission([...], "/route")` in `apps/web/lib/auth.ts`.
+- [ ] Expected errors (validation, conflicts, self-approval) are returned from the action as form state
+      (`useActionState`), not thrown; see `app/(platform)/refunds/actions.ts`.
 
 ## 5. Tests
 - [ ] Named server tests for each business rule, written first and shown failing.

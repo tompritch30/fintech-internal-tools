@@ -363,6 +363,27 @@ leak by default. `Date` fields are exempt; mask nested records separately and
 combine them (see ADDING-AN-APP.md). `Masked<T>` keeps `null`/`undefined` on masked
 fields.
 
+### 4.4 First app: refunds
+
+Code: `apps/web/app/(platform)/refunds/`. Business logic is in `refunds.ts` (tested in
+`apps/web/test/refunds.test.ts`, real Postgres); `actions.ts` wraps it with `defineAction`;
+`mock-provider.ts` stands in for the card provider. Tables (migrations `0004_refunds`,
+`0005_refunds_guard`): `payments`, `refunds`, `mock_provider_refunds`.
+
+| Rule | How it is enforced |
+|---|---|
+| Refund needs a reason and can't exceed what's left | Validated in `requestRefund`; "left" = amount − refunded − refunds awaiting approval |
+| Over `REFUND_APPROVAL_THRESHOLD_PENCE` → different approver | `requestApproval` with kind `refund.issue`; the refunds row is created in `onRequested`, so both commit together. Self-approval is refused by the engine and the `maker_is_not_checker` CHECK |
+| Only the last four card digits are stored | No PAN column exists; CHECK `payments_card_last4_only` allows exactly four digits |
+| Email masked; reveal needs a reason | `mask` on every payment view; `unmask` (needs `pii:unmask` + reason, writes `field.unmask`) |
+| Money moves once, only when approved | The provider is called only in `executeRefund` (straight through, or from `onApproved`). The engine's version check stops a second approval; the provider ledger is unique on `refund_id`; the refund's id is minted when the form renders, so a double submit returns the same refund; the `refunds_guard` trigger refuses to touch a succeeded refund |
+| Total never exceeds the original amount | The payment row is locked (`SELECT … FOR UPDATE`) while the remaining amount is checked; CHECK `payments_refund_within_amount` is the backstop |
+| Queue and history | `/refunds/approvals` (`approvals:decide`); each refund's Timeline merges its own audit rows with its approval request's |
+
+Grants: `app_runtime` may only `SELECT` payments and `UPDATE (refunded_pence)`; on
+`refunds` it has `SELECT, INSERT, UPDATE`; on `mock_provider_refunds` `SELECT, INSERT`.
+No DELETE anywhere. Payments are created only by the seed (`app_owner`).
+
 ## 5. UI kit (`packages/ui`)
 
 Built once in A1 and reused by all three apps. The record components follow the
@@ -407,7 +428,9 @@ Out of A1 on purpose. Each needs its own decision.
 | **Audit export** (CSV, admin-only, audited) | Research Q3: Dataverse has no native audit export | A2 or later |
 | **Read audit for sensitive records** | Unmask reads are audited since A2 (`field.unmask`); ordinary reads of masked records are not | Later |
 | **`Masked<T>` is compile-time only** | Casts/`any` bypass the brand; the backstops are REVIEW.md rule 3 and the `server-only` import | Accepted risk |
-| **Timeline doesn't apply masking** | `apps/web` audit Timeline shows `before`/`after` JSON unmasked; apply `mask` when a real sensitive record uses it | With the first app that masks fields |
+| **Timeline doesn't apply masking** | `apps/web` audit Timeline shows `before`/`after` JSON unmasked; apply `mask` when a real sensitive record uses it | Refunds keeps the customer email out of every refund audit row instead (tested); fix in the Timeline when an app needs masked values in history |
+| **No `onRejected`/`onCancelled` hook in the approvals engine** | Apps can't update their own record when a request is rejected | Refunds derives "rejected"/"cancelled" from the approval request instead of storing it twice. Core follow-up if a later app needs the hook |
+| **App-specific permissions (`refunds:*`)** | Refunds reuses `approvals:request`, `approvals:decide` and `pii:unmask` because `packages/core` was out of scope; so analysts can't reveal a customer email | Separate core PR if Thomas wants `refunds:read`/`refunds:approve` |
 | **Stale roles** (idle timeout, shorter TTL or back-channel logout) | Removing someone's role in the IdP takes effect only at their next login | Before production |
 | **Scheduled session cleanup** | `createSession` deletes a user's expired sessions when they sign in again; users who never come back keep one expired row (and its ID token) each | Before production |
 | **Correlation ID on audit rows** | Trace one user action across rows and logs | Later |
@@ -440,13 +463,15 @@ Out of A1 on purpose. Each needs its own decision.
 | `OIDC_ROLES_CLAIM` | web | `roles` |
 | `OIDC_ALLOW_INSECURE_HTTP` | web | `true` locally; unset in production |
 | `SESSION_TTL_HOURS` | web | `8` |
+| `REFUND_APPROVAL_THRESHOLD_PENCE` | web (refunds) | `25000` (£250.00; refunds above it need approval) |
 | `POSTGRES_PASSWORD` | Postgres container (superuser bootstrap) | `demo-only-change-me` |
 | `KC_BOOTSTRAP_ADMIN_USERNAME` / `_PASSWORD` | Keycloak container | `admin` / `demo-only-change-me` |
 
 All values above are fake and local-dev-only. `.env.example` is the source of truth.
 
 Demo users (Keycloak realm `internal-tools`, password `demo-only-change-me`):
-`analyst` (analyst), `approver` (approver), `admin` (admin), `norole` (no roles).
+`analyst` (analyst), `approver` (approver), `admin` (admin), `norole` (no roles),
+`senior` (analyst + approver: can request and approve, used to test that nobody approves their own refund).
 
 ## 8. File tree (end state of the A1 PR)
 
