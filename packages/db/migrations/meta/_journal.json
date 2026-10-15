@@ -50,6 +50,20 @@
       "when": 1792097366739,
       "tag": "0006_refunds_rejected",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792100981438,
+      "tag": "0007_kyc",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792100981987,
+      "tag": "0008_kyc_guard",
+      "breakpoints": true
     }
   ]
 }
