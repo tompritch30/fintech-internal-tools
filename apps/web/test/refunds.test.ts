@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 import { ConflictError, ForbiddenError, SelfApprovalError, ValidationError, permissionsFor } from "@fit/core";
 import { approvalRequests, auditLog, createDb, mockProviderRefunds, payments, refunds } from "@fit/db";
-import { seedPayments } from "@fit/db/seed";
+import { seed, seedPayments } from "@fit/db/seed";
 import { expectDbError, makeUser, ownerDb } from "../../../packages/core/test/helpers/db.ts";
 import { TEST_DATABASE_URL } from "../../../packages/core/test/helpers/env.ts";
 import {
@@ -11,6 +11,7 @@ import {
   getPaymentView,
   listPendingRefundApprovals,
   parsePounds,
+  paymentHistory,
   loadRefundConfig,
   refundHistory,
   rejectRefund,
@@ -538,5 +539,55 @@ describe("rule 6: approvers get a queue, and every refund shows its history", ()
     const payment = await newPayment(5_000);
     const refund = await requestRefund(await analyst(), refundInput(payment.id, 1_000), config);
     expect((await refundHistory(db, refund.id)).map((h) => h.action)).toEqual(["refund.succeeded", "refund.requested"]);
+  });
+});
+
+describe("seeded payments have an audit history", () => {
+  const seeded = seedPayments();
+  const seededIds = async () =>
+    (await owner.select({ id: payments.id }).from(payments).where(inArray(payments.reference, seeded.map((p) => p.reference)))).map((p) => p.id);
+  const captureRows = (ids: string[]) =>
+    owner
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.entityType, "payment"), eq(auditLog.action, "payment.captured"), inArray(auditLog.entityId, ids)));
+
+  it("every seeded payment's history starts with its capture", async () => {
+    const ids = await seededIds();
+    expect(ids).toHaveLength(seeded.length);
+    for (const id of ids) {
+      const history = await paymentHistory(db, id);
+      expect(history.at(-1)).toMatchObject({ action: "payment.captured", entityType: "payment", entityId: id });
+    }
+  });
+
+  it("running the seed again adds no second capture row", async () => {
+    await seed(owner);
+    const ids = await seededIds();
+    const rows = await captureRows(ids);
+    expect(rows).toHaveLength(ids.length);
+    expect(new Set(rows.map((r) => r.entityId)).size).toBe(ids.length);
+  });
+
+  it("the capture row records the payment but not the customer's name or email", async () => {
+    const [first] = seeded;
+    const [payment] = await owner.select().from(payments).where(eq(payments.reference, first!.reference));
+    const [row] = await captureRows([payment!.id]);
+    expect(row?.after).toMatchObject({ reference: first!.reference, amountPence: first!.amountPence, merchant: first!.merchant });
+    const all = JSON.stringify(await captureRows(await seededIds()));
+    for (const p of seeded) {
+      expect(all).not.toContain(p.customerName);
+      expect(all).not.toContain(p.customerEmail);
+    }
+  });
+
+  it("a payment the seed didn't create gets no capture row, and its reveals still show in its history", async () => {
+    const payment = await newPayment(5_000);
+    await seed(owner);
+    expect(await captureRows([payment.id])).toHaveLength(0);
+
+    // Positive control: the payment's history is read from the audit log.
+    await revealCustomerName(await approver(), { paymentId: payment.id, reason: "Matching the bank statement" });
+    expect(await paymentHistory(db, payment.id)).toMatchObject([{ action: "field.unmask", entityId: payment.id }]);
   });
 });
