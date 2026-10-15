@@ -117,7 +117,9 @@ function measure(limits) {
     // Chart text is inside the SVG, so scale the chart's font by how much the image is shrunk.
     for (const img of s.querySelectorAll("img")) {
       if (!/(^|\/)charts\//.test(img.getAttribute("src") ?? "") || !img.naturalWidth) continue;
-      const px = (img.getBoundingClientRect().width / img.naturalWidth) * limits.chartFontPx;
+      const box = img.getBoundingClientRect();
+      // object-fit: contain shrinks the SVG to fit the tighter of width and height.
+      const px = Math.min(box.width / img.naturalWidth, box.height / img.naturalHeight) * limits.chartFontPx;
       if (px < limits.minFontPx) fail.push(["chart-text-too-small", `chart labels render at ${px.toFixed(1)}px (min ${limits.minFontPx}px); give the chart more width or fewer bullets`]);
     }
 
