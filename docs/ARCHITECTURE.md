@@ -153,7 +153,8 @@ The fix, set once in `docker-compose.yml`:
 - `packages/core` owns the *role → permission* map in code, so a change to it is a
   reviewed change to `packages/core`. The map lives in `PERMISSION_REGISTRY` (built
   by `definePermissionRegistry`): every permission is a `domain:action` key with a
-  description and its granted roles, validated and frozen at module load — a bad
+  description and its granted roles, validated and deep-frozen at module load
+  (registry and `ROLE_PERMISSIONS`), so a runtime push can't add a grant — a bad
   key, empty description, empty or duplicate role list, or unknown role throws
   `ValidationError` at startup rather than silently misgranting access. `PERMISSIONS`,
   the `Permission` union and `ROLE_PERMISSIONS` are all derived from the registry.

@@ -12,8 +12,8 @@ const PERMISSION_NAME = /^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$/;
 
 /**
  * Declares the permission registry: every permission is a `domain:action` key with a
- * description and the roles it grants. Validated and frozen at module load, so a bad
- * entry fails startup rather than silently granting or withholding access.
+ * description and the roles it grants. Validated and deep-frozen at module load, so a
+ * bad entry fails startup rather than silently granting or withholding access.
  */
 export function definePermissionRegistry<const R extends Record<string, PermissionDef>>(defs: R): Readonly<R> {
   for (const [key, def] of Object.entries(defs)) {
@@ -35,6 +35,10 @@ export function definePermissionRegistry<const R extends Record<string, Permissi
       }
     }
   }
+  for (const def of Object.values(defs)) {
+    Object.freeze(def.roles);
+    Object.freeze(def);
+  }
   return Object.freeze(defs);
 }
 
@@ -55,7 +59,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = (() => {
   for (const [permission, def] of Object.entries(PERMISSION_REGISTRY)) {
     for (const role of def.roles) map[role].push(permission as Permission);
   }
-  return map;
+  for (const role of ROLES) Object.freeze(map[role]);
+  return Object.freeze(map);
 })();
 
 export function isRole(value: string): value is Role {

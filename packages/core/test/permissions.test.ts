@@ -76,7 +76,7 @@ describe("permission registry", () => {
 
   it("the registry and role map can't be changed at runtime", () => {
     expect(() => (ROLE_PERMISSIONS.admin as Permission[]).push("pii:unmask")).toThrow(TypeError);
-    expect(() => (PERMISSION_REGISTRY["audit:read"].roles as Role[]).push("analyst")).toThrow(TypeError);
+    expect(() => (PERMISSION_REGISTRY["audit:read"].roles as unknown as Role[]).push("analyst")).toThrow(TypeError);
     expect(() => ((ROLE_PERMISSIONS as Record<string, unknown>).analyst = [])).toThrow(TypeError);
     expect(() => ((PERMISSION_REGISTRY["audit:read"] as { description: string }).description = "x")).toThrow(TypeError);
     expect(permissionsFor(["admin"]).has("pii:unmask")).toBe(false);
