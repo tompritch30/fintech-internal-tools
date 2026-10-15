@@ -1,13 +1,19 @@
 export const ROLES = ["analyst", "approver", "admin"] as const;
 export type Role = (typeof ROLES)[number];
 
-export const PERMISSIONS = ["platform:access", "audit:read"] as const;
+export const PERMISSIONS = [
+  "platform:access",
+  "audit:read",
+  "approvals:request",
+  "approvals:decide",
+  "pii:unmask",
+] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
 /** Role → permission map. Changing it is a change to packages/core (human review). */
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  analyst: ["platform:access"],
-  approver: ["platform:access"],
+  analyst: ["platform:access", "approvals:request"],
+  approver: ["platform:access", "approvals:decide", "pii:unmask"],
   admin: ["platform:access", "audit:read"],
 };
 

@@ -1,8 +1,11 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  check,
   index,
+  integer,
   jsonb,
+  pgEnum,
   pgTable,
   primaryKey,
   text,
@@ -82,6 +85,53 @@ export const auditLog = pgTable(
   ],
 );
 
+export const approvalStatus = pgEnum("approval_status", [
+  "pending",
+  "approved",
+  "rejected",
+  "cancelled",
+]);
+
+/**
+ * Maker-checker approvals (ARCHITECTURE.md §4.2). The requester can never decide:
+ * enforced in code (SelfApprovalError) and by maker_is_not_checker. Content and
+ * status transitions are additionally guarded by a trigger (0003_approvals_guard.sql);
+ * app_runtime has no DELETE grant.
+ */
+export const approvalRequests = pgTable(
+  "approval_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Which approval kind created the request, e.g. 'refund.issue'. */
+    kind: text("kind").notNull(),
+    /** The app's entity type the request is about, e.g. 'refund'. */
+    subjectType: text("subject_type").notNull(),
+    subjectId: text("subject_id").notNull(),
+    /** What will happen if approved. Never copied into audit rows. */
+    payload: jsonb("payload").notNull(),
+    status: approvalStatus("status").notNull().default("pending"),
+    requestedBy: uuid("requested_by")
+      .notNull()
+      .references(() => users.id),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+    decidedBy: uuid("decided_by").references(() => users.id),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    decisionNote: text("decision_note"),
+    /** Optimistic concurrency: decides must pass the version they saw. */
+    version: integer("version").notNull().default(1),
+  },
+  (t) => [
+    index("approval_requests_status_kind_idx").on(t.status, t.kind),
+    index("approval_requests_subject_idx").on(t.subjectType, t.subjectId),
+    check("maker_is_not_checker", sql`${t.decidedBy} is null or ${t.decidedBy} <> ${t.requestedBy}`),
+    check(
+      "decision_matches_status",
+      sql`(${t.status} = 'pending' and ${t.decidedBy} is null and ${t.decidedAt} is null) or (${t.status} in ('approved','rejected') and ${t.decidedBy} is not null and ${t.decidedAt} is not null) or (${t.status} = 'cancelled' and ${t.decidedBy} is null and ${t.decidedAt} is not null)`,
+    ),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type AuditLogRow = typeof auditLog.$inferSelect;
 export type NewAuditLogRow = typeof auditLog.$inferInsert;
+export type ApprovalRequestRow = typeof approvalRequests.$inferSelect;

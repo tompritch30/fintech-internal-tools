@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./cookie": "./src/session/cookie.ts"
+    "./cookie": "./src/session/cookie.ts",
+    "./masking": "./src/masking/masking.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
