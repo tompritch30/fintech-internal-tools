@@ -413,6 +413,44 @@ cancelled request's refund stays `pending`, is shown as Cancelled and no longer 
 its amount; the app has no cancel action. Seeded payments get no audit rows: seeding is
 setup, not a business action.
 
+### 4.5 Second app: KYC review queue
+
+Code: `apps/web/app/(platform)/kyc/` (issue #12). Business logic is in `kyc.ts` (tested in
+`apps/web/test/kyc.test.ts`, real Postgres); `actions.ts` wraps it with `defineAction`.
+Tables (migrations `0008_kyc`, `0009_kyc_guard`): `kyc_cases`, `kyc_documents`. Cases and
+documents are created only by the seed (`app_owner`); all of it is synthetic (`TST-` ID
+numbers, `ZZ` postcodes, documents stamped `SYNTHETIC TEST DOCUMENT`).
+
+Status: `open` → `in_review` (claimed) → `approved` | `rejected` | `escalated` (back to the
+queue, unowned) | `pending_approval` (high-risk approve, waiting for sign-off) → `approved`,
+or back to `in_review` with the owner if the checker refuses.
+
+| Rule | How it is enforced |
+|---|---|
+| One owner per case; only the owner decides | `claimCase` locks the row (`SELECT … FOR UPDATE`) and claims only `open`/`escalated`; a second or concurrent claim gets `ConflictError`. Decide/escalate check `owner_id = user`, else `ForbiddenError` + `access.denied` (`required: "kyc:case-owner"`). CHECKs tie `owner_id`/`claimed_at` to status |
+| Reject and escalate need a note | Validated in `decideCase`; CHECK `kyc_cases_rejection_has_note` is the backstop |
+| High-risk approve → different person signs off | High-risk = `risk_rating = 'high'` or sanctions hit or PEP (`isHighRisk`). Approve opens `requestApproval` kind `kyc.high_risk_approval` (`kyc:request` → `kyc:approve`); `signOffCase` calls `decideApproval`, which refuses the requester. Trigger `kyc_cases_guard` refuses `status = 'approved'` on a high-risk case without an approved request |
+| No PII in approval payloads or audit rows | Payload and audit `before`/`after` carry only reference, status, risk flags and owner; tests scan the JSON for the name, DOB, ID number and address |
+| Name, DOB, ID number, address masked | `defineMaskedEntity` on every list row and view; `revealCaseField` needs `pii:unmask` + reason and writes `field.unmask` (field name, no value) |
+| Documents opened only with a reason | Reads return document metadata only; `openCaseDocument` needs `pii:unmask` + reason and writes `field.unmask` on the `kyc_document` (no content in metadata) |
+| Closed cases are kept, not deleted | Closing sets `retention_until = closed_at + KYC_RETENTION_YEARS` (default 5; values below 5 or non-integers are refused by `loadKycConfig`). CHECK keeps it ≥ 5 years; the trigger refuses DELETE of a closed case and any change to a closed case; `BEFORE TRUNCATE` triggers block truncation; documents are immutable |
+| Case history | `caseHistory` merges the case's audit rows, its documents' and its approval requests', newest first; shown in the case Timeline |
+
+Grants: `app_runtime` may `SELECT` both tables and `UPDATE` only `status`, `owner_id`,
+`claimed_at`, `decision_note`, `closed_at`, `retention_until` on `kyc_cases`. No INSERT,
+DELETE or document writes.
+
+Permissions (in `PERMISSION_REGISTRY`): `kyc:read` (analyst, approver) guards the queue (`/kyc`, `/kyc/status/<status>`) and case pages;
+`kyc:request` (analyst) claims and decides; `kyc:approve` (approver) signs off. Reveals and
+document opens use the shared `pii:unmask` (approver). Issue #12 asked for an app-level
+registry instead of editing `packages/core`; none exists, so this follows the refunds
+convention (flagged in PR #22). Demo users: `analyst` works cases, `approver` signs off and
+reveals, `senior` (both roles) shows the self-sign-off refusal.
+
+KYC gaps: no case intake or document upload (seed only); escalation has no separate senior
+queue (it returns the case unowned); retention is enforced but nothing purges cases
+after `retention_until`.
+
 ## 5. UI kit (`packages/ui`)
 
 Built once in A1 and reused by all three apps. The record components follow the
@@ -494,6 +532,7 @@ Out of A1 on purpose. Each needs its own decision.
 | `SESSION_IDLE_MINUTES` | web | `15` |
 | `UNMASK_RATE_LIMIT_PER_HOUR` | web | `20` |
 | `REFUND_APPROVAL_THRESHOLD_PENCE` | web (refunds) | `25000` (£250.00; refunds above it need approval) |
+| `KYC_RETENTION_YEARS` | web (KYC) | `5` (closed cases kept this many years; below 5 is refused) |
 | `POSTGRES_PASSWORD` | Postgres container (superuser bootstrap) | `demo-only-change-me` |
 | `KC_BOOTSTRAP_ADMIN_USERNAME` / `_PASSWORD` | Keycloak container | `admin` / `demo-only-change-me` |
 
