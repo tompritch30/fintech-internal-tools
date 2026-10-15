@@ -17,7 +17,7 @@ How the numbers were counted:
 | E2E tests (Playwright) | 2 (`login.spec.ts`) | 2 | 2 | 2 |
 | Migrations | 0000–0003, 0007 | 0004, 0005, 0006 | 0008, 0009 | 0010, 0011 |
 | Build PRs | #3, #4, #6, #7, #9, #15, #17, #19, #23 | #10, #18 | #22 | #24 |
-| Review findings | 9 (A1 6, A2 3), 1 on #9; 3 security-review breaks (§3) |  2 on #10 | 1 on #22 | 0 threads on #24 |
+| Review findings | 9 (A1 6, A2 3), 1 on #9; 3 security-review breaks (§3) | 2 on #10 (both fixed) | 1 on #22 | 0 threads on #24 |
 | Devin cost | _[cost: see billing page]_ | _[cost: see billing page]_ | _[cost: see billing page]_ | _[cost: see billing page]_ |
 | Thomas review time | _[Thomas to fill]_ | _[Thomas to fill]_ | _[Thomas to fill]_ | _[Thomas to fill]_ |
 
@@ -69,8 +69,8 @@ Devin Review threads on merged PRs, as of 2026-10-15 23:15 UTC. All are resolved
 | #7 | bug | `Masked<T>` dropped `undefined` from optional fields | Fixed in #9 |
 | #7 | security | Nested sensitive data survived shallow masking | Fixed in #9: `mask` refuses nested values it has no policy for |
 | #9 | bug | Approval payload loses present values (sparse arrays) | Fixed in `4165b90`; red test first in `00ff27a` |
-| #10 | bug | Seeded payments have no audit rows | Left for Thomas: payments stand in for an external card system |
-| #10 | security | Payment view shows customer names unmasked | Left for Thomas: the brief masks the email, and the name stays visible on purpose |
+| #10 | bug | Seeded payments have no audit rows | First left as setup data (Thomas agreed in the thread). Later fixed in a follow-up PR: the seed writes one `payment.captured` row per seeded payment (backfills, no duplicates on rerun, no name or email), and the payment page has a History section |
+| #10 | security | Payment view shows customer names unmasked | Fixed in #10 before merge (`ca328ec`, `cb5de10`, `efd1b41`): core `name` mask style shows "Jane S."; `revealCustomerName` needs a reason and writes `field.unmask` |
 | #21 | bug | Ruleset JSON weaker than the live ruleset (no `merge_queue` rule) | Confirmed as blocking and resolved before merge |
 | #22 | security | Failed reveal could leave sensitive data on screen | Checked and not reproducible (`useActionState` replaces the state); code left as it is |
 | #30 | bug | `MAX_PAGE = 10_000` made audit rows past page 10,000 unreachable | Fixed in #30 before merge (cap raised to 1e9); re-review found nothing |

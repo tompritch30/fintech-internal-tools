@@ -1,6 +1,6 @@
 // Dummy data only. Subjects match the user ids in infra/keycloak/internal-tools-realm.json.
 import { fileURLToPath } from "node:url";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { createDb, type Db } from "./index.ts";
 import { auditLog, flags, flagValues, kycCases, kycDocuments, payments, roles, userRoles, users } from "./schema.ts";
 import { loadRootEnv } from "./root-env.ts";
@@ -163,7 +163,41 @@ export async function seed(db: Db): Promise<void> {
     }
 
     // Payments are inserted once; refunds made later only change refunded_pence.
-    await tx.insert(payments).values(seedPayments()).onConflictDoNothing({ target: payments.reference });
+    const seededPayments = seedPayments();
+    await tx.insert(payments).values(seededPayments).onConflictDoNothing({ target: payments.reference });
+
+    // Each seeded payment gets one `payment.captured` row, so its history starts at capture. This also
+    // backfills payments seeded before the row existed; a rerun adds nothing. No customer name or email.
+    const captured = new Set(
+      (
+        await tx
+          .select({ entityId: auditLog.entityId })
+          .from(auditLog)
+          .where(and(eq(auditLog.entityType, "payment"), eq(auditLog.action, "payment.captured")))
+      ).map((r) => r.entityId),
+    );
+    const uncaptured = (
+      await tx.select().from(payments).where(inArray(payments.reference, seededPayments.map((p) => p.reference)))
+    ).filter((p) => !captured.has(p.id));
+    if (uncaptured.length > 0) {
+      await tx.insert(auditLog).values(
+        uncaptured.map((p) => ({
+          actorSubject: "card-system",
+          action: "payment.captured",
+          entityType: "payment",
+          entityId: p.id,
+          reason: "Payment captured by the card system (seeded dummy data)",
+          after: {
+            reference: p.reference,
+            merchant: p.merchant,
+            cardBrand: p.cardBrand,
+            cardLast4: p.cardLast4,
+            amountPence: p.amountPence,
+            capturedAt: p.capturedAt.toISOString(),
+          },
+        })),
+      );
+    }
 
     // KYC cases are inserted once (documents with them); not audited: seeding is setup, not a business action.
     for (const { kase, documents } of seedKycCases()) {

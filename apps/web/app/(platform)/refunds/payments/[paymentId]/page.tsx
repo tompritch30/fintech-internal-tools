@@ -5,7 +5,8 @@ import { Badge, CommandBar, RecordHeader, Table, type Column } from "@fit/ui";
 import { getDb, requirePagePermission } from "../../../../../lib/auth.ts";
 import { RefundRequestForm, RevealField } from "../../forms.tsx";
 import { formatPence, formatWhen, STATUS } from "../../format.ts";
-import { getPaymentView, listRefundsForPayment, loadRefundConfig, type RefundView } from "../../refunds.ts";
+import type { AuditListItem } from "@fit/core";
+import { getPaymentView, listRefundsForPayment, loadRefundConfig, paymentHistory, type RefundView } from "../../refunds.ts";
 
 const refundColumns: Column<RefundView>[] = [
   {
@@ -24,13 +25,20 @@ const refundColumns: Column<RefundView>[] = [
   { key: "status", label: "Status", render: (r) => <Badge tone={STATUS[r.status]?.tone}>{STATUS[r.status]?.label}</Badge> },
 ];
 
+const historyColumns: Column<AuditListItem>[] = [
+  { key: "occurredAt", label: "When", render: (h) => formatWhen(h.occurredAt) },
+  { key: "actor", label: "Who", render: (h) => h.actor ?? "system" },
+  { key: "action", label: "Action", render: (h) => h.action },
+  { key: "reason", label: "Reason", render: (h) => h.reason ?? "" },
+];
+
 export default async function PaymentPage({ params }: { params: Promise<{ paymentId: string }> }) {
   const { paymentId } = await params;
   const user = await requirePagePermission("refunds:read", `/refunds/payments/${paymentId}`);
   const db = getDb();
   const payment = await getPaymentView(db, paymentId);
   if (!payment) notFound();
-  const refunds = await listRefundsForPayment(db, payment.id);
+  const [refunds, history] = await Promise.all([listRefundsForPayment(db, payment.id), paymentHistory(db, payment.id)]);
   const { approvalThresholdPence } = loadRefundConfig();
   const canRequest = user.permissions.has("refunds:request") && payment.availablePence > 0;
   const canReveal = user.permissions.has("pii:unmask");
@@ -77,6 +85,12 @@ export default async function PaymentPage({ params }: { params: Promise<{ paymen
         <p>No refunds on this payment yet.</p>
       ) : (
         <Table caption="Refunds on this payment" columns={refundColumns} rows={refunds} rowKey={(r) => r.id} />
+      )}
+      <h2>History</h2>
+      {history.length === 0 ? (
+        <p>No history recorded for this payment.</p>
+      ) : (
+        <Table caption="Payment history" columns={historyColumns} rows={history} rowKey={(h) => String(h.id)} />
       )}
     </div>
   );
