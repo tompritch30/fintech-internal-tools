@@ -64,6 +64,47 @@ describe("mask", () => {
     expect(output.v).toBe(expected);
   });
 
+  it("refuses a record with an unpoliced nested object", () => {
+    const policies = [{ field: "email", style: "email", unmaskPermission: "pii:unmask" }] as const;
+    // `as never` bypasses the compile-time guard to exercise the runtime one.
+    expect(() =>
+      mask<{ id: string; email: string }, typeof policies>(
+        { id: "1", email: "a@example.test", address: { line1: "1 Test Street" } } as never,
+        policies,
+      ),
+    ).toThrow(ValidationError);
+    expect(() =>
+      mask<{ id: string; email: string }, typeof policies>(
+        { id: "1", tags: ["b@example.test"] } as never,
+        policies,
+      ),
+    ).toThrow(ValidationError);
+  });
+
+  it("masks a record whose only object fields are Dates", () => {
+    const createdAt = new Date("2026-01-02T03:04:05Z");
+    const output = mask({ email: "alice@example.test", createdAt }, [
+      { field: "email", style: "email", unmaskPermission: "pii:unmask" },
+    ]);
+    expect(output.createdAt).toBe(createdAt);
+    expect(output.email).toBe("a•••@example.test");
+  });
+
+  it("masks a nested record by masking each part separately", () => {
+    const customer = { id: "1", email: "alice@example.test" };
+    const address = { line1: "1 Test Street", postcode: "TE5T 1NG" };
+    const maskedCustomer = mask(customer, [
+      { field: "email", style: "email", unmaskPermission: "pii:unmask" },
+    ]);
+    const maskedAddress = mask(address, [
+      { field: "line1", style: "full", unmaskPermission: "pii:unmask" },
+      { field: "postcode", style: "last4", unmaskPermission: "pii:unmask" },
+    ]);
+    const combined = { ...maskedCustomer, address: maskedAddress };
+    const json = JSON.stringify(combined);
+    for (const raw of ["alice@example.test", "1 Test Street", "TE5T 1NG"]) expect(json).not.toContain(raw);
+  });
+
   it("leaves null and undefined values as they are", () => {
     const record: { a: string | null; b?: string } = { a: null };
     const output = mask(record, [

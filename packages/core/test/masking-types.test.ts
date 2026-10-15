@@ -30,4 +30,35 @@ describe("Masked<T> types", () => {
     expectTypeOf(masked.balance).toEqualTypeOf<number>();
     expect(typed).toBe(masked);
   });
+
+  it("mask() does not compile for a record with a nested object or unknown field", () => {
+    // Dead closure: the calls must type-check (or not), never run.
+    const compileCheck = () => {
+      // @ts-expect-error nested objects must be masked as their own records
+      mask({ id: "1", email: "a@example.test", address: { line1: "1 Test Street" } }, policies);
+      // @ts-expect-error `unknown` could hide a nested object
+      mask({ id: "1", email: "a@example.test", meta: {} as unknown }, policies);
+    };
+    expect(compileCheck).toBeTypeOf("function");
+    // Control: Date fields are allowed — they serialize as ISO strings.
+    const withDate = mask({ id: "1", email: "a@example.test", createdAt: new Date() }, policies);
+    expect(withDate.createdAt).toBeInstanceOf(Date);
+  });
+
+  it("Masked<T> keeps undefined for optional masked fields", () => {
+    const record: { id: string; f?: string | null; g: string; h: string | null } = {
+      id: "1",
+      f: "x@example.test",
+      g: "y@example.test",
+      h: "z@example.test",
+    };
+    const masked = mask(record, [
+      { field: "f", style: "email", unmaskPermission: "pii:unmask" },
+      { field: "g", style: "email", unmaskPermission: "pii:unmask" },
+      { field: "h", style: "email", unmaskPermission: "pii:unmask" },
+    ]);
+    expectTypeOf(masked.f).toEqualTypeOf<MaskedValue | null | undefined>();
+    expectTypeOf(masked.g).toEqualTypeOf<MaskedValue>();
+    expectTypeOf(masked.h).toEqualTypeOf<MaskedValue | null>();
+  });
 });
