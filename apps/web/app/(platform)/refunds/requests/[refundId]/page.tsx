@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { AuditListItem } from "@fit/core";
-import { CommandBar, RecordHeader, Timeline } from "@fit/ui";
+import { ActionDialog, ActionPanel, Input, RecordHeader, RecordSection, Timeline, linkClass } from "@fit/ui";
 import { getDb, requirePagePermission } from "../../../../../lib/auth.ts";
-import { DecisionForms } from "../../forms.tsx";
-import { formatPence, formatWhen, STATUS } from "../../format.ts";
+import { approveRefundAction, rejectRefundAction } from "../../actions.ts";
+import { formatPence, formatWhen, statusOf } from "../../format.ts";
+import { refundActions } from "../../record-actions.ts";
 import { getRefundView, refundHistory } from "../../refunds.ts";
 
 function summary(h: AuditListItem): string | undefined {
@@ -29,6 +30,8 @@ function summary(h: AuditListItem): string | undefined {
   }
 }
 
+const APPROVAL_STATUS: Record<string, string> = { pending: "Waiting for approval", approved: "Approved", rejected: "Rejected", cancelled: "Cancelled" };
+
 export default async function RefundPage({ params }: { params: Promise<{ refundId: string }> }) {
   const { refundId } = await params;
   const user = await requirePagePermission("refunds:read", `/refunds/requests/${refundId}`);
@@ -36,55 +39,71 @@ export default async function RefundPage({ params }: { params: Promise<{ refundI
   const refund = await getRefundView(db, refundId);
   if (!refund) notFound();
   const history = await refundHistory(db, refund.id);
-  const status = STATUS[refund.status] ?? { label: refund.status, tone: "neutral" as const };
-  const awaiting = refund.status === "pending_approval" && refund.approval?.status === "pending";
-  const canDecide = awaiting && user.permissions.has("refunds:approve");
-  const isRequester = refund.requestedBy === user.id;
+  const { actions, waiting } = refundActions(user, refund);
+  const decision = { refundId: refund.id, expectedVersion: refund.approval?.version ?? 0 };
 
   return (
     <div className="stack">
       <RecordHeader
+        back={{ href: user.permissions.has("refunds:approve") ? "/refunds/approvals" : "/refunds", label: user.permissions.has("refunds:approve") ? "Approvals" : "Payments" }}
         title={`Refund ${refund.id.slice(0, 8)} · ${formatPence(refund.amountPence)}`}
-        status={status}
+        status={statusOf(refund.status)}
         owner={refund.requestedByName}
+        ownerLabel="Requested by"
+      />
+      <ActionPanel label="Refund actions" waiting={waiting}>
+        {actions.includes("approve") ? (
+          <ActionDialog label="Approve refund" variant="primary" description="The refund is sent to the payment provider straight away." action={approveRefundAction} hidden={decision}>
+            <Input id="approve-note" name="note" label="Approval note (optional)" maxLength={500} />
+          </ActionDialog>
+        ) : null}
+        {actions.includes("reject") ? (
+          <ActionDialog label="Reject refund" variant="danger" description="No money is moved." action={rejectRefundAction} hidden={decision}>
+            <Input id="reject-note" name="note" label="Rejection reason" required maxLength={500} />
+          </ActionDialog>
+        ) : null}
+      </ActionPanel>
+      <RecordSection
+        title="Details"
         fields={[
           {
             label: "Payment",
             value: (
-              <Link className="underline underline-offset-4" href={`/refunds/payments/${refund.paymentId}`}>
+              <Link className={linkClass} href={`/refunds/payments/${refund.paymentId}`}>
                 {refund.paymentReference}
               </Link>
             ),
           },
+          { label: "Amount", value: formatPence(refund.amountPence) },
           { label: "Reason", value: refund.reason },
           { label: "Requested", value: formatWhen(refund.requestedAt) },
-          { label: "Approval", value: refund.requiresApproval ? (refund.approval?.decidedByName ?? "Required") : "Not required" },
           { label: "Provider refund", value: refund.providerRefundId ?? "—" },
         ]}
       />
-      {canDecide && refund.approval ? (
-        <CommandBar label="Refund actions">
-          {isRequester ? (
-            <p className="w-full text-sm text-muted-foreground">
-              You requested this refund. A different approver has to decide it; the server will refuse your approval.
-            </p>
-          ) : null}
-          <DecisionForms refundId={refund.id} version={refund.approval.version} />
-        </CommandBar>
-      ) : awaiting ? (
-        <p>Waiting for an approver. Nothing has been paid yet.</p>
-      ) : null}
-      <h2>History</h2>
-      <Timeline
-        items={history.map((h) => ({
-          id: h.id,
-          occurredAt: h.occurredAt,
-          actor: h.actor,
-          action: h.action,
-          summary: summary(h),
-          reason: h.reason,
-        }))}
+      <RecordSection
+        title="Decision"
+        fields={
+          refund.requiresApproval
+            ? [
+                { label: "Approval", value: APPROVAL_STATUS[refund.approval?.status ?? ""] ?? "Required" },
+                { label: "Decided by", value: refund.approval?.decidedByName ?? "—" },
+                { label: "Decision note", value: refund.approval?.decisionNote ?? "—" },
+              ]
+            : [{ label: "Approval", value: "Not required (at or under the threshold)" }]
+        }
       />
+      <RecordSection title="History">
+        <Timeline
+          items={history.map((h) => ({
+            id: h.id,
+            occurredAt: h.occurredAt,
+            actor: h.actor,
+            action: h.action,
+            summary: summary(h),
+            reason: h.reason,
+          }))}
+        />
+      </RecordSection>
     </div>
   );
 }
