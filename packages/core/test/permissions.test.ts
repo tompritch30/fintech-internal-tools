@@ -64,8 +64,8 @@ describe("definePermissionRegistry", () => {
 describe("permission registry", () => {
   it("ROLE_PERMISSIONS matches the registry's grants", () => {
     const sorted = (p: readonly string[]) => [...p].sort();
-    expect(sorted(ROLE_PERMISSIONS.analyst)).toEqual(sorted(["platform:access", "approvals:request", "refunds:read", "refunds:request", "kyc:read", "kyc:request"]));
-    expect(sorted(ROLE_PERMISSIONS.approver)).toEqual(sorted(["platform:access", "approvals:decide", "pii:unmask", "refunds:read", "refunds:approve", "kyc:read", "kyc:approve"]));
+    expect(sorted(ROLE_PERMISSIONS.analyst)).toEqual(sorted(["platform:access", "approvals:request", "refunds:read", "refunds:request", "flags:read", "flags:request", "kyc:read", "kyc:request"]));
+    expect(sorted(ROLE_PERMISSIONS.approver)).toEqual(sorted(["platform:access", "approvals:decide", "pii:unmask", "refunds:read", "refunds:approve", "flags:read", "flags:approve", "kyc:read", "kyc:approve"]));
     expect(sorted(ROLE_PERMISSIONS.admin)).toEqual(sorted(["platform:access", "audit:read"]));
   });
 
@@ -73,6 +73,7 @@ describe("permission registry", () => {
     expect(ROLE_PERMISSIONS.admin).not.toContain("approvals:decide");
     expect(ROLE_PERMISSIONS.admin).not.toContain("pii:unmask");
     expect(ROLE_PERMISSIONS.admin).not.toContain("refunds:approve");
+    expect(ROLE_PERMISSIONS.admin).not.toContain("flags:approve");
   });
 
   it("the registry and role map can't be changed at runtime", () => {

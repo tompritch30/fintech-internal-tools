@@ -55,6 +55,12 @@ export const PERMISSION_REGISTRY = definePermissionRegistry({
   "kyc:read": { description: "View the KYC review queue and cases (masked)", roles: ["analyst", "approver"] },
   "kyc:request": { description: "Claim a KYC case and approve, reject or escalate it", roles: ["analyst"] },
   "kyc:approve": { description: "Give the four-eyes sign-off on a high-risk KYC approval", roles: ["approver"] },
+  "flags:read": { description: "View feature flags and their history", roles: ["analyst", "approver"] },
+  "flags:request": {
+    description: "Change dev and staging flag values, request prod changes and use the prod kill switch",
+    roles: ["analyst"],
+  },
+  "flags:approve": { description: "Approve or reject a prod feature flag change", roles: ["approver"] },
 });
 
 export const PERMISSIONS = Object.keys(PERMISSION_REGISTRY) as readonly (keyof typeof PERMISSION_REGISTRY)[];

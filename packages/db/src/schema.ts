@@ -298,6 +298,89 @@ export const kycDocuments = pgTable(
   ],
 );
 
+/** Feature flags app (apps/web flags). Environments every flag holds a value for. */
+export const flagEnvironment = pgEnum("flag_environment", ["dev", "staging", "prod"]);
+
+/** One feature flag. Created by the seed (app_owner) only; app_runtime can only SELECT. Dummy data only. */
+export const flags = pgTable(
+  "flags",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Stable key services ask for, e.g. new-checkout-flow. */
+    key: text("key").notNull().unique(),
+    description: text("description").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check("flags_key_format", sql`${t.key} ~ '^[a-z][a-z0-9-]{1,62}$'`)],
+);
+
+/**
+ * A flag's current value in one environment: exactly one row per (flag, environment), created
+ * with the flag. app_runtime can UPDATE only the value columns (0011_flags_guard.sql); every
+ * update must bump version by one, which gives optimistic concurrency and stale-approval checks.
+ */
+export const flagValues = pgTable(
+  "flag_values",
+  {
+    flagId: uuid("flag_id")
+      .notNull()
+      .references(() => flags.id),
+    environment: flagEnvironment("environment").notNull(),
+    enabled: boolean("enabled").notNull().default(false),
+    /** Share of traffic that gets the flag when enabled: a whole number from 0 to 100. */
+    rolloutPercentage: integer("rollout_percentage").notNull().default(0),
+    version: integer("version").notNull().default(1),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedBy: uuid("updated_by").references(() => users.id),
+  },
+  (t) => [
+    primaryKey({ columns: [t.flagId, t.environment] }),
+    check("flag_values_rollout_range", sql`${t.rolloutPercentage} between 0 and 100`),
+  ],
+);
+
+export const flagChangeStatus = pgEnum("flag_change_status", ["pending", "applied", "rejected"]);
+
+/**
+ * A prod change waiting for (or decided by) a second person. The id is minted when the form
+ * renders (idempotency key). One pending change per flag and environment; content is immutable
+ * and status moves pending -> applied | rejected only (0011_flags_guard.sql).
+ */
+export const flagChanges = pgTable(
+  "flag_changes",
+  {
+    id: uuid("id").primaryKey(),
+    flagId: uuid("flag_id")
+      .notNull()
+      .references(() => flags.id),
+    environment: flagEnvironment("environment").notNull(),
+    beforeEnabled: boolean("before_enabled").notNull(),
+    beforeRolloutPercentage: integer("before_rollout_percentage").notNull(),
+    afterEnabled: boolean("after_enabled").notNull(),
+    afterRolloutPercentage: integer("after_rollout_percentage").notNull(),
+    /** flag_values.version the change was requested against; approval fails if prod moved since. */
+    baseVersion: integer("base_version").notNull(),
+    reason: text("reason").notNull(),
+    status: flagChangeStatus("status").notNull().default("pending"),
+    approvalRequestId: uuid("approval_request_id")
+      .notNull()
+      .references(() => approvalRequests.id),
+    requestedBy: uuid("requested_by")
+      .notNull()
+      .references(() => users.id),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("flag_changes_approval_request_id_idx").on(t.approvalRequestId),
+    uniqueIndex("flag_changes_one_pending_idx").on(t.flagId, t.environment).where(sql`${t.status} = 'pending'`),
+    check("flag_changes_prod_only", sql`${t.environment} = 'prod'`),
+    check("flag_changes_rollout_range", sql`${t.afterRolloutPercentage} between 0 and 100 and ${t.beforeRolloutPercentage} between 0 and 100`),
+    check("flag_changes_reason_present", sql`length(btrim(${t.reason})) > 0`),
+    check("flag_changes_decided_at", sql`(${t.status} = 'pending') = (${t.decidedAt} is null)`),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type AuditLogRow = typeof auditLog.$inferSelect;
 export type NewAuditLogRow = typeof auditLog.$inferInsert;
@@ -306,3 +389,7 @@ export type PaymentRow = typeof payments.$inferSelect;
 export type RefundRow = typeof refunds.$inferSelect;
 export type KycCaseRow = typeof kycCases.$inferSelect;
 export type KycDocumentRow = typeof kycDocuments.$inferSelect;
+export type FlagRow = typeof flags.$inferSelect;
+export type FlagValueRow = typeof flagValues.$inferSelect;
+export type FlagChangeRow = typeof flagChanges.$inferSelect;
+export type FlagEnvironment = (typeof flagEnvironment.enumValues)[number];

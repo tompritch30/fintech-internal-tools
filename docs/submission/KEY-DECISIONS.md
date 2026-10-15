@@ -8,7 +8,7 @@
 The client spends about $250K a year on Power Apps (their figure) and asked whether to keep paying
 or build. I wanted to answer with working software. I built a shared platform (sign-in,
 permissions, audit, approvals, masking) and the two apps with the most to lose: refunds (money)
-and KYC review (identity data). Feature flags is built in an open PR (#24), but my draft call is to
+and KYC review (identity data). Feature flags was built and merged in PR #24, but my draft call is to
 buy it: least regulatory risk, and products exist. I left out hosting, a real Entra tenant and data
 migration so the time went on the controls an auditor checks.
 
