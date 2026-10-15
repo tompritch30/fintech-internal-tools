@@ -71,7 +71,8 @@ Use this for each business app (KYC, refunds, feature flags). One app per sessio
   Mask each part separately and combine:
 
   ```ts
-  const masked = { ...mask(customer, customer.policies), address: mask(address, addressPolicies) };
+  const { address, ...rest } = row;
+  const masked = { ...mask(rest, customerEntity.policies), address: mask(address, addressPolicies) };
   ```
 
   `Date` fields are exempt (they serialize as ISO strings).
