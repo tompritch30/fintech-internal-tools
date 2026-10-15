@@ -89,8 +89,10 @@ Use this for each business app (KYC, refunds, feature flags). One app per sessio
 ## 4. UI
 - [ ] Pages live under `apps/web/app/(platform)/<app>/` so they get the `AppShell`.
 - [ ] Add nav items in `app/(platform)/layout.tsx`, shown only when the user has the permission.
-- [ ] Use the kit: `ListView` for queues, `RecordHeader` + `CommandBar` + `Timeline`
-      (`listAuditForEntity`) for records. Show only commands the user may run.
+- [ ] Follow the UI skill, [.agents/skills/ui/SKILL.md](../.agents/skills/ui/SKILL.md): `ListView` for
+      queues; for records, `RecordHeader` + one `ActionPanel` + `RecordSection`s (History is a
+      `Timeline` from `listAuditForEntity`). Render only actions the user can take (a tested
+      `record-actions.ts`), `StatusBadge` kinds for colour, `RevealButton` for masked values.
 - [ ] Add a component to `packages/ui` only when a real app needs it.
 - [ ] Pages several roles read (e.g. a record makers and checkers both open): register an
       `<app>:read` permission for all of them and guard with `requirePagePermission`

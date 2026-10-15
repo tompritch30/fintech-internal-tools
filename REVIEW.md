@@ -19,3 +19,14 @@ Flag any PR that breaks one of these rules. Each is also in [AGENTS.md](AGENTS.m
 5. **App PRs never touch `packages/core`.** A PR that adds or changes a business app
    (KYC, refunds, feature flags…) must not modify `packages/core`. Core changes go in
    their own PR for code-owner review.
+6. **UI follows the shared kit** ([.agents/skills/ui/SKILL.md](.agents/skills/ui/SKILL.md)).
+   - **One record layout:** `RecordHeader` (title, status, owner), then one `ActionPanel`,
+     then titled `RecordSection`s (Details, Documents, Decision, History).
+   - **No one-off styling in app pages** beyond layout classes. Colours, borders, cards and
+     badge or form styling come from `@fit/ui`; a new pattern becomes a `packages/ui` component.
+   - **Never render an action the user can't take.** Actions come from a tested function that
+     checks permission, state and business rules (e.g. no approving your own request). With no
+     actions, `ActionPanel` shows a neutral waiting line. No disabled or always-refused buttons.
+   - **Badges are neutral by default** via `StatusBadge`: red (`risk`) only for genuine risk
+     such as high risk or a sanctions hit, green (`done`) only for completed. No `Badge tone` in app pages.
+   - **Reveals use `RevealButton`** (one button, reason dialog), not inline reason boxes.

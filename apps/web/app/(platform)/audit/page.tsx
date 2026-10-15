@@ -1,6 +1,7 @@
-import { listAudit, type AuditListItem } from "@fit/core";
-import { Badge, ListView, type ListColumn } from "@fit/ui";
+import type { AuditListItem } from "@fit/core";
+import { FilterBar, ListView, PageHeader, StatusBadge, type ListColumn } from "@fit/ui";
 import { getDb, requirePagePermission } from "../../../lib/auth.ts";
+import { auditFilterOptions, first, parseAuditFilters, searchAudit, type SearchParam } from "./query.ts";
 import { parsePageParam } from "../../../lib/page-param.ts";
 
 const PAGE_SIZE = 25;
@@ -8,44 +9,57 @@ const PAGE_SIZE = 25;
 const columns: ListColumn<AuditListItem>[] = [
   { key: "occurredAt", label: "When (UTC)", sortable: true, render: (r) => r.occurredAt.toISOString().replace("T", " ").slice(0, 19) },
   { key: "actor", label: "Who", render: (r) => r.actor ?? "system" },
-  {
-    key: "action",
-    label: "Action",
-    render: (r) => <Badge tone={r.action === "access.denied" ? "danger" : "neutral"}>{r.action}</Badge>,
-  },
+  { key: "action", label: "Action", render: (r) => <StatusBadge label={r.action} /> },
   { key: "entity", label: "Record", render: (r) => `${r.entityType} ${r.entityId}` },
   { key: "reason", label: "Reason", render: (r) => r.reason ?? "" },
 ];
 
-export default async function AuditPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ q?: string; page?: string; sort?: string; dir?: string }>;
-}) {
+const opts = (values: string[]) => values.map((v) => ({ value: v, label: v }));
+
+export default async function AuditPage({ searchParams }: { searchParams: Promise<Record<string, SearchParam>> }) {
   await requirePagePermission("audit:read", "/audit");
   const params = await searchParams;
+  const filters = parseAuditFilters(params);
   const query = {
-    search: params.q,
     sort: params.sort === "occurredAt" ? "occurredAt" : undefined,
     dir: params.dir === "asc" ? ("asc" as const) : ("desc" as const),
-    page: parsePageParam(params.page),
+    page: parsePageParam(first(params.page)),
   };
-  const { rows, total } = await listAudit(getDb(), { search: query.search, page: query.page, pageSize: PAGE_SIZE, dir: query.dir });
+  const db = getDb();
+  const [{ rows, total }, options] = await Promise.all([
+    searchAudit(db, filters, { page: query.page, pageSize: PAGE_SIZE, dir: query.dir }),
+    auditFilterOptions(db),
+  ]);
+  const values: Record<string, string | undefined> = { ...filters };
 
   return (
     <div className="stack">
-      <h1 className="page-title">Audit log</h1>
-      <p>Read-only. Rows cannot be edited or deleted.</p>
+      <PageHeader title="Audit log" description="Read-only. Rows cannot be edited or deleted. Dates are UTC and include both ends." />
+      <FilterBar
+        label="Audit filters"
+        basePath="/audit"
+        values={values}
+        fields={[
+          { name: "from", label: "From", type: "date" },
+          { name: "to", label: "To", type: "date" },
+          { name: "user", label: "User", type: "select", options: opts(options.users) },
+          { name: "action", label: "Action", type: "select", options: opts(options.actions) },
+          { name: "recordType", label: "Record type", type: "select", options: opts(options.recordTypes) },
+          { name: "recordId", label: "Record ID", type: "text", placeholder: "ID or its start" },
+        ]}
+      />
       <ListView
         label="Audit log"
         basePath="/audit"
+        search={false}
+        params={values}
         columns={columns}
         rows={rows}
         rowKey={(r) => String(r.id)}
         query={query}
         pageSize={PAGE_SIZE}
         total={total}
-        emptyTitle="No audit rows match"
+        emptyTitle="No audit rows match these filters"
       />
     </div>
   );

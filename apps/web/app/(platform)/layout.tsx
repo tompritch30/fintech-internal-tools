@@ -32,6 +32,7 @@ export default async function PlatformLayout({ children }: { children: ReactNode
       nav={nav}
       currentPath={currentPath}
       user={user.displayName ?? user.username}
+      roles={[...user.roles].sort()}
       headerActions={
         <form method="post" action="/auth/logout">
           <Button type="submit" variant="ghost" className="h-8 w-full justify-start px-2">

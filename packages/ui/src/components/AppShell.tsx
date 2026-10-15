@@ -19,6 +19,7 @@ export function AppShell({
   nav,
   currentPath,
   user,
+  roles,
   headerActions,
   children,
 }: {
@@ -26,6 +27,8 @@ export function AppShell({
   nav: NavItem[];
   currentPath: string;
   user: string;
+  /** Shown in the account menu. */
+  roles?: string[];
   headerActions?: ReactNode;
   children: ReactNode;
 }) {
@@ -72,7 +75,7 @@ export function AppShell({
               </>
             ) : null}
           </div>
-          <UserMenu user={user}>{headerActions}</UserMenu>
+          <UserMenu user={user} roles={roles}>{headerActions}</UserMenu>
         </header>
         <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
           <div className="mx-auto w-full max-w-6xl">{children}</div>

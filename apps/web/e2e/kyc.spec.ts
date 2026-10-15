@@ -17,6 +17,18 @@ async function signOut(page: Page) {
   await expect(page).toHaveURL(/\/login$/);
 }
 
+/** As the current (different) approver: opens the proof of address through the reason dialog, then signs off. */
+async function signOffAs(page: Page) {
+  await page.getByRole("button", { name: "Reveal utility_bill.pdf" }).click();
+  const reveal = page.getByRole("dialog");
+  await reveal.getByLabel("Reason").fill("Proof of address check");
+  await reveal.getByRole("button", { name: "Reveal" }).click();
+  await expect(page.getByRole("status", { name: "Contents of utility_bill.pdf" })).toContainText("SYNTHETIC TEST DOCUMENT");
+  await page.getByRole("button", { name: "Sign off approval" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Sign off approval" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Approved");
+}
+
 /** Claims the first open high-risk case with the given flag and approves it; returns the case page URL. */
 async function claimAndApproveHighRisk(page: Page, flag: "PEP" | "Sanctions"): Promise<string> {
   await page.getByRole("link", { name: "KYC queue" }).click();
@@ -30,6 +42,7 @@ async function claimAndApproveHighRisk(page: Page, flag: "PEP" | "Sanctions"): P
   await page.getByRole("button", { name: "Claim case" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toContainText("In review");
   await page.getByRole("button", { name: "Approve (needs sign-off)" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Approve (needs sign-off)" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Awaiting sign-off");
   return page.url();
 }
@@ -44,12 +57,8 @@ test("analyst approves a high-risk case, a different approver opens the ID and s
 
   await signIn(page, "approver");
   await page.goto(caseUrl);
-  const doc = page.getByRole("form", { name: "Open utility_bill.pdf" });
-  await doc.getByLabel(/Reason for opening/).fill("Proof of address check");
-  await doc.getByRole("button", { name: /^Open/ }).click();
-  await expect(doc).toContainText("SYNTHETIC TEST DOCUMENT");
-  await page.getByRole("button", { name: "Sign off approval" }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Approved");
+  await signOffAs(page);
+
   const history = page.getByRole("list", { name: "History" });
   for (const action of ["kyc.claimed", "approval.requested", "field.unmask", "approval.approved", "kyc.approved"]) {
     await expect(history).toContainText(action);
@@ -57,16 +66,16 @@ test("analyst approves a high-risk case, a different approver opens the ID and s
   await expect(page.getByRole("button", { name: "Sign off approval" })).toHaveCount(0);
 });
 
-test("an analyst-approver is blocked from signing off their own high-risk approval", async ({ page }) => {
+test("an analyst-approver is not offered sign-off of their own high-risk approval; a different approver gives it", async ({ page }) => {
   await signIn(page, "senior");
   // Sanctions cases, so the two tests never pick the same case when run in parallel.
-  await claimAndApproveHighRisk(page, "Sanctions");
-  await expect(page.getByText("You asked for this sign-off")).toBeVisible();
-  await page.getByRole("button", { name: "Sign off approval" }).click();
-  await expect(page.getByRole("form", { name: "Sign off approval" }).getByRole("alert")).toHaveText(
-    "You asked for this sign-off, so a different approver must give it.",
-  );
-  await page.reload();
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Awaiting sign-off");
-  await expect(page.getByRole("list", { name: "History" })).not.toContainText("approval.approved");
+  const caseUrl = await claimAndApproveHighRisk(page, "Sanctions");
+  await expect(page.getByRole("status", { name: "Case actions" })).toHaveText("You asked for this sign-off. Waiting for a different approver.");
+  await expect(page.getByRole("button", { name: "Sign off approval" })).toHaveCount(0);
+  await signOut(page);
+
+  // Positive control: a different approver can sign off the same case.
+  await signIn(page, "approver");
+  await page.goto(caseUrl);
+  await signOffAs(page);
 });
