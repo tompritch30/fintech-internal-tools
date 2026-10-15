@@ -447,7 +447,8 @@ describe("rule 7: the case page shows its full audit and approval history", () =
       expect.arrayContaining(["kyc.claimed", "kyc.approval_requested", "approval.requested", "field.unmask", "approval.approved", "kyc.approved"]),
     );
     expect(actions.filter((a) => a === "field.unmask")).toHaveLength(2);
-    expect(actions[0]).toBe("kyc.approved");
+    // The sign-off writes both rows in one transaction: the case effect (in the hook) first, then the decision.
+    expect(actions.slice(0, 2)).toEqual(["approval.approved", "kyc.approved"]);
     expect(actions.at(-1)).toBe("kyc.claimed");
     const times = history.map((h) => h.occurredAt.getTime());
     expect([...times].sort((x, y) => y - x)).toEqual(times);
