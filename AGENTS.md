@@ -1,8 +1,9 @@
 # AGENTS.md — working rules for every Devin session
 
 Read this first. The critical rules are at the top. Detail lives in
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
-[docs/ADDING-AN-APP.md](docs/ADDING-AN-APP.md).
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
+[docs/ADDING-AN-APP.md](docs/ADDING-AN-APP.md) and [docs/GOVERNANCE.md](docs/GOVERNANCE.md)
+(repo controls). Reviewers check [REVIEW.md](REVIEW.md).
 
 ## 1. Critical rules
 
