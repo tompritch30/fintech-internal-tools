@@ -63,8 +63,13 @@ type HasNonJson<T> = T extends NonJson
 /** Payloads are stored as JSONB; types JSON can't round-trip are refused. */
 type JsonPayload<P> = true extends HasNonJson<P> ? { readonly payloadMustBeJsonSafe: never } : unknown;
 
-/** Runtime counterpart of JsonPayload: payloads must survive a JSON round-trip. */
-function isJsonSafe(value: unknown): boolean {
+/**
+ * Runtime counterpart of JsonPayload: payloads must survive a JSON round-trip.
+ * `ancestors` tracks the objects on the current path (not a global seen-set:
+ * reusing one object twice is fine, only cycles are unsafe). Holes in sparse
+ * arrays become null in JSONB, so they're unsafe too.
+ */
+function isJsonSafe(value: unknown, ancestors: Set<object> = new Set()): boolean {
   if (value === null) return true;
   switch (typeof value) {
     case "string":
@@ -72,10 +77,22 @@ function isJsonSafe(value: unknown): boolean {
       return true;
     case "number":
       return Number.isFinite(value);
-    case "object":
-      if (Array.isArray(value)) return value.every(isJsonSafe);
-      if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) return false;
-      return Object.values(value).every((v) => v === undefined || isJsonSafe(v));
+    case "object": {
+      if (ancestors.has(value)) return false;
+      ancestors.add(value);
+      try {
+        if (Array.isArray(value)) {
+          for (let i = 0; i < value.length; i++) {
+            if (!(i in value) || !isJsonSafe(value[i], ancestors)) return false;
+          }
+          return true;
+        }
+        if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) return false;
+        return Object.values(value).every((v) => v === undefined || isJsonSafe(v, ancestors));
+      } finally {
+        ancestors.delete(value);
+      }
+    }
     default:
       return false;
   }

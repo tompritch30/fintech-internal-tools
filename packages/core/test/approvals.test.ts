@@ -238,7 +238,7 @@ describe("maker-checker approvals", () => {
 
   it.each([
     { label: "Date", payload: () => ({ at: new Date() }) },
-    // eslint-disable-next-line no-sparse-arrays -- intentionally sparse to test the guard
+    // intentionally sparse: tests that the guard rejects holes
     { label: "sparse array", payload: () => ({ lines: [1, , 3] }) },
     {
       label: "circular",
