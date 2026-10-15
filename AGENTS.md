@@ -19,7 +19,7 @@ Read this first. The critical rules are at the top. Detail lives in
 5. **Dummy data only.** No real PII. No real secrets. Never commit a `.env` file.
 6. **Every authorization check runs on the server.** Call `requirePermission` (or
    `requireRole`) in every server action and route handler. Hiding a button in the UI
-   is a convenience, never the control.
+   is a convenience, never the control. A denial writes an `access.denied` audit row.
 7. **Every change to business data is audited in the same transaction**, via
    `withAudit(tx, …)`. Never write to `audit_log` any other way. Never update or delete it.
 8. **Masked fields are masked on the server.** No admin bypass. Unmasking needs a

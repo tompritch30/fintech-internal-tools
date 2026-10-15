@@ -152,6 +152,11 @@ The fix, set once in `docker-compose.yml`:
   are synced to `user_roles` at each login.
 - `packages/core` owns the *role → permission* map in code, so a change to it is a
   reviewed change to `packages/core`.
+- **Denied access is audited.** When `requireRole` / `requirePermission` blocks a
+  signed-in user, it writes an `access.denied` audit row (user, required permission or
+  role, route or action name) and then throws. This row is written on its own, not
+  inside a business transaction, so it survives the rejected request. Unauthenticated
+  requests are redirected to `/login` and are not audited (there is no user to record).
 - A1 roles: `analyst`, `approver`, `admin`. A1 permissions: `platform:access` (any
   role) and `audit:read` (admin). A signed-in user with no role sees a "no access" page.
 
@@ -162,7 +167,8 @@ The fix, set once in `docker-compose.yml`:
   or the audit insert throws, both roll back.
 - Each row records: when, who (user id and IdP subject), action, entity type and id,
   before/after JSON, an optional reason, and request metadata.
-- Login and logout also write audit rows (`auth.login`, `auth.logout`).
+- Login, logout and denied access also write audit rows (`auth.login`, `auth.logout`,
+  `access.denied`).
 
 ### 3.6 Append-only audit at the database level
 
@@ -215,7 +221,7 @@ Each with a named test against real Postgres and a positive control:
 - **OIDC login and session:** a seeded Keycloak user can log in end to end (Playwright),
   logout works, and unauthenticated requests are redirected to `/login`.
 - **RBAC:** `requireRole` / `requirePermission` deny a user without the role, and allow
-  a user with it.
+  a user with it. A denial writes an `access.denied` audit row; an allowed call writes none.
 - **Audit:** `withAudit` writes the change and the audit row together, and a failure
   rolls both back. As `app_runtime`, `UPDATE` and `DELETE` on `audit_log` fail;
   `INSERT` succeeds.
@@ -270,7 +276,36 @@ unmask(tx, actor, { entityType, entityId, field, reason }): Promise<string>
 
 Policies are declared per entity in code, next to the app that owns the entity.
 
-## 5. Ports and environment variables
+## 5. UI kit (`packages/ui`)
+
+Built once in A1 and reused by all three apps. The record components follow the
+Power Apps model-driven patterns that ops staff already know (research R2-Q2): list
+view → record form → command bar actions → timeline.
+
+| Component | Purpose | R2-Q2 equivalent |
+|---|---|---|
+| `AppShell` | Left nav (app sections), top bar with signed-in user and sign-out | Site map / navigator |
+| `ListView` | The queue: columns, select rows, search, sort and filter, paging, with a `CommandBar` slot for actions on selected rows | List view |
+| `CommandBar` | Row of actions for a list or a record (e.g. Assign, Approve, Reject) | Command bar |
+| `RecordHeader` | Record title, status badge, owner and key fields | Form heading bar |
+| `StageBar` | Ordered status stages with the current one highlighted | Business process flow bar |
+| `Timeline` | Record history in one stream, newest first: audit events with who, when, what changed, reason | Timeline |
+| `Button`, `Input`, `Table`, `Badge`, `EmptyState` | Base components | — |
+
+Rules:
+
+- Components are **presentational only**. They never decide what a user may do. A page
+  passes in only the actions the server has already authorised, and every action's
+  server action still calls `requirePermission`.
+- `Timeline` reads from `audit_log` via a core query (`listAuditForEntity`). It shows
+  masked values only (masking from A2).
+- Tokens are CSS variables in `tokens.css`. The palette is Cognition-inspired at most:
+  neutral ink and off-white with one accent. No logos.
+- In A1 the audit viewer page uses `ListView`, and a demo record page under
+  `(platform)` uses `RecordHeader`, `CommandBar`, `StageBar` and `Timeline` with dummy data,
+  so each component is exercised before the first business app.
+
+## 6. Ports and environment variables
 
 | Service | Port |
 |---|---|
@@ -298,7 +333,7 @@ All values above are fake and local-dev-only. `.env.example` is the source of tr
 Demo users (Keycloak realm `internal-tools`, password `demo-only-change-me`):
 `analyst` (analyst), `approver` (approver), `admin` (admin), `norole` (no roles).
 
-## 6. File tree (end state of the A1 PR)
+## 7. File tree (end state of the A1 PR)
 
 ```
 .
@@ -346,7 +381,8 @@ Demo users (Keycloak realm `internal-tools`, password `demo-only-change-me`):
 │       │       ├── layout.tsx   # AppShell + requireUser
 │       │       ├── page.tsx     # home: signed-in user and roles
 │       │       ├── no-access/page.tsx
-│       │       └── audit/page.tsx   # admin-only, read-only audit viewer
+│       │       ├── audit/page.tsx   # admin-only, read-only audit viewer (ListView)
+│       │       └── demo-record/page.tsx  # UI kit demo: RecordHeader, CommandBar, StageBar, Timeline
 │       ├── lib/
 │       │   └── auth.ts          # Next glue: cookies → core session/rbac
 │       └── e2e/
@@ -364,6 +400,7 @@ Demo users (Keycloak realm `internal-tools`, password `demo-only-change-me`):
 │   │   │   ├── rbac/permissions.ts
 │   │   │   ├── rbac/guards.ts
 │   │   │   ├── audit/with-audit.ts
+│   │   │   ├── audit/queries.ts     # audit viewer + listAuditForEntity (Timeline)
 │   │   │   └── errors.ts
 │   │   └── test/
 │   │       ├── helpers/db.ts
@@ -393,7 +430,12 @@ Demo users (Keycloak realm `internal-tools`, password `demo-only-change-me`):
 │           ├── Input.tsx
 │           ├── Table.tsx
 │           ├── Badge.tsx
-│           └── EmptyState.tsx
+│           ├── EmptyState.tsx
+│           ├── ListView.tsx
+│           ├── CommandBar.tsx
+│           ├── RecordHeader.tsx
+│           ├── StageBar.tsx
+│           └── Timeline.tsx
 └── docs/
     ├── ARCHITECTURE.md
     ├── ADDING-AN-APP.md
