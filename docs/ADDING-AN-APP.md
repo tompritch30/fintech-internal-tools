@@ -65,6 +65,21 @@ Use this for each business app (KYC, refunds, feature flags). One app per sessio
   Render `mask(row, customer.policies)` — a `Masked<T>` — and pass only that to client
   components. Call `unmask(db, actor, customer, { entityId, field, reason })` from a
   server action when a user with `pii:unmask` needs the raw value; it audits the read.
+- **Nested records:** `mask` refuses a record that still contains an unpoliced object
+  or array field (compile-time error, and a `ValidationError` at runtime). This fails
+  closed: a nested sensitive field can't leak because nobody wrote a policy for it.
+  Mask each part separately and combine:
+
+  ```ts
+  const { address, ...rest } = row;
+  const masked = { ...mask(rest, customerEntity.policies), address: mask(address, addressPolicies) };
+  ```
+
+  `Date` fields are exempt (they serialize as ISO strings).
+- **Payloads must be JSON-safe:** approval payloads live in a `jsonb` column, so
+  `defineApprovalKind`/`requestApproval` reject `Date`, `bigint`, `Map`, class
+  instances, functions and `NaN`/`Infinity` at compile time and runtime. Keep dates as
+  ISO strings and money as integer minor units or a string in payload types.
 
 ## 4. UI
 - [ ] Pages live under `apps/web/app/(platform)/<app>/` so they get the `AppShell`.

@@ -236,6 +236,44 @@ describe("maker-checker approvals", () => {
     ).rejects.toThrow(NotFoundError);
   });
 
+  it.each([
+    { label: "Date", payload: () => ({ at: new Date() }) },
+    // intentionally sparse: tests that the guard rejects holes
+    { label: "sparse array", payload: () => ({ lines: [1, , 3] }) },
+    {
+      label: "circular",
+      payload: () => {
+        const circular: Record<string, unknown> = { a: 1 };
+        circular.self = circular;
+        return circular;
+      },
+    },
+  ])("rejects a request whose payload is not JSON-safe ($label)", async ({ payload }) => {
+    const { user: requester } = await analyst();
+    const subjectId = uniqueId("payout");
+    await expect(
+      // `as never` bypasses the compile-time payload check to exercise the runtime one.
+      requestApproval(db, requester, payoutKind, { subjectId, payload: payload() as never }),
+    ).rejects.toThrow(ValidationError);
+    const rows = await db.select().from(approvalRequests).where(eq(approvalRequests.subjectId, subjectId));
+    expect(rows).toHaveLength(0);
+    const audits = await db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.action, "approval.requested"), eq(auditLog.actorUserId, requester.id)));
+    expect(audits).toHaveLength(0);
+  });
+
+  it("accepts a payload that reuses the same object twice", async () => {
+    const { user: requester } = await analyst();
+    const line = { sku: "x", qty: 1 };
+    const request = await requestApproval(db, requester, payoutKind, {
+      subjectId: uniqueId("payout"),
+      payload: { lines: [line, line] } as never,
+    });
+    expect(request.payload).toEqual({ lines: [{ sku: "x", qty: 1 }, { sku: "x", qty: 1 }] });
+  });
+
   it("rejects deciding with a different kind's definition", async () => {
     const { request } = await newRequest();
     const { user: dec } = await approver();
@@ -379,6 +417,31 @@ describe("approval hooks", () => {
     const [t] = await db.select({ n: users.displayName }).from(users).where(eq(users.id, target.id));
     expect(t).toBeDefined();
     expect(t?.n).not.toBe("approved-effect");
+  });
+
+  it("passes hooks the payload exactly as requested", async () => {
+    const { user: requester } = await analyst();
+    const { user: dec } = await approver();
+    const payload = { amount: 1250, currency: "GBP", lines: [{ sku: "x", qty: 2 }], note: null };
+    let seenRequested: unknown;
+    let seenApproved: unknown;
+    const kind = defineApprovalKind<typeof payload>({
+      kind: "test.payload",
+      subjectType: "test_subject",
+      requestPermission: "approvals:request",
+      approvePermission: "approvals:decide",
+      onRequested: async (_tx, req) => {
+        seenRequested = req.payload;
+      },
+      onApproved: async (_tx, req) => {
+        seenApproved = req.payload;
+      },
+    });
+    const request = await requestApproval(db, requester, kind, { subjectId: uniqueId("payout"), payload });
+    await decideApproval(db, dec, kind, { id: request.id, decision: "approve", expectedVersion: 1 });
+    expect(seenRequested).toEqual(payload);
+    expect(seenApproved).toEqual(payload);
+    expect(request.payload).toEqual(payload);
   });
 
   it("commits the onApproved effect with the decision", async () => {
