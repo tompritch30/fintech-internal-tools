@@ -169,6 +169,21 @@ This is a paragraph of prose that goes on well past twenty words, which is the l
 
 # Two images in one paragraph are two visuals
 
-![w:400](assets/charts/cost.svg) ![w:400](assets/charts/cost.svg)
+<div class="visual placeholder">x</div>
+
+| A | B |
+|---|---|
+| x | y |
+
+<!-- Notes. -->
+
+---
+
+<!-- expect: chart-text-too-small -->
+<!-- _footer: "Source: fixture" -->
+
+# A chart squeezed so small its labels can't be read
+
+![w:500](assets/charts/cost.svg)
 
 <!-- Notes. -->

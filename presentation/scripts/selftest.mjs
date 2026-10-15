@@ -39,6 +39,22 @@ try {
   const barsOk = tooNarrow === 0;
   ok &&= barsOk;
   console.log(`${barsOk ? "✓" : "✗"} chart: long value labels keep every bar visible${barsOk ? "" : ` (${tooNarrow} bars under 100px)`}`);
+
+  // Wide-glyph labels must not run into their bars; long placeholders must stay inside the chart.
+  const wide = barChart({ bars: [{ label: "WWWWWWWWWWWWWWWWWWWW", value: 10 }, { label: "Unknown", value: null, placeholder: "[not measured yet, waiting on billing export]" }] }, await fontBase64());
+  await page.setContent(wide);
+  await page.evaluate(() => document.fonts.ready);
+  const wideBad = await page.evaluate(() => {
+    const vb = document.querySelector("svg").viewBox.baseVal;
+    const barX = document.querySelector("rect").x.baseVal.value;
+    const texts = [...document.querySelectorAll("text")];
+    const overlap = texts.filter((t) => t.getAttribute("x") === "0" && t.getBBox().x + t.getBBox().width > barX);
+    const clipped = texts.filter((t) => t.getBBox().x + t.getBBox().width > vb.width);
+    return [...overlap, ...clipped].map((t) => t.textContent);
+  });
+  const wideOk = wideBad.length === 0;
+  ok &&= wideOk;
+  console.log(`${wideOk ? "✓" : "✗"} chart: wide labels clear the bars and long placeholders fit${wideOk ? "" : ` (${wideBad.join(", ")})`}`);
 } finally {
   await browser.close();
 }
