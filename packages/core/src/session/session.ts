@@ -102,13 +102,12 @@ export async function getSessionUser(
       email: users.email,
       role: userRoles.roleName,
     })
-    .from(sessions)
-    .innerJoin(users, eq(users.id, sessions.userId))
+    .from(users)
     .leftJoin(userRoles, eq(userRoles.userId, users.id))
     .where(eq(users.id, session.userId));
   const first = rows[0];
   if (!first) return null;
-  const roles = rows.map((r) => r.role).filter((r): r is string => r !== null);
+  const roles = [...new Set(rows.map((r) => r.role).filter((r): r is string => r !== null))];
   return {
     id: first.id,
     subject: first.subject,
