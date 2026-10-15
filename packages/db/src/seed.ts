@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import { createDb, type Db } from "./index.ts";
 import { auditLog, flags, flagValues, kycCases, kycDocuments, payments, roles, userRoles, users } from "./schema.ts";
+import { loadRootEnv } from "./root-env.ts";
 
 export const SEED_ROLES = [
   { name: "analyst", description: "Works the queues; can create requests" },
@@ -214,6 +215,7 @@ export async function seed(db: Db): Promise<void> {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  loadRootEnv();
   const url = process.env.DATABASE_OWNER_URL;
   if (!url) throw new Error("DATABASE_OWNER_URL is not set");
   const db = createDb(url, { max: 1 });

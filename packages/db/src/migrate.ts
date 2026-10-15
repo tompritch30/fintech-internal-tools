@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { createDb } from "./index.ts";
+import { loadRootEnv } from "./root-env.ts";
 
 export const migrationsFolder = fileURLToPath(new URL("../migrations", import.meta.url));
 
@@ -15,6 +16,7 @@ export async function runMigrations(ownerUrl: string): Promise<void> {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  loadRootEnv();
   const url = process.env.DATABASE_OWNER_URL;
   if (!url) throw new Error("DATABASE_OWNER_URL is not set");
   await runMigrations(url);
