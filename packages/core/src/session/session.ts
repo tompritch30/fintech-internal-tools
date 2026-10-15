@@ -74,7 +74,11 @@ export async function createSession(
 }
 
 /** Returns the signed-in user for a session token, or null if missing/expired/revoked. */
-export async function getSessionUser(db: Db, token: string | undefined | null): Promise<SessionUser | null> {
+export async function getSessionUser(
+  db: Db,
+  token: string | undefined | null,
+  _idleMinutes: number,
+): Promise<SessionUser | null> {
   if (!token) return null;
   const rows = await db
     .select({

@@ -1,3 +1,5 @@
+import { unmaskRateLimit } from "./masking/rate-limit.ts";
+
 export interface OidcConfig {
   issuer: string;
   /** Server-to-server base for the issuer (Docker only). See ARCHITECTURE.md §3.3. */
@@ -12,6 +14,8 @@ export interface CoreConfig {
   appUrl: string;
   databaseUrl: string;
   sessionTtlHours: number;
+  sessionIdleMinutes: number;
+  unmaskRateLimitPerHour: number;
   oidc: OidcConfig;
 }
 
@@ -26,6 +30,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CoreConfig {
     appUrl: required(env, "APP_URL").replace(/\/$/, ""),
     databaseUrl: required(env, "DATABASE_URL"),
     sessionTtlHours: Number(env.SESSION_TTL_HOURS ?? "8"),
+    sessionIdleMinutes: Number(env.SESSION_IDLE_MINUTES ?? "15"),
+    unmaskRateLimitPerHour: unmaskRateLimit(env).max,
     oidc: {
       issuer: required(env, "OIDC_ISSUER"),
       internalIssuer: env.OIDC_INTERNAL_ISSUER || undefined,

@@ -9,7 +9,11 @@ import type { Permission } from "../rbac/permissions.ts";
 import type { SessionUser } from "../session/session.ts";
 import { UNMASK_RATE_LIMIT } from "./rate-limit.ts";
 
-export { UNMASK_RATE_LIMIT } from "./rate-limit.ts";
+export {
+  DEFAULT_UNMASK_RATE_LIMIT_PER_HOUR,
+  UNMASK_RATE_LIMIT,
+  unmaskRateLimit,
+} from "./rate-limit.ts";
 
 export type MaskStyle = "last4" | "full" | "email" | "name";
 
