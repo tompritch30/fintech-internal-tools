@@ -321,7 +321,7 @@ describe("unmask", () => {
         await unmask(db, user, userEntity, { entityId: id, field: "email", reason: "case work review" });
       }
       await expect(unmask(db, user, userEntity, { entityId: id, field: "email", reason: "case work review" }))
-        .rejects.toMatchObject({ name: "ForbiddenError", message: "unmask:rate-limit" });
+        .rejects.toMatchObject({ name: "ForbiddenError", required: "unmask:rate-limit" });
       const rows = await db.select().from(auditLog).where(
         and(eq(auditLog.actorUserId, user.id), eq(auditLog.action, "field.unmask")),
       );
