@@ -390,6 +390,22 @@ describe("rule 6: closed cases are kept for the retention period and can't be de
     for (const bad of ["4", "0", "-5", "5.5", "five"]) expect(() => loadKycConfig({ KYC_RETENTION_YEARS: bad })).toThrow(/KYC_RETENTION_YEARS/);
   });
 
+  it("refuses a claim while KYC_RETENTION_YEARS is invalid, so no case gets stuck in review", async () => {
+    const { kase } = await newCase();
+    const a = await analyst();
+    const saved = process.env.KYC_RETENTION_YEARS;
+    process.env.KYC_RETENTION_YEARS = "3";
+    try {
+      await expect(claimCase(a, { caseId: kase.id })).rejects.toThrow(/KYC_RETENTION_YEARS/);
+    } finally {
+      if (saved === undefined) delete process.env.KYC_RETENTION_YEARS;
+      else process.env.KYC_RETENTION_YEARS = saved;
+    }
+    expect((await caseRow(kase.id))?.status).toBe("open");
+    await claimCase(a, { caseId: kase.id }); // positive control: valid config claims
+    expect((await caseRow(kase.id))?.status).toBe("in_review");
+  });
+
   it("sets retention to the configured years after closing", async () => {
     const { kase } = await newCase();
     const a = await analyst();

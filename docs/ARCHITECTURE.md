@@ -440,7 +440,7 @@ Grants: `app_runtime` may `SELECT` both tables and `UPDATE` only `status`, `owne
 `claimed_at`, `decision_note`, `closed_at`, `retention_until` on `kyc_cases`. No INSERT,
 DELETE or document writes.
 
-Permissions (in `PERMISSION_REGISTRY`): `kyc:read` (analyst, approver) guards both pages;
+Permissions (in `PERMISSION_REGISTRY`): `kyc:read` (analyst, approver) guards the queue (`/kyc`, `/kyc/status/<status>`) and case pages;
 `kyc:request` (analyst) claims and decides; `kyc:approve` (approver) signs off. Reveals and
 document opens use the shared `pii:unmask` (approver). Issue #12 asked for an app-level
 registry instead of editing `packages/core`; none exists, so this follows the refunds
@@ -448,8 +448,7 @@ convention (flagged in PR #22). Demo users: `analyst` works cases, `approver` si
 reveals, `senior` (both roles) shows the self-sign-off refusal.
 
 KYC gaps: no case intake or document upload (seed only); escalation has no separate senior
-queue (it returns the case unowned); the queue's status filter is dropped when you sort or
-page (`ListView` takes one `basePath`); retention is enforced but nothing purges cases
+queue (it returns the case unowned); retention is enforced but nothing purges cases
 after `retention_until`.
 
 ## 5. UI kit (`packages/ui`)

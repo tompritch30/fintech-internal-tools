@@ -21,8 +21,10 @@ async function signOut(page: Page) {
 async function claimAndApproveHighRisk(page: Page, flag: "PEP" | "Sanctions"): Promise<string> {
   await page.getByRole("link", { name: "KYC queue" }).click();
   await page.getByRole("link", { name: "Open", exact: true }).click();
-  await expect(page).toHaveURL(/\/kyc\?status=open$/);
+  await expect(page).toHaveURL(/\/kyc\/status\/open$/);
   await expect(page.getByRole("link", { name: "Open", exact: true })).toHaveAttribute("aria-current", "page");
+  await page.getByRole("link", { name: "Opened" }).click(); // sorting keeps the status filter
+  await expect(page).toHaveURL(/\/kyc\/status\/open\?sort=openedAt/);
   await page.getByRole("row").filter({ hasText: flag }).first().getByRole("link").first().click();
   await expect(page).toHaveURL(/\/kyc\/cases\/[0-9a-f-]{36}$/);
   await page.getByRole("button", { name: "Claim case" }).click();

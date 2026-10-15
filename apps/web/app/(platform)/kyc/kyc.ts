@@ -402,6 +402,8 @@ async function viewOrThrow(db: Executor, caseId: string): Promise<KycCaseView> {
 }
 
 export async function claimCase(ctx: ActionContext, input: { caseId: string }): Promise<KycCaseView> {
+  // A bad retention setting would only fail at decision time, leaving the claimed case stuck.
+  loadKycConfig();
   if (!UUID.test(input.caseId)) throw new NotFoundError(`KYC case ${input.caseId} not found`);
   await requirePermission({ db: ctx.db, user: ctx.user, resource: caseResource(input.caseId) }, "kyc:request");
   await ctx.db.transaction(async (tx) => {
