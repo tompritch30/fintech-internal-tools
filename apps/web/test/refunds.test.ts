@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
-import { ConflictError, ForbiddenError, SelfApprovalError, ValidationError } from "@fit/core";
+import { ConflictError, ForbiddenError, SelfApprovalError, ValidationError, permissionsFor } from "@fit/core";
 import { approvalRequests, auditLog, createDb, mockProviderRefunds, payments, refunds } from "@fit/db";
 import { seedPayments } from "@fit/db/seed";
 import { expectDbError, makeUser, ownerDb } from "../../../packages/core/test/helpers/db.ts";
@@ -16,6 +16,7 @@ import {
   rejectRefund,
   requestRefund,
   revealCustomerEmail,
+  revealCustomerName,
   searchPayments,
 } from "../app/(platform)/refunds/refunds.ts";
 
@@ -36,7 +37,7 @@ async function newPayment(amountPence: number) {
     .insert(payments)
     .values({
       reference: `PAY-T-${n}`,
-      customerName: "Test Customer",
+      customerName: `Test Customer${n}`,
       customerEmail: `test.customer.${n}@example.test`,
       merchant: "Test Merchant",
       cardBrand: "Visa",
@@ -72,6 +73,16 @@ async function pendingRefund(amountPence = 30_000) {
   const refund = await requestRefund(maker, refundInput(payment.id, amountPence), config);
   return { payment, maker, refund };
 }
+
+describe("refunds permissions come from the registry", () => {
+  it("analysts request, approvers approve, both read; admins get none", () => {
+    expect([...permissionsFor(["analyst"])]).toEqual(expect.arrayContaining(["refunds:read", "refunds:request"]));
+    expect([...permissionsFor(["approver"])]).toEqual(expect.arrayContaining(["refunds:read", "refunds:approve"]));
+    expect(permissionsFor(["analyst"]).has("refunds:approve" as never)).toBe(false);
+    expect(permissionsFor(["approver"]).has("refunds:request" as never)).toBe(false);
+    expect([...permissionsFor(["admin"])].filter((p) => p.startsWith("refunds:"))).toEqual([]);
+  });
+});
 
 describe("rule 1: an analyst finds a payment and requests a refund with a reason", () => {
   it("finds a payment by its reference, without the customer email in the list", async () => {
@@ -142,7 +153,7 @@ describe("rule 1: an analyst finds a payment and requests a refund with a reason
     expect(control.rows.map((r) => r.id)).toEqual([payment.id]);
   });
 
-  it("denies a user without approvals:request and audits the denial", async () => {
+  it("denies a user without refunds:request and audits the denial", async () => {
     const payment = await newPayment(5_000);
     const { user } = await makeUser(db, []);
     await expect(requestRefund({ db, user }, refundInput(payment.id, 1_000), config)).rejects.toBeInstanceOf(ForbiddenError);
@@ -255,11 +266,35 @@ describe("rule 3: card numbers are never stored; the email is masked", () => {
     expect(JSON.stringify(row)).not.toContain(payment.customerEmail);
   });
 
-  it("an analyst can't reveal the email", async () => {
+  it("an analyst can't reveal the email or the name", async () => {
     const payment = await newPayment(5_000);
     const maker = await analyst();
     await expect(revealCustomerEmail(maker, { paymentId: payment.id, reason: "Curious" })).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(revealCustomerName(maker, { paymentId: payment.id, reason: "Curious" })).rejects.toBeInstanceOf(ForbiddenError);
     expect(await auditFor(payment.id, "field.unmask")).toHaveLength(0);
+  });
+
+  it("the payment list and view show only the customer's first name and last initial", async () => {
+    const payment = await newPayment(5_000);
+    const { rows } = await searchPayments(db, { search: payment.reference });
+    const view = await getPaymentView(db, payment.id);
+    expect(rows[0]?.customerName).toBe("Test C.");
+    expect(view?.customerName).toBe("Test C.");
+    expect(JSON.stringify({ rows, view })).not.toContain(payment.customerName);
+  });
+
+  it("revealing the full name needs a reason", async () => {
+    const payment = await newPayment(5_000);
+    const checker = await approver();
+    await expect(revealCustomerName(checker, { paymentId: payment.id, reason: "" })).rejects.toBeInstanceOf(ValidationError);
+    expect(await auditFor(payment.id, "field.unmask")).toHaveLength(0);
+
+    // Positive control: with a reason the full name comes back and the read is audited (without the value).
+    const name = await revealCustomerName(checker, { paymentId: payment.id, reason: "Matching the bank statement" });
+    expect(name).toBe(payment.customerName);
+    const [row] = await auditFor(payment.id, "field.unmask");
+    expect(row).toMatchObject({ entityType: "payment", reason: "Matching the bank statement", actorUserId: checker.user.id });
+    expect(JSON.stringify(row)).not.toContain(payment.customerName);
   });
 
   it("refund audit rows never contain the customer email", async () => {
@@ -291,6 +326,22 @@ describe("rule 4: money moves once, and only when approved", () => {
     expect(await providerRows(refund.id)).toHaveLength(0);
     expect(await refundedPence(payment.id)).toBe(0);
     expect(await auditFor(rejected.approval!.id, "approval.rejected")).toHaveLength(1);
+  });
+
+  it("a rejection marks the refund rejected and audits it in the same transaction", async () => {
+    const { payment, refund } = await pendingRefund();
+    await rejectRefund(await approver(), { refundId: refund.id, expectedVersion: 1, note: "Duplicate request" });
+    const [row] = await refundRows(payment.id);
+    expect(row?.status).toBe("rejected");
+    const [audit] = await auditFor(refund.id, "refund.rejected");
+    expect(audit).toMatchObject({ before: { status: "pending" }, after: { status: "rejected" } });
+  });
+
+  it("the database refuses to change a rejected refund", async () => {
+    const { payment, refund } = await pendingRefund();
+    await rejectRefund(await approver(), { refundId: refund.id, expectedVersion: 1, note: "Duplicate request" });
+    await expectDbError(owner.update(refunds).set({ status: "succeeded" }).where(eq(refunds.id, refund.id)), /refund is already rejected/);
+    expect((await refundRows(payment.id))[0]?.status).toBe("rejected");
   });
 
   it("approving twice moves the money once", async () => {

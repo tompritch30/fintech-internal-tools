@@ -134,6 +134,10 @@ export async function revealCustomerEmail(ctx: ActionContext, input: { paymentId
   return unmask(ctx.db, ctx.user, paymentEntity, { entityId: input.paymentId, field: "customerEmail", reason: input.reason });
 }
 
+export async function revealCustomerName(_ctx: ActionContext, _input: { paymentId: string; reason: string }): Promise<string | null> {
+  throw new Error("not implemented");
+}
+
 // ---------------------------------------------------------------------------
 // Reads
 
