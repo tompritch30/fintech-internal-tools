@@ -1,6 +1,6 @@
 import "server-only";
 import type { Configuration } from "openid-client";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createDb, type Db } from "@fit/db";
 import {
@@ -15,7 +15,6 @@ import {
   type Permission,
   type SessionUser,
 } from "@fit/core";
-import { isPrefetchRequest } from "./prefetch.ts";
 
 const cache = globalThis as unknown as { fitConfig?: CoreConfig; fitDb?: Db; fitOidc?: Promise<Configuration> };
 
@@ -52,7 +51,7 @@ export async function requirePagePermission(permission: Permission, resource: st
   const user = await requireUser();
   try {
     return await requirePermission(
-      { db: getDb(), user, resource, isPrefetch: isPrefetchRequest(await headers()) },
+      { db: getDb(), user, resource },
       permission,
     );
   } catch (err) {

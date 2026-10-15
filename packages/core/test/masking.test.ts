@@ -240,7 +240,6 @@ describe("unmask", () => {
     ).rejects.toThrow(NotFoundError);
     expect(await unmaskAuditRows(missing)).toHaveLength(0);
   });
-
   it("refuses a 21st unmask by the same user within the hour and audits the denial", async () => {
     const { id } = await userWithEmail();
     const { user } = await makeUser(db, ["approver"]);
