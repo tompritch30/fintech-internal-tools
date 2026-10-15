@@ -105,9 +105,13 @@ function measure(limits) {
     }
 
     // One visual
-    const visuals = s.querySelectorAll(":scope > p:has(> img), :scope > .visual, :scope > table, :scope > figure, :scope > svg, :scope > pre");
+    const visuals = s.querySelectorAll(":scope > p > img, :scope > .visual, :scope > table, :scope > figure, :scope > svg, :scope > pre");
     if (visuals.length > limits.visuals) fail.push(["too-many-visuals", `${visuals.length} visuals (max ${limits.visuals})`]);
     if (visuals.length === 0) warn.push("no visual (chart, diagram, table or screenshot)");
+
+    for (const img of s.querySelectorAll("img")) {
+      if (!img.naturalWidth) fail.push(["missing-image", `image did not load: ${img.getAttribute("src")}`]);
+    }
 
     // Text size
     for (const el of all) {

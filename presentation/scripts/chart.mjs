@@ -4,6 +4,7 @@
 // A bar with "value": null is drawn as a dashed placeholder labelled TBD: never invent a number.
 import { readdir, readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { ROOT } from "./lib.mjs";
 
 const C = { ink: "#191919", muted: "#626870", rule: "#e5e5e5", accent: "#2200ff", accent2: "#317cff" };
@@ -16,11 +17,14 @@ const FONT = 30;
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
-function barChart(spec, fontBase64) {
+export function barChart(spec, fontBase64) {
   const bars = spec.bars ?? [];
   const known = bars.filter((b) => typeof b.value === "number");
   const max = Math.max(...known.map((b) => b.value), 0) || 1;
-  const track = W - LABEL_W - VALUE_W;
+  const fmt = (b) => `${spec.valuePrefix ?? ""}${b.value.toLocaleString("en-GB")}${spec.valueSuffix ?? ""}`;
+  // Reserve room for the longest value label (Inter semibold is about 0.65 em per character).
+  const valueW = Math.max(VALUE_W, ...known.map((b) => 24 + fmt(b).length * FONT * 0.65));
+  const track = W - LABEL_W - valueW;
   const H = bars.length * BAR_H + (bars.length - 1) * GAP;
   const rows = bars.map((b, i) => {
     const y = i * (BAR_H + GAP);
@@ -32,7 +36,7 @@ function barChart(spec, fontBase64) {
 <text x="${LABEL_W + w + 24}" y="${cy}" dominant-baseline="middle" fill="${C.muted}">TBD</text>`;
     }
     const w = Math.max(4, (b.value / max) * track);
-    const value = `${spec.valuePrefix ?? ""}${b.value.toLocaleString("en-GB")}${spec.valueSuffix ?? ""}`;
+    const value = fmt(b);
     return `${label}<rect x="${LABEL_W}" y="${y}" width="${w}" height="${BAR_H}" fill="${b.highlight ? C.accent : C.muted}"/>
 <text x="${LABEL_W + w + 24}" y="${cy}" dominant-baseline="middle" font-weight="600">${esc(value)}</text>`;
   });
@@ -44,12 +48,17 @@ ${rows.join("\n")}
 `;
 }
 
-const font = (await readFile(join(ROOT, "assets/fonts/inter-latin-wght-normal.woff2"))).toString("base64");
-const dir = join(ROOT, "charts");
-for (const file of (await readdir(dir)).filter((f) => f.endsWith(".json"))) {
-  const spec = JSON.parse(await readFile(join(dir, file), "utf8"));
-  const out = join(ROOT, spec.output);
-  await mkdir(dirname(out), { recursive: true });
-  await writeFile(out, barChart(spec, font));
-  console.log(`charts/${file} -> ${spec.output}`);
+export const fontBase64 = async () =>
+  (await readFile(join(ROOT, "assets/fonts/inter-latin-wght-normal.woff2"))).toString("base64");
+
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const font = await fontBase64();
+  const dir = join(ROOT, "charts");
+  for (const file of (await readdir(dir)).filter((f) => f.endsWith(".json"))) {
+    const spec = JSON.parse(await readFile(join(dir, file), "utf8"));
+    const out = join(ROOT, spec.output);
+    await mkdir(dirname(out), { recursive: true });
+    await writeFile(out, barChart(spec, font));
+    console.log(`charts/${file} -> ${spec.output}`);
+  }
 }

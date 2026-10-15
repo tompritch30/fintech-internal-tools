@@ -151,3 +151,24 @@ This is a paragraph of prose that goes on well past twenty words, which is the l
 - <span style="font-size:18px">Tiny</span>
 
 <!-- Notes. -->
+
+---
+
+<!-- expect: missing-image -->
+
+# A missing image is caught
+
+![Screenshot that does not exist](assets/does-not-exist.png)
+
+<!-- Notes. -->
+
+---
+
+<!-- expect: too-many-visuals -->
+<!-- _footer: "Source: selftest fixture" -->
+
+# Two images in one paragraph are two visuals
+
+![w:400](assets/charts/cost.svg) ![w:400](assets/charts/cost.svg)
+
+<!-- Notes. -->

@@ -3,7 +3,8 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { checkDeck } from "./check.mjs";
-import { DIST, ROOT } from "./lib.mjs";
+import { DIST, ROOT, launchBrowser } from "./lib.mjs";
+import { barChart, fontBase64 } from "./chart.mjs";
 
 const fixture = join(ROOT, "test/fixtures/violations.md");
 const expected = [...(await readFile(fixture, "utf8")).matchAll(/<!-- expect: ([\w-]+) -->/g)].map((m) => m[1]);
@@ -16,6 +17,23 @@ for (const [i, want] of expected.entries()) {
   const pass = want === "pass" ? codes.length === 0 : codes.includes(want) && codes.every((c) => c === want);
   ok &&= pass;
   console.log(`${pass ? "✓" : "✗"} slide ${i + 1}: expect ${want}, got ${codes.length ? codes.join(", ") : "pass"}`);
+}
+// Chart labels must stay inside the SVG, however long the value.
+const svg = barChart({ valuePrefix: "£", bars: [{ label: "Long value", value: 123456789 }, { label: "Short", value: 1 }] }, await fontBase64());
+const browser = await launchBrowser();
+try {
+  const page = await browser.newPage();
+  await page.setContent(svg);
+  await page.evaluate(() => document.fonts.ready);
+  const clipped = await page.evaluate(() => {
+    const vb = document.querySelector("svg").viewBox.baseVal;
+    return [...document.querySelectorAll("text")].filter((t) => { const b = t.getBBox(); return b.x + b.width > vb.width || b.x < 0; }).map((t) => t.textContent);
+  });
+  const pass = clipped.length === 0;
+  ok &&= pass;
+  console.log(`${pass ? "✓" : "✗"} chart: value labels fit inside the chart${pass ? "" : ` (clipped: ${clipped.join(", ")})`}`);
+} finally {
+  await browser.close();
 }
 console.log(ok ? "\nselftest passed" : "\nselftest FAILED");
 process.exit(ok ? 0 : 1);
