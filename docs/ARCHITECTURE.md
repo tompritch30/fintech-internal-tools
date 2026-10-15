@@ -393,7 +393,7 @@ Demo users (Keycloak realm `internal-tools`, password `demo-only-change-me`):
 ├── pnpm-lock.yaml
 ├── tsconfig.base.json
 ├── eslint.config.mjs
-├── vitest.workspace.ts          # or vitest projects in vitest.config.ts
+├── vitest.config.ts             # vitest projects: packages/core, apps/web
 ├── docker-compose.yml
 ├── .devin/
 │   └── blueprint.yaml
@@ -415,6 +415,7 @@ Demo users (Keycloak realm `internal-tools`, password `demo-only-change-me`):
 │       ├── tsconfig.json
 │       ├── playwright.config.ts
 │       ├── proxy.ts             # route gating (Next 16 name for middleware)
+│       ├── scripts/with-root-env.mjs   # loads the root .env for pnpm dev/start
 │       ├── app/
 │       │   ├── layout.tsx
 │       │   ├── globals.css
@@ -428,12 +429,17 @@ Demo users (Keycloak realm `internal-tools`, password `demo-only-change-me`):
 │       │       ├── page.tsx     # home: signed-in user and roles
 │       │       ├── no-access/page.tsx
 │       │       ├── audit/page.tsx   # admin-only, read-only audit viewer (ListView)
-│       │       └── demo-record/page.tsx  # UI kit demo: RecordHeader, CommandBar, Timeline
+│       │       └── demo-record/
+│       │           ├── page.tsx     # UI kit demo: RecordHeader, CommandBar, Timeline
+│       │           ├── actions.ts   # "use server": addDemoNoteAction = defineAction(...)
+│       │           └── note.ts      # testable logic: withAudit
 │       ├── lib/
-│       │   └── auth.ts          # Next glue: cookies → core session/rbac
+│       │   ├── auth.ts          # Next glue: cookies → core session/rbac, defineAction
+│       │   └── prefetch.ts      # isPrefetchRequest
 │       ├── test/
 │       │   ├── proxy.test.ts            # unauthenticated → /login
-│       │   └── actions-use-define-action.test.ts
+│       │   ├── actions-use-define-action.test.ts
+│       │   └── demo-note.test.ts         # write action → audit row
 │       └── e2e/
 │           └── login.spec.ts
 ├── packages/
@@ -446,6 +452,7 @@ Demo users (Keycloak realm `internal-tools`, password `demo-only-change-me`):
 │   │   │   ├── config.ts
 │   │   │   ├── auth/oidc.ts
 │   │   │   ├── session/session.ts
+│   │   │   ├── session/cookie.ts    # cookie name (importable by proxy)
 │   │   │   ├── rbac/permissions.ts
 │   │   │   ├── rbac/guards.ts       # requireRole, requirePermission, access.denied audit
 │   │   │   ├── rbac/define-action.ts
@@ -453,7 +460,7 @@ Demo users (Keycloak realm `internal-tools`, password `demo-only-change-me`):
 │   │   │   ├── audit/queries.ts     # audit viewer + listAuditForEntity (Timeline)
 │   │   │   └── errors.ts
 │   │   └── test/
-│   │       ├── helpers/db.ts
+│   │       ├── helpers/          # db.ts, env.ts, global-setup.ts (migrate + seed test DB)
 │   │       ├── session.test.ts
 │   │       ├── rbac.test.ts
 │   │       ├── audit.test.ts
@@ -474,18 +481,9 @@ Demo users (Keycloak realm `internal-tools`, password `demo-only-change-me`):
 │       ├── tsconfig.json
 │       └── src/
 │           ├── index.ts
-│           ├── tokens.css       # CSS variables
-│           ├── styles.css
-│           ├── AppShell.tsx
-│           ├── Button.tsx
-│           ├── Input.tsx
-│           ├── Table.tsx
-│           ├── Badge.tsx
-│           ├── EmptyState.tsx
-│           ├── ListView.tsx
-│           ├── CommandBar.tsx
-│           ├── RecordHeader.tsx
-│           └── Timeline.tsx
+│           ├── styles.css       # CSS variables (tokens) and component styles
+│           └── components/  # AppShell, Button, Input, Table, Badge, EmptyState,
+│                            # ListView, CommandBar, RecordHeader, Timeline
 └── docs/
     ├── ARCHITECTURE.md
     ├── ADDING-AN-APP.md

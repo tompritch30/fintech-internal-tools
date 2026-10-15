@@ -51,14 +51,14 @@ run `corepack enable` once.
 |---|---|
 | Start the full stack (web, Postgres, Keycloak; runs migrate + seed) | `docker compose up --build` |
 | Install dependencies | `pnpm install` |
-| Run web on the host (hot reload) | `docker compose up -d postgres keycloak` then `pnpm dev` |
+| Run web on the host (hot reload) | `cp .env.example .env`, `docker compose up -d postgres keycloak`, then `pnpm dev` |
 | Lint | `pnpm lint` |
 | Typecheck | `pnpm typecheck` |
 | Test (needs Postgres running) | `pnpm test` |
 | Migrate | `pnpm db:migrate` |
 | Seed | `pnpm db:seed` |
 | Generate a migration from schema changes | `pnpm db:generate` |
-| End-to-end test (needs full stack running) | `pnpm test:e2e` |
+| End-to-end test (needs Postgres + Keycloak; starts `pnpm dev` itself, or set `E2E_BASE_URL=http://localhost:3000` to use the compose stack) | `pnpm test:e2e` |
 
 Keep this table in step with the root `package.json`. If you change a script, change
 this table in the same PR.
