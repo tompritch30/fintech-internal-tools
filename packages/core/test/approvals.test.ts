@@ -236,12 +236,24 @@ describe("maker-checker approvals", () => {
     ).rejects.toThrow(NotFoundError);
   });
 
-  it("rejects a request whose payload is not JSON-safe", async () => {
+  it.each([
+    { label: "Date", payload: () => ({ at: new Date() }) },
+    // eslint-disable-next-line no-sparse-arrays -- intentionally sparse to test the guard
+    { label: "sparse array", payload: () => ({ lines: [1, , 3] }) },
+    {
+      label: "circular",
+      payload: () => {
+        const circular: Record<string, unknown> = { a: 1 };
+        circular.self = circular;
+        return circular;
+      },
+    },
+  ])("rejects a request whose payload is not JSON-safe ($label)", async ({ payload }) => {
     const { user: requester } = await analyst();
     const subjectId = uniqueId("payout");
     await expect(
       // `as never` bypasses the compile-time payload check to exercise the runtime one.
-      requestApproval(db, requester, payoutKind, { subjectId, payload: { at: new Date() } as never }),
+      requestApproval(db, requester, payoutKind, { subjectId, payload: payload() as never }),
     ).rejects.toThrow(ValidationError);
     const rows = await db.select().from(approvalRequests).where(eq(approvalRequests.subjectId, subjectId));
     expect(rows).toHaveLength(0);
@@ -250,6 +262,16 @@ describe("maker-checker approvals", () => {
       .from(auditLog)
       .where(and(eq(auditLog.action, "approval.requested"), eq(auditLog.actorUserId, requester.id)));
     expect(audits).toHaveLength(0);
+  });
+
+  it("accepts a payload that reuses the same object twice", async () => {
+    const { user: requester } = await analyst();
+    const line = { sku: "x", qty: 1 };
+    const request = await requestApproval(db, requester, payoutKind, {
+      subjectId: uniqueId("payout"),
+      payload: { lines: [line, line] } as never,
+    });
+    expect(request.payload).toEqual({ lines: [{ sku: "x", qty: 1 }, { sku: "x", qty: 1 }] });
   });
 
   it("rejects deciding with a different kind's definition", async () => {
