@@ -22,11 +22,11 @@ formal assessment.
 |---|---|---|---|
 | 1 | Open a record by ID without permission | Holds | — |
 | 2 | Call server actions directly to skip checks | Holds | — |
-| 3 | Unmask without a reason | Holds (gap: any non-empty reason passes) | — |
+| 3 | Unmask without a reason | Holds (gap: any non-empty reason passes); gaps closed by the hardening PR | — |
 | 4 | Cross-site request forgery on actions | Holds | — |
 | 5 | Privilege escalation through the IdP roles claim | Holds | — |
 | 6 | Open redirect in the login callback | Holds | — |
-| 7 | Session cookie settings | Holds (gaps: no idle timeout, no security headers) | — |
+| 7 | Session cookie settings | Holds (gaps: no idle timeout, no security headers); gaps closed by the hardening PR | — |
 | 8a | Bypass the audit log: tamper with rows | Holds for the app role (gap: owner/superuser) | — |
 | 8b | Bypass the audit log: denied access unrecorded | **Breaks** | [#19](https://github.com/tompritch30/fintech-internal-tools/pull/19) |
 | 9 | Injection | Holds | — |
@@ -300,3 +300,18 @@ Fix PRs (red test first, then fix):
 - Dependency CVE scan (`pnpm audit`) and fuzzing.
 - The KYC and feature-flag apps (not built yet).
 - Denial of service, beyond noting there's no general rate limiting.
+
+## Follow-up: hardening
+
+The hardening PR requires unmask reasons to contain at least 10 characters after
+trimming and adds the configurable `UNMASK_RATE_LIMIT_PER_HOUR` limit (default 20
+per user per rolling hour). It sets the `__Host-` session cookie and a 15-minute
+idle timeout. The proxy adds CSP with `frame-ancestors 'none'`, HSTS and the other
+security headers.
+
+Control mappings: PCI DSS 8.2.8 (idle timeout); OWASP ASVS V3 (session management:
+cookie prefix and idle timeout); ASVS V14.4 (HTTP security headers); ISO 27001
+A.8.5 (secure authentication); SOC 2 CC6.1.
+
+Still open: real alerting; audit tamper by the database owner; the alias-dodge in
+the audit-write test.

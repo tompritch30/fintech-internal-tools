@@ -23,7 +23,7 @@ export async function makeUser(db: Db, roles: string[]): Promise<{ user: Session
   const subject = `test-${randomUUID()}`;
   const { id } = await syncUserFromClaims(db, { subject, username: subject, roles });
   const { token } = await createSession(db, id, 1);
-  const user = await getSessionUser(db, token);
+  const user = await getSessionUser(db, token, 15);
   if (!user) throw new Error("test user has no session");
   return { user, token };
 }

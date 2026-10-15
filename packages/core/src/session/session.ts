@@ -74,8 +74,25 @@ export async function createSession(
 }
 
 /** Returns the signed-in user for a session token, or null if missing/expired/revoked. */
-export async function getSessionUser(db: Db, token: string | undefined | null): Promise<SessionUser | null> {
+export async function getSessionUser(
+  db: Db,
+  token: string | undefined | null,
+  idleMinutes: number,
+): Promise<SessionUser | null> {
   if (!token) return null;
+  const [session] = await db
+    .update(sessions)
+    .set({ lastSeenAt: sql`now()` })
+    .where(
+      and(
+        eq(sessions.id, hashToken(token)),
+        gt(sessions.expiresAt, sql`now()`),
+        gt(sessions.lastSeenAt, sql`now() - (${idleMinutes} * interval '1 minute')`),
+      ),
+    )
+    .returning({ userId: sessions.userId });
+  if (!session) return null;
+
   const rows = await db
     .select({
       id: users.id,
@@ -85,13 +102,12 @@ export async function getSessionUser(db: Db, token: string | undefined | null): 
       email: users.email,
       role: userRoles.roleName,
     })
-    .from(sessions)
-    .innerJoin(users, eq(users.id, sessions.userId))
+    .from(users)
     .leftJoin(userRoles, eq(userRoles.userId, users.id))
-    .where(and(eq(sessions.id, hashToken(token)), gt(sessions.expiresAt, sql`now()`)));
+    .where(eq(users.id, session.userId));
   const first = rows[0];
   if (!first) return null;
-  const roles = rows.map((r) => r.role).filter((r): r is string => r !== null);
+  const roles = [...new Set(rows.map((r) => r.role).filter((r): r is string => r !== null))];
   return {
     id: first.id,
     subject: first.subject,

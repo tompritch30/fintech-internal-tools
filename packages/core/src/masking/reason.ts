@@ -1,0 +1,1 @@
+export const MIN_UNMASK_REASON_LENGTH = 10;
