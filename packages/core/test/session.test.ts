@@ -48,6 +48,16 @@ describe("sessions", () => {
     expect(await getSessionUser(db, first.token, 15)).not.toBeNull();
   });
 
+  it("returns each role once when the user has several live sessions", async () => {
+    const { user, token } = await makeUser(db, ["analyst", "approver"]);
+    await createSession(db, user.id, 1);
+
+    const found = await getSessionUser(db, token, 15);
+
+    expect(found?.roles).toHaveLength(2);
+    expect(new Set(found?.roles)).toEqual(new Set(["analyst", "approver"]));
+  });
+
   it("logout revokes the session immediately", async () => {
     const { token } = await makeUser(db, ["analyst"]);
     expect(await getSessionUser(db, token, 15)).not.toBeNull();
