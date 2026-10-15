@@ -395,6 +395,29 @@ cancelled request's refund stays `pending`, is shown as Cancelled and no longer 
 its amount; the app has no cancel action. Seeded payments get no audit rows: seeding is
 setup, not a business action.
 
+### 4.5 Feature flags app
+
+Code: `apps/web/app/(platform)/flags/` (`flags.ts` logic, `actions.ts` `defineAction`
+wrappers, `service.ts` + `app/api/flags/route.ts` for services). Tests:
+`apps/web/test/flags.test.ts` (real Postgres) and `apps/web/e2e/flags.spec.ts`. Tables
+(migrations `0007_flags`, `0008_flags_guard`): `flags`, `flag_values`, `flag_changes`.
+
+| Rule | How it is enforced |
+|---|---|
+| A value per environment (dev, staging, prod) | `flag_values` keyed on (flag, environment), created with the flag by the seed; `app_runtime` can't INSERT/DELETE values, and the guard trigger keeps flag and environment fixed |
+| dev and staging change directly | `changeFlag` locks the row, checks the form's version and writes `flag.value_changed` via `withAudit` |
+| Prod on/change needs a different approver | `requestApproval` with kind `flag.prod_change`; the `flag_changes` row is created in `onRequested`. One pending change per flag (partial unique index). `onApproved` applies it only if prod's version still equals the change's `base_version`, so an old request can't undo a later kill |
+| Prod off is an immediate kill switch | Off with the rollout unchanged (or `killFlag`) skips approval and ignores the page's version; audited as `flag.killed` |
+| Rollout is 0–100 | `validateValue`/`parseRolloutPercentage`; CHECK `flag_values_rollout_range` is the backstop |
+| History with before and after | Audit rows store `before` and `after` (with `after.previous`, since `listAuditForEntity` returns `after` only); the Timeline merges the flag's rows with its changes' approval rows |
+| Read-only service endpoint | `GET /api/flags?environment=…` with `Authorization: Bearer $FLAGS_SERVICE_TOKEN` (constant-time compare); only `GET` is exported; returns current values with `cache-control: no-store`; `proxy.ts` lets exactly `/api/flags` through without a session |
+
+Permissions (in `PERMISSION_REGISTRY`): `flags:read` (analyst, approver) guards the
+pages; `flags:request` (analyst) changes dev/staging, requests prod changes and uses the
+kill switch; `flags:approve` (approver) opens `/flags/approvals` and decides. Every
+version bump is checked by the `flag_values_guard` trigger (+1 exactly). The service
+endpoint authenticates a token, not a user, so failed service calls are not audited.
+
 ## 5. UI kit (`packages/ui`)
 
 Built once in A1 and reused by all three apps. The record components follow the
@@ -474,6 +497,7 @@ Out of A1 on purpose. Each needs its own decision.
 | `OIDC_ALLOW_INSECURE_HTTP` | web | `true` locally; unset in production |
 | `SESSION_TTL_HOURS` | web | `8` |
 | `REFUND_APPROVAL_THRESHOLD_PENCE` | web (refunds) | `25000` (£250.00; refunds above it need approval) |
+| `FLAGS_SERVICE_TOKEN` | web (flags service endpoint) | `demo-only-change-me-flags`; unset switches `GET /api/flags` off |
 | `POSTGRES_PASSWORD` | Postgres container (superuser bootstrap) | `demo-only-change-me` |
 | `KC_BOOTSTRAP_ADMIN_USERNAME` / `_PASSWORD` | Keycloak container | `admin` / `demo-only-change-me` |
 
