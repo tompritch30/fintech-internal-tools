@@ -1,0 +1,20 @@
+{
+  "name": "@fit/presentation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "charts": "node scripts/chart.mjs",
+    "export": "node scripts/export.mjs html pdf pptx",
+    "export:html": "node scripts/export.mjs html",
+    "export:pdf": "node scripts/export.mjs pdf",
+    "export:pptx": "node scripts/export.mjs pptx",
+    "check": "node scripts/check.mjs slides.md",
+    "check:selftest": "node scripts/selftest.mjs",
+    "setup:browser": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@marp-team/marp-cli": "4.5.1",
+    "@marp-team/marp-core": "4.4.0",
+    "playwright": "1.64.1"
+  }
+}
