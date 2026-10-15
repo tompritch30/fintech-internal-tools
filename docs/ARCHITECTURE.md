@@ -166,10 +166,10 @@ The fix, set once in `docker-compose.yml`:
   role, route or action name) and then throws. This row is written on its own, not
   inside a business transaction, so it survives the rejected request. Unauthenticated
   requests are redirected to `/login` and are not audited (there is no user to record).
-- **Prefetches are not audited.** Next.js prefetches pages behind links, which would
-  write false `access.denied` rows. Prefetch requests (`Next-Router-Prefetch` /
-  `Purpose: prefetch` headers) are still denied but write no row. Pages also don't
-  render links the user can't use.
+- **Page denials are always audited, including requests with prefetch headers.**
+  Headers such as `Next-Router-Prefetch`, `Purpose`, and `Sec-Purpose` are
+  client-controlled and cannot suppress a denial audit row. The layout renders links
+  only for actions the user may use, so false denial rows should remain rare.
 - **Roles can be stale.** Roles sync from the IdP only at login. If someone loses a
   role in the IdP, they keep it until their session ends (at most
   `SESSION_TTL_HOURS`). Revoking the session row ends access at once. See Known gaps.
@@ -272,8 +272,9 @@ Each with a named test against real Postgres and a positive control:
 - **OIDC login and session:** a seeded Keycloak user can log in end to end (Playwright),
   logout works, and unauthenticated requests are redirected to `/login`.
 - **RBAC:** `requireRole` / `requirePermission` deny a user without the role, and allow
-  a user with it. A denial writes an `access.denied` audit row; an allowed call writes
-  none; a denied prefetch writes none.
+  a user with it. Page denials write an `access.denied` audit row regardless of
+  prefetch headers, which are client-controlled; the layout only renders links the
+  user may use, so false denial rows should remain rare. An allowed call writes none.
 - **Guards on every action:** every exported server action is built with `defineAction`.
 - **Audit writes only via core:** nothing outside `packages/core/src/audit/` writes to `audit_log`.
 - **Audit:** `withAudit` writes the change and the audit row together, and a failure
