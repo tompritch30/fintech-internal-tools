@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Badge, ListView, type ListColumn } from "@fit/ui";
+import { ListView, PageHeader, StatusBadge, Tabs, linkClass, type ListColumn } from "@fit/ui";
 import { getDb, requirePagePermission } from "../../../lib/auth.ts";
-import { RISK, STATUS, formatWhen } from "./format.ts";
+import { STATUS, formatWhen, riskBadges, statusOf } from "./format.ts";
 import { KYC_STATUSES, listKycCases, loadKycConfig, type KycCaseListItem, type KycStatus } from "./kyc.ts";
 import { parsePageParam } from "../../../lib/page-param.ts";
 
@@ -14,7 +14,7 @@ const columns: ListColumn<KycCaseListItem>[] = [
     label: "Case",
     sortable: true,
     render: (c) => (
-      <Link className="font-medium underline-offset-4 hover:underline" href={`/kyc/cases/${c.id}`}>
+      <Link className={linkClass} href={`/kyc/cases/${c.id}`}>
         {c.reference}
       </Link>
     ),
@@ -27,9 +27,9 @@ const columns: ListColumn<KycCaseListItem>[] = [
     sortable: true,
     render: (c) => (
       <span className="flex flex-wrap gap-1">
-        <Badge tone={c.highRisk ? "danger" : "neutral"}>{RISK[c.riskRating] ?? c.riskRating}</Badge>
-        {c.sanctionsHit ? <Badge tone="danger">Sanctions</Badge> : null}
-        {c.pep ? <Badge tone="warning">PEP</Badge> : null}
+        {riskBadges(c).map((b) => (
+          <StatusBadge key={b.label} {...b} />
+        ))}
       </span>
     ),
   },
@@ -37,7 +37,7 @@ const columns: ListColumn<KycCaseListItem>[] = [
     key: "status",
     label: "Status",
     sortable: true,
-    render: (c) => <Badge tone={STATUS[c.status]?.tone ?? "neutral"}>{STATUS[c.status]?.label ?? c.status}</Badge>,
+    render: (c) => <StatusBadge {...statusOf(c.status)} />,
   },
   { key: "ownerName", label: "Owner", render: (c) => c.ownerName ?? "—" },
   { key: "openedAt", label: "Opened", sortable: true, render: (c) => formatWhen(c.openedAt) },
@@ -61,20 +61,14 @@ export async function KycQueue({ status, searchParams }: { status?: KycStatus; s
   const filters = [{ value: undefined, label: "All" }, ...KYC_STATUSES.map((s) => ({ value: s, label: STATUS[s]?.label ?? s }))];
   return (
     <div className="stack">
-      <h1 className="page-title">KYC review queue</h1>
-      <p>Claim a case to review it. Applicant details are masked; high-risk approvals need a second person&apos;s sign-off.</p>
-      <nav aria-label="Filter by status" className="flex flex-wrap gap-2 text-sm">
-        {filters.map((f) => (
-          <Link
-            key={f.label}
-            href={f.value ? `/kyc/status/${f.value}` : "/kyc"}
-            aria-current={f.value === status ? "page" : undefined}
-            className={`rounded-md border px-2 py-1 ${f.value === status ? "bg-muted font-medium" : ""}`}
-          >
-            {f.label}
-          </Link>
-        ))}
-      </nav>
+      <PageHeader
+        title="KYC review queue"
+        description="Claim a case to review it. Applicant details are masked; high-risk approvals need a second person's sign-off."
+      />
+      <Tabs
+        label="Filter by status"
+        items={filters.map((f) => ({ href: f.value ? `/kyc/status/${f.value}` : "/kyc", label: f.label, current: f.value === status }))}
+      />
       <ListView
         label="KYC cases"
         basePath={basePath}

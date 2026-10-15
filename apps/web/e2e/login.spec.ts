@@ -15,16 +15,17 @@ async function signOut(page: Page) {
   await page.getByRole("button", { name: "Sign out" }).click();
 }
 
-test("analyst signs in through Keycloak, sees their roles, and signs out", async ({ page }) => {
+test("analyst signs in through Keycloak, sees their roles in the account menu, and signs out", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/login$/);
 
   await signIn(page, "analyst");
   await expect(page.getByTestId("username")).toHaveText("analyst");
-  await expect(page.getByText("analyst", { exact: true }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Audit log" })).toHaveCount(0);
 
-  await signOut(page);
+  await page.getByRole("button", { name: /account menu/i }).click();
+  await expect(page.getByRole("list", { name: "Your roles" })).toHaveText("analyst");
+  await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login$/);
   await page.goto("/");
   await expect(page).toHaveURL(/\/login$/);
@@ -39,9 +40,12 @@ test("analyst is denied the audit log, and admin sees that denial in it", async 
   await expect(page).toHaveURL(/\/login$/);
 
   await signIn(page, "admin");
-  await page.getByRole("link", { name: "Audit log" }).click();
-  await page.getByRole("searchbox").fill("access.denied");
-  await page.getByRole("button", { name: "Search" }).click();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Audit log" }).click();
+  const filters = page.getByRole("form", { name: "Audit filters" });
+  await filters.getByLabel("Action", { exact: true }).selectOption("access.denied");
+  await filters.getByLabel("Record ID").fill("/audit");
+  await filters.getByRole("button", { name: "Apply filters" }).click();
+  await expect(page).toHaveURL(/action=access.denied/);
   const row = page.getByRole("row").filter({ hasText: "access.denied" }).filter({ hasText: "/audit" }).first();
   await expect(row).toContainText("analyst");
 });

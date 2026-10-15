@@ -1,4 +1,4 @@
-import type { BadgeTone } from "@fit/ui";
+import type { StatusValue } from "@fit/ui";
 
 /** Shared by server pages and client forms, so no server-only imports here. */
 export interface FormState {
@@ -13,9 +13,12 @@ export const formatPence = (pence: number) => gbp.format(pence / 100);
 
 export const formatWhen = (d: Date) => `${d.toISOString().slice(0, 16).replace("T", " ")} UTC`;
 
-export const STATUS: Record<string, { label: string; tone: BadgeTone }> = {
-  pending_approval: { label: "Pending approval", tone: "warning" },
-  succeeded: { label: "Refunded", tone: "success" },
-  rejected: { label: "Rejected", tone: "danger" },
-  cancelled: { label: "Cancelled", tone: "neutral" },
+/** Status kinds: neutral unless done. Refunds carry no risk flag of their own. */
+export const STATUS: Record<string, StatusValue> = {
+  pending_approval: { label: "Pending approval", kind: "neutral" },
+  succeeded: { label: "Refunded", kind: "done" },
+  rejected: { label: "Rejected", kind: "neutral" },
+  cancelled: { label: "Cancelled", kind: "neutral" },
 };
+
+export const statusOf = (status: string): StatusValue => STATUS[status] ?? { label: status };
