@@ -1,5 +1,5 @@
 import "server-only";
-import { and, count, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, ne, notLike, sql } from "drizzle-orm";
 import type { SessionUser } from "@fit/core";
 import { approvalRequests, auditLog, kycCases, payments, refunds, users, type Db } from "@fit/db";
 import { kycApproval } from "./kyc/kyc.ts";
@@ -87,12 +87,15 @@ const RECORD_LINKS: Record<string, { permission: string; href: (id: string) => s
   kyc_case: { permission: "kyc:read", href: (id) => `/kyc/cases/${id}` },
 };
 
-/** The user's own latest audit rows. Only their own, so no one sees others' activity without audit:read. */
+/**
+ * The user's own latest work: audit rows they wrote, minus sign-ins, sign-outs and denials.
+ * Only their own, so no one sees others' activity without audit:read.
+ */
 export async function myRecentActivity(db: Db, user: Viewer): Promise<ActivityItem[]> {
   const rows = await db
     .select({ id: auditLog.id, occurredAt: auditLog.occurredAt, action: auditLog.action, entityType: auditLog.entityType, entityId: auditLog.entityId })
     .from(auditLog)
-    .where(eq(auditLog.actorUserId, user.id))
+    .where(and(eq(auditLog.actorUserId, user.id), notLike(auditLog.action, "auth.%"), ne(auditLog.action, "access.denied")))
     .orderBy(desc(auditLog.occurredAt), desc(auditLog.id))
     .limit(LIMIT);
   return rows.map((r) => {

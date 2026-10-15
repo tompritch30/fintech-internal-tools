@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
+import { requirePermission } from "@fit/core";
 import { createDb, kycCases, payments } from "@fit/db";
 import { makeUser, ownerDb } from "../../../packages/core/test/helpers/db.ts";
 import { TEST_DATABASE_URL } from "../../../packages/core/test/helpers/env.ts";
@@ -68,6 +69,15 @@ describe("dashboard: recent activity", () => {
     const { maker, refund } = await pendingRefundBy(["analyst"]);
     const mine = await myRecentActivity(db, maker.user);
     expect(mine.find((a) => a.action === "refund.requested")).toMatchObject({ href: `/refunds/requests/${refund.id}` });
+  });
+
+  it("leaves out the user's sign-ins and access denials", async () => {
+    const { maker, refund } = await pendingRefundBy(["analyst"]);
+    await expect(requirePermission({ db, user: maker.user, resource: `/audit-${refund.id}` }, "audit:read")).rejects.toThrow();
+    const actions = (await myRecentActivity(db, maker.user)).map((a) => a.action);
+    expect(actions).not.toContain("access.denied");
+    // Positive control: the user's own refund request is still there.
+    expect(actions).toContain("refund.requested");
   });
 
   it("never shows another user's actions", async () => {

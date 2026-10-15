@@ -19,8 +19,8 @@ export function AppTile({ href, title, description, icon, stat }: { href: string
 
 export function TileGrid({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <section aria-label={label} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div role="group" aria-label={label} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {children}
-    </section>
+    </div>
   );
 }
