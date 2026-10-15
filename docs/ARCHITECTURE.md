@@ -368,21 +368,31 @@ fields.
 Code: `apps/web/app/(platform)/refunds/`. Business logic is in `refunds.ts` (tested in
 `apps/web/test/refunds.test.ts`, real Postgres); `actions.ts` wraps it with `defineAction`;
 `mock-provider.ts` stands in for the card provider. Tables (migrations `0004_refunds`,
-`0005_refunds_guard`): `payments`, `refunds`, `mock_provider_refunds`.
+`0005_refunds_guard`, `0006_refunds_rejected`): `payments`, `refunds`, `mock_provider_refunds`.
+Refunds is the reference app: new apps copy its layout, permissions and hooks.
 
 | Rule | How it is enforced |
 |---|---|
 | Refund needs a reason and can't exceed what's left | Validated in `requestRefund`; "left" = amount − refunded − refunds awaiting approval |
 | Over `REFUND_APPROVAL_THRESHOLD_PENCE` → different approver | `requestApproval` with kind `refund.issue`; the refunds row is created in `onRequested`, so both commit together. Self-approval is refused by the engine and the `maker_is_not_checker` CHECK |
 | Only the last four card digits are stored | No PAN column exists; CHECK `payments_card_last4_only` allows exactly four digits |
-| Email masked; reveal needs a reason | `mask` on every payment view; `unmask` (needs `pii:unmask` + reason, writes `field.unmask`) |
+| Email and name masked; reveal needs a reason | `mask` on every payment list row and view: email `t•••@example.test`, name `Jane S.` (core `name` style); `unmask` (needs `pii:unmask` + reason, writes `field.unmask`) |
 | Money moves once, only when approved | The provider is called only in `executeRefund` (straight through, or from `onApproved`). The engine's version check stops a second approval; the provider ledger is unique on `refund_id`; the refund's id is minted when the form renders, so a double submit returns the same refund; the `refunds_guard` trigger refuses to touch a succeeded refund |
 | Total never exceeds the original amount | The payment row is locked (`SELECT … FOR UPDATE`) while the remaining amount is checked; CHECK `payments_refund_within_amount` is the backstop |
-| Queue and history | `/refunds/approvals` (`approvals:decide`); each refund's Timeline merges its own audit rows with its approval request's |
+| Queue and history | `/refunds/approvals` (`refunds:approve`); each refund's Timeline merges its own audit rows with its approval request's |
 
 Grants: `app_runtime` may only `SELECT` payments and `UPDATE (refunded_pence)`; on
 `refunds` it has `SELECT, INSERT, UPDATE`; on `mock_provider_refunds` `SELECT, INSERT`.
 No DELETE anywhere. Payments are created only by the seed (`app_owner`).
+
+Permissions (in `PERMISSION_REGISTRY`): `refunds:read` (analyst, approver) guards every
+refunds page; `refunds:request` (analyst) requests; `refunds:approve` (approver) opens the
+queue and decides. Reveals use the shared `pii:unmask` (approver). Status: `pending` →
+`succeeded` (provider paid) or `rejected` (set by the kind's `onRejected` hook in the
+rejection's transaction, audited as `refund.rejected`). `cancelApproval` runs no hook, so a
+cancelled request's refund stays `pending`, is shown as Cancelled and no longer holds back
+its amount; the app has no cancel action. Seeded payments get no audit rows: seeding is
+setup, not a business action.
 
 ## 5. UI kit (`packages/ui`)
 
@@ -428,9 +438,8 @@ Out of A1 on purpose. Each needs its own decision.
 | **Audit export** (CSV, admin-only, audited) | Research Q3: Dataverse has no native audit export | A2 or later |
 | **Read audit for sensitive records** | Unmask reads are audited since A2 (`field.unmask`); ordinary reads of masked records are not | Later |
 | **`Masked<T>` is compile-time only** | Casts/`any` bypass the brand; the backstops are REVIEW.md rule 3 and the `server-only` import | Accepted risk |
-| **Timeline doesn't apply masking** | `apps/web` audit Timeline shows `before`/`after` JSON unmasked; apply `mask` when a real sensitive record uses it | Refunds keeps the customer email out of every refund audit row instead (tested); fix in the Timeline when an app needs masked values in history |
-| **No `onRejected`/`onCancelled` hook in the approvals engine** | Apps can't update their own record when a request is rejected | Refunds derives "rejected"/"cancelled" from the approval request instead of storing it twice. Core follow-up if a later app needs the hook |
-| **App-specific permissions (`refunds:*`)** | Refunds reuses `approvals:request`, `approvals:decide` and `pii:unmask` because `packages/core` was out of scope; so analysts can't reveal a customer email | Separate core PR if Thomas wants `refunds:read`/`refunds:approve` |
+| **Timeline doesn't apply masking** | `apps/web` audit Timeline shows `before`/`after` JSON unmasked; apply `mask` when a real sensitive record uses it | Refunds keeps the customer email and name out of every refund audit row instead (tested); fix in the Timeline when an app needs masked values in history |
+| **No `onCancelled` hook in the approvals engine** | `cancelApproval` can't update the app's record | Refunds has no cancel action and derives "cancelled" from the request; add the hook when an app lets makers cancel |
 | **Stale roles** (idle timeout, shorter TTL or back-channel logout) | Removing someone's role in the IdP takes effect only at their next login | Before production |
 | **Scheduled session cleanup** | `createSession` deletes a user's expired sessions when they sign in again; users who never come back keep one expired row (and its ID token) each | Before production |
 | **Correlation ID on audit rows** | Trace one user action across rows and logs | Later |

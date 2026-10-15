@@ -42,6 +42,7 @@ Use this for each business app (KYC, refunds, feature flags). One app per sessio
       // so record + approval_requests row + audit row commit together
     },
     onApproved: async (tx, req) => { /* apply the effect of approval */ },
+    onRejected: async (tx, req) => { /* mark the app's record rejected (audited) */ },
   });
   ```
 
@@ -67,6 +68,8 @@ Use this for each business app (KYC, refunds, feature flags). One app per sessio
   Render `mask(row, customer.policies)` — a `Masked<T>` — and pass only that to client
   components. Call `unmask(db, actor, customer, { entityId, field, reason })` from a
   server action when a user with `pii:unmask` needs the raw value; it audits the read.
+  Styles: `last4`, `email`, `full`, and `name` (first name + last initial, "Jane S.";
+  a one-word name shows only its initial). Refunds masks the customer email and name.
 - **Nested records:** `mask` refuses a record that still contains an unpoliced object
   or array field (compile-time error, and a `ValidationError` at runtime). This fails
   closed: a nested sensitive field can't leak because nobody wrote a policy for it.
@@ -89,8 +92,9 @@ Use this for each business app (KYC, refunds, feature flags). One app per sessio
 - [ ] Use the kit: `ListView` for queues, `RecordHeader` + `CommandBar` + `Timeline`
       (`listAuditForEntity`) for records. Show only commands the user may run.
 - [ ] Add a component to `packages/ui` only when a real app needs it.
-- [ ] Pages several roles may read (e.g. a record both makers and checkers open) can use
-      `requirePagePermission`'s sibling `requirePageAnyPermission([...], "/route")` in `apps/web/lib/auth.ts`.
+- [ ] Pages several roles read (e.g. a record makers and checkers both open): register an
+      `<app>:read` permission for all of them and guard with `requirePagePermission`
+      (refunds: `refunds:read`).
 - [ ] Expected errors (validation, conflicts, self-approval) are returned from the action as form state
       (`useActionState`), not thrown; see `app/(platform)/refunds/actions.ts`.
 
