@@ -6,7 +6,11 @@ import type { ReactNode } from "react";
  */
 export function CommandBar({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="fit-commandbar" role="toolbar" aria-label={label}>
+    <div
+      className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3 text-card-foreground shadow-xs"
+      role="toolbar"
+      aria-label={label}
+    >
       {children}
     </div>
   );
