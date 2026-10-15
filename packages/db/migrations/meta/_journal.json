@@ -61,15 +61,29 @@
     {
       "idx": 8,
       "version": "7",
-      "when": 1792102184657,
-      "tag": "0008_flags",
+      "when": 1792102190818,
+      "tag": "0008_kyc",
       "breakpoints": true
     },
     {
       "idx": 9,
       "version": "7",
-      "when": 1792102185400,
-      "tag": "0009_flags_guard",
+      "when": 1792102191570,
+      "tag": "0009_kyc_guard",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792102951947,
+      "tag": "0010_flags",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792102952681,
+      "tag": "0011_flags_guard",
       "breakpoints": true
     }
   ]

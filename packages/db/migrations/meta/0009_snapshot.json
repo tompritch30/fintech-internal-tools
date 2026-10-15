@@ -1,6 +1,6 @@
 {
-  "id": "d0e0d537-4857-47b9-b16b-4290fed86b76",
-  "prevId": "4a06c2f2-e964-4836-a81a-c885d45047fe",
+  "id": "fed23a06-4774-48f6-8295-fb5615e3c872",
+  "prevId": "8c011bd1-1cb6-4c5a-85be-88dae49bf0a9",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -315,304 +315,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.flag_changes": {
-      "name": "flag_changes",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "flag_id": {
-          "name": "flag_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "environment": {
-          "name": "environment",
-          "type": "flag_environment",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "before_enabled": {
-          "name": "before_enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "before_rollout_percentage": {
-          "name": "before_rollout_percentage",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "after_enabled": {
-          "name": "after_enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "after_rollout_percentage": {
-          "name": "after_rollout_percentage",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "base_version": {
-          "name": "base_version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reason": {
-          "name": "reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "flag_change_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "approval_request_id": {
-          "name": "approval_request_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "requested_by": {
-          "name": "requested_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "requested_at": {
-          "name": "requested_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "decided_at": {
-          "name": "decided_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "flag_changes_approval_request_id_idx": {
-          "name": "flag_changes_approval_request_id_idx",
-          "columns": [
-            {
-              "expression": "approval_request_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        },
-        "flag_changes_one_pending_idx": {
-          "name": "flag_changes_one_pending_idx",
-          "columns": [
-            {
-              "expression": "flag_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "environment",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "with": {},
-          "method": "btree",
-          "where": "\"flag_changes\".\"status\" = 'pending'",
-          "concurrently": false
-        }
-      },
-      "foreignKeys": {
-        "flag_changes_flag_id_flags_id_fk": {
-          "name": "flag_changes_flag_id_flags_id_fk",
-          "tableFrom": "flag_changes",
-          "columnsFrom": [
-            "flag_id"
-          ],
-          "tableTo": "flags",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "flag_changes_approval_request_id_approval_requests_id_fk": {
-          "name": "flag_changes_approval_request_id_approval_requests_id_fk",
-          "tableFrom": "flag_changes",
-          "columnsFrom": [
-            "approval_request_id"
-          ],
-          "tableTo": "approval_requests",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "flag_changes_requested_by_users_id_fk": {
-          "name": "flag_changes_requested_by_users_id_fk",
-          "tableFrom": "flag_changes",
-          "columnsFrom": [
-            "requested_by"
-          ],
-          "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "flag_changes_prod_only": {
-          "name": "flag_changes_prod_only",
-          "value": "\"flag_changes\".\"environment\" = 'prod'"
-        },
-        "flag_changes_rollout_range": {
-          "name": "flag_changes_rollout_range",
-          "value": "\"flag_changes\".\"after_rollout_percentage\" between 0 and 100 and \"flag_changes\".\"before_rollout_percentage\" between 0 and 100"
-        },
-        "flag_changes_reason_present": {
-          "name": "flag_changes_reason_present",
-          "value": "length(btrim(\"flag_changes\".\"reason\")) > 0"
-        },
-        "flag_changes_decided_at": {
-          "name": "flag_changes_decided_at",
-          "value": "(\"flag_changes\".\"status\" = 'pending') = (\"flag_changes\".\"decided_at\" is null)"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.flag_values": {
-      "name": "flag_values",
-      "schema": "",
-      "columns": {
-        "flag_id": {
-          "name": "flag_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "environment": {
-          "name": "environment",
-          "type": "flag_environment",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "enabled": {
-          "name": "enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "rollout_percentage": {
-          "name": "rollout_percentage",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "version": {
-          "name": "version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_by": {
-          "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "flag_values_flag_id_flags_id_fk": {
-          "name": "flag_values_flag_id_flags_id_fk",
-          "tableFrom": "flag_values",
-          "columnsFrom": [
-            "flag_id"
-          ],
-          "tableTo": "flags",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "flag_values_updated_by_users_id_fk": {
-          "name": "flag_values_updated_by_users_id_fk",
-          "tableFrom": "flag_values",
-          "columnsFrom": [
-            "updated_by"
-          ],
-          "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "flag_values_flag_id_environment_pk": {
-          "name": "flag_values_flag_id_environment_pk",
-          "columns": [
-            "flag_id",
-            "environment"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "flag_values_rollout_range": {
-          "name": "flag_values_rollout_range",
-          "value": "\"flag_values\".\"rollout_percentage\" between 0 and 100"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.flags": {
-      "name": "flags",
+    "public.kyc_cases": {
+      "name": "kyc_cases",
       "schema": "",
       "columns": {
         "id": {
@@ -622,43 +326,277 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "key": {
-          "name": "key",
+        "reference": {
+          "name": "reference",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "description": {
-          "name": "description",
+        "applicant_name": {
+          "name": "applicant_name",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "created_at": {
-          "name": "created_at",
+        "date_of_birth": {
+          "name": "date_of_birth",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "id_number": {
+          "name": "id_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "address": {
+          "name": "address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nationality": {
+          "name": "nationality",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "risk_rating": {
+          "name": "risk_rating",
+          "type": "kyc_risk_rating",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sanctions_hit": {
+          "name": "sanctions_hit",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "pep": {
+          "name": "pep",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "status": {
+          "name": "status",
+          "type": "kyc_case_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'open'"
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "claimed_at": {
+          "name": "claimed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decision_note": {
+          "name": "decision_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "opened_at": {
+          "name": "opened_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "closed_at": {
+          "name": "closed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "retention_until": {
+          "name": "retention_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
-      "indexes": {},
-      "foreignKeys": {},
+      "indexes": {
+        "kyc_cases_status_idx": {
+          "name": "kyc_cases_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "kyc_cases_owner_id_idx": {
+          "name": "kyc_cases_owner_id_idx",
+          "columns": [
+            {
+              "expression": "owner_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "kyc_cases_owner_id_users_id_fk": {
+          "name": "kyc_cases_owner_id_users_id_fk",
+          "tableFrom": "kyc_cases",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "tableTo": "users",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "flags_key_unique": {
-          "name": "flags_key_unique",
+        "kyc_cases_reference_unique": {
+          "name": "kyc_cases_reference_unique",
           "columns": [
-            "key"
+            "reference"
           ],
           "nullsNotDistinct": false
         }
       },
       "policies": {},
       "checkConstraints": {
-        "flags_key_format": {
-          "name": "flags_key_format",
-          "value": "\"flags\".\"key\" ~ '^[a-z][a-z0-9-]{1,62}$'"
+        "kyc_cases_owner_matches_status": {
+          "name": "kyc_cases_owner_matches_status",
+          "value": "(\"kyc_cases\".\"status\" in ('open', 'escalated')) = (\"kyc_cases\".\"owner_id\" is null)"
+        },
+        "kyc_cases_claimed_at_with_owner": {
+          "name": "kyc_cases_claimed_at_with_owner",
+          "value": "(\"kyc_cases\".\"owner_id\" is null) = (\"kyc_cases\".\"claimed_at\" is null)"
+        },
+        "kyc_cases_closed_has_retention": {
+          "name": "kyc_cases_closed_has_retention",
+          "value": "(\"kyc_cases\".\"status\" in ('approved', 'rejected')) = (\"kyc_cases\".\"closed_at\" is not null and \"kyc_cases\".\"retention_until\" is not null)"
+        },
+        "kyc_cases_retention_at_least_5_years": {
+          "name": "kyc_cases_retention_at_least_5_years",
+          "value": "\"kyc_cases\".\"retention_until\" is null or \"kyc_cases\".\"retention_until\" >= \"kyc_cases\".\"closed_at\" + interval '5 years'"
+        },
+        "kyc_cases_rejection_has_note": {
+          "name": "kyc_cases_rejection_has_note",
+          "value": "\"kyc_cases\".\"status\" <> 'rejected' or length(btrim(coalesce(\"kyc_cases\".\"decision_note\", ''))) > 0"
+        },
+        "kyc_cases_nationality_code": {
+          "name": "kyc_cases_nationality_code",
+          "value": "\"kyc_cases\".\"nationality\" ~ '^[A-Z]{2}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.kyc_documents": {
+      "name": "kyc_documents",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "case_id": {
+          "name": "case_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "file_name": {
+          "name": "file_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uploaded_at": {
+          "name": "uploaded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "kyc_documents_case_id_idx": {
+          "name": "kyc_documents_case_id_idx",
+          "columns": [
+            {
+              "expression": "case_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "kyc_documents_case_id_kyc_cases_id_fk": {
+          "name": "kyc_documents_case_id_kyc_cases_id_fk",
+          "tableFrom": "kyc_documents",
+          "columnsFrom": [
+            "case_id"
+          ],
+          "tableTo": "kyc_cases",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "kyc_documents_kind": {
+          "name": "kyc_documents_kind",
+          "value": "\"kyc_documents\".\"kind\" in ('passport', 'driving_licence', 'utility_bill', 'bank_statement')"
         }
       },
       "isRLSEnabled": false
@@ -1251,22 +1189,25 @@
         "cancelled"
       ]
     },
-    "public.flag_change_status": {
-      "name": "flag_change_status",
+    "public.kyc_case_status": {
+      "name": "kyc_case_status",
       "schema": "public",
       "values": [
-        "pending",
-        "applied",
+        "open",
+        "in_review",
+        "pending_approval",
+        "escalated",
+        "approved",
         "rejected"
       ]
     },
-    "public.flag_environment": {
-      "name": "flag_environment",
+    "public.kyc_risk_rating": {
+      "name": "kyc_risk_rating",
       "schema": "public",
       "values": [
-        "dev",
-        "staging",
-        "prod"
+        "low",
+        "medium",
+        "high"
       ]
     },
     "public.refund_status": {

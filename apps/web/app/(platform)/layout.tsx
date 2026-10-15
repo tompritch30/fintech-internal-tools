@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { headers } from "next/headers";
-import { Banknote, ClipboardCheck, House, LogOut, ScrollText, SquareKanban, ToggleRight } from "lucide-react";
+import { Banknote, ClipboardCheck, House, IdCard, LogOut, ScrollText, SquareKanban, ToggleRight } from "lucide-react";
 import { AppShell, Button, type NavItem } from "@fit/ui";
 import { requireUser } from "../../lib/auth.ts";
 
@@ -21,6 +21,7 @@ export default async function PlatformLayout({ children }: { children: ReactNode
     nav.push({ href: "/refunds", label: "Refunds", icon: <Banknote /> });
   }
   if (user.permissions.has("refunds:approve")) nav.push({ href: "/refunds/approvals", label: "Approvals", icon: <ClipboardCheck /> });
+  if (user.permissions.has("kyc:read")) nav.push({ href: "/kyc", label: "KYC queue", icon: <IdCard /> });
   if (user.permissions.has("flags:read")) nav.push({ href: "/flags", label: "Feature flags", icon: <ToggleRight /> });
   if (user.permissions.has("flags:approve")) nav.push({ href: "/flags/approvals", label: "Flag approvals", icon: <ClipboardCheck /> });
   if (user.permissions.has("audit:read")) nav.push({ href: "/audit", label: "Audit log", icon: <ScrollText /> });
