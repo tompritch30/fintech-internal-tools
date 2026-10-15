@@ -209,16 +209,35 @@ The fix, set once in `docker-compose.yml`:
 The roles are created by `infra/postgres/init/01-roles.sql`. Docker Compose runs it on
 first start; CI runs the same file with `psql`.
 
-### 3.8 Masking (A2 — design only)
+### 3.8 Masking
+
+Built in A2 (`packages/core/src/masking/masking.ts`, exported as `@fit/core/masking`).
 
 - Masking runs **on the server, before data reaches the client**. Client components
   only ever receive masked DTOs.
-- **No admin bypass.** The `admin` role gets no special case. (This closes the Dataverse
-  gap in research Q3, where system administrators bypass column security.)
-- Unmasking needs a permission **and** a non-empty reason, and writes a `field.unmask`
-  audit row in the same transaction as the read.
-- Guard against leaks by accident: masked data has a `Masked<T>` type, and modules that
-  load raw rows import `server-only`, so a full row can't be passed to a client component.
+- **No admin bypass.** The `admin` role gets no `pii:unmask` grant and no special case.
+  (This closes the Dataverse gap in research Q3, where system administrators bypass
+  column security.)
+- `mask(record, policies)` is a pure function: it takes no actor or role, returns a
+  shallow-copied `Masked<T>` and never mutates the input. Mask formats (bullet is
+  U+2022; `full` is always 8 bullets so length doesn't leak):
+  - `last4`: length ≥ 8 → `"••••" + last 4`, else `"••••••••"`
+  - `full`: `"••••••••"` always
+  - `email`: local part ≥ 2 chars → `"a•••@domain"`; local part of 1 char →
+    `"•••@domain"`; no `@` → `"••••••••"`
+  - `null`/`undefined` pass through; a non-string runtime value masks as `full`.
+- `unmask(db, actor, entity, { entityId, field, reason })` needs the field's policy
+  `unmaskPermission` (`pii:unmask`) **and** a non-empty reason, and writes a
+  `field.unmask` audit row in the same transaction as the read. The audit row records
+  the actor, entity, field and reason — **never the value** (no before/after).
+- Guard against leaks by accident: masked data has a `Masked<T>` brand (compile-time
+  only, see Known gaps), and `masking.ts` imports `server-only`, so it can't be
+  imported from a client component. Because `server-only` throws under plain Node,
+  masking is exposed via the `@fit/core/masking` subpath export, not `@fit/core`;
+  core's vitest config aliases `server-only` to its `empty.js` so the tests run.
+- Policies are declared per entity in code, next to the app that owns the entity, via
+  `defineMaskedEntity({ entityType, policies, load })`; `load` runs in the unmask
+  transaction.
 
 ## 4. `packages/core` scope
 
@@ -231,8 +250,8 @@ only place these concerns are implemented.
 | `session` | Create, validate and revoke DB sessions | **A1** |
 | `rbac` | Role → permission map, `requireRole`, `requirePermission` | **A1** |
 | `audit` | `withAudit(tx, …)`, audit read query for the viewer | **A1** |
-| `approvals` | Maker-checker approvals engine | A2 (design below) |
-| `masking` | Field masking policies, `mask`, `unmask` | A2 (design below) |
+| `approvals` | Maker-checker approvals engine | **A2** |
+| `masking` | Field masking policies, `mask`, `unmask` | **A2** |
 
 ### 4.1 Built and tested in A1
 
@@ -249,41 +268,74 @@ Each with a named test against real Postgres and a positive control:
   rolls both back. As `app_runtime`, `UPDATE` and `DELETE` on `audit_log` fail;
   `INSERT` succeeds.
 
-### 4.2 Approvals engine (A2 — design only)
+#### Built and tested in A2
 
-Schema sketch:
+- **Approvals:** requester can't decide their own request (code: `SelfApprovalError`
+  plus an `access.denied` row; DB: `maker_is_not_checker` check). Approver needs the
+  kind's approve permission — admin gets it too only if granted, and it isn't, so no
+  admin bypass. Only `pending` rows can be decided, optimistic concurrency via
+  `version`/`expectedVersion`, exactly one of two concurrent decisions wins. The
+  `approval_requests_guard` trigger rejects non-pending inserts, updates to decided
+  rows and content changes; `app_runtime` has no DELETE. `onRequested`/`onApproved`
+  hooks commit the app's record and effect in the same transaction as the request /
+  decision and its audit row. Payloads never appear in audit rows.
+- **Masking:** `mask` formats are tested verbatim, input is never mutated, `unmask`
+  needs the policy permission plus a reason and writes `field.unmask` — the value is
+  never in the audit row. No admin bypass. `Masked<T>` brand checked at compile time.
 
-```sql
-create type approval_status as enum ('pending', 'approved', 'rejected', 'cancelled');
+### 4.2 Approvals engine
 
-create table approval_requests (
-  id            uuid primary key default gen_random_uuid(),
-  kind          text not null,              -- e.g. 'refund.issue'
-  subject_type  text not null,              -- e.g. 'refund'
-  subject_id    text not null,
-  payload       jsonb not null,             -- what will happen if approved
-  status        approval_status not null default 'pending',
-  requested_by  uuid not null references users(id),
-  requested_at  timestamptz not null default now(),
-  decided_by    uuid references users(id),
-  decided_at    timestamptz,
-  decision_note text,
-  version       integer not null default 1, -- optimistic concurrency
-  constraint maker_is_not_checker check (decided_by is null or decided_by <> requested_by)
-);
-```
+Table `approval_requests` (packages/db): `id uuid pk`, `kind`, `subject_type`,
+`subject_id`, `payload jsonb`, `status` (enum `pending|approved|rejected|cancelled`,
+default `pending`), `requested_by`/`requested_at`, `decided_by`/`decided_at`,
+`decision_note`, `version int default 1`. Indexes on `(status, kind)` and
+`(subject_type, subject_id)`.
 
-Interface sketch:
+Interface (`packages/core/src/approvals/approvals.ts`, exported from `@fit/core`):
 
 ```ts
-requestApproval(tx, actor, { kind, subjectType, subjectId, payload }): Promise<ApprovalRequest>
-decideApproval(tx, actor, { id, decision: "approve" | "reject", note, expectedVersion }): Promise<ApprovalRequest>
-cancelApproval(tx, actor, { id, note }): Promise<ApprovalRequest>
+defineApprovalKind<P>({ kind, subjectType, requestPermission, approvePermission,
+  onRequested?, onApproved? }): ApprovalKind<P>
+requestApproval(db, actor, kind, { subjectId, payload }): Promise<ApprovalRequest<P>>
+decideApproval(db, actor, kind, { id, decision: "approve"|"reject", note?, expectedVersion }): Promise<ApprovalRequest<P>>
+cancelApproval(db, actor, { id, note }): Promise<ApprovalRequest>
 ```
 
+Deviations from the original sketch: the functions take `db`, not `tx` — denials
+(self-approval, requester-only cancel) write their `access.denied` row *before* the
+transaction opens, so it survives. `onRequested(tx, request)` runs inside the
+request's transaction so the app's record commits with the request; `onApproved(tx,
+request)` runs inside the approval's transaction so the effect commits with the
+decision.
+
 Rules: the requester can never approve their own request (checked in code **and** by
-the `CHECK` constraint). The approver needs the kind's approve permission. Only
-`pending` requests can be decided. Every call writes its audit row through `withAudit`.
+the `maker_is_not_checker` CHECK). The approver needs the kind's approve permission.
+Rejects and cancels need a non-empty note. Only `pending` requests can be decided;
+`expectedVersion` gives optimistic concurrency (a stale or lost race →
+`ConflictError`). Audit rows: `approval.requested|approved|rejected|cancelled` on
+entityType `approval_request` with before/after `{status, version}` — **payloads are
+never copied into audit rows**; the row references the request id.
+
+Database guards (migration `0003_approvals_guard.sql`): the `decision_matches_status`
+CHECK ties `decided_by`/`decided_at` to the status; a `BEFORE INSERT OR UPDATE`
+trigger rejects inserts that don't start `pending`/v1, updates to non-pending rows
+(`already %`), and changes to id/kind/subject/payload/requester/requested_at
+(`content is immutable`). `app_runtime` has `SELECT, INSERT, UPDATE` only — no DELETE.
+
+### 4.3 Field masking
+
+Interface (`@fit/core/masking`):
+
+```ts
+type MaskPolicy<F> = { field: F; style: "last4"|"full"|"email"; unmaskPermission: Permission };
+
+defineMaskedEntity<T>({ entityType, policies, load }): MaskedEntity<T>
+mask<T, P>(record: T, policies: P): Masked<T, P[number]["field"]>
+unmask<T>(db, actor, entity, { entityId, field, reason }): Promise<string | null>
+```
+
+`unmask` takes the `MaskedEntity` definition (not raw entityType/field strings) so the
+permission and the row load come from the declared policy.
 
 ### 4.3 Field masking (A2 — design only)
 
@@ -338,7 +390,9 @@ Out of A1 on purpose. Each needs its own decision.
 | **DB-trigger audit on business tables** (with `SET LOCAL app.user_id`) | App-written audit misses raw SQL and code that skips `withAudit`; before/after values are only as good as the caller passes | Production hardening |
 | **Tamper-evidence** (hash-chained audit rows, export to storage outside the DB) | An auditor can verify nothing was altered, even by the owner or a DBA | Production hardening |
 | **Audit export** (CSV, admin-only, audited) | Research Q3: Dataverse has no native audit export | A2 or later |
-| **Read audit for sensitive records** | Research Q3: Dataverse logs reads only in production, via Purview | A2, with masking |
+| **Read audit for sensitive records** | Unmask reads are audited since A2 (`field.unmask`); ordinary reads of masked records are not | Later |
+| **`Masked<T>` is compile-time only** | Casts/`any` bypass the brand; the backstops are REVIEW.md rule 3 and the `server-only` import | Accepted risk |
+| **Timeline doesn't apply masking** | `apps/web` audit Timeline shows `before`/`after` JSON unmasked; apply `mask` when a real sensitive record uses it | With the first app that masks fields |
 | **Stale roles** (idle timeout, shorter TTL or back-channel logout) | Removing someone's role in the IdP takes effect only at their next login | Before production |
 | **Scheduled session cleanup** | `createSession` deletes a user's expired sessions when they sign in again; users who never come back keep one expired row (and its ID token) each | Before production |
 | **Correlation ID on audit rows** | Trace one user action across rows and logs | Later |
@@ -449,34 +503,41 @@ Demo users (Keycloak realm `internal-tools`, password `demo-only-change-me`):
 │   │   ├── tsconfig.json
 │   │   ├── vitest.config.ts
 │   │   ├── src/
-│   │   │   ├── index.ts
+│   │   │   ├── index.ts           # everything except masking
 │   │   │   ├── config.ts
 │   │   │   ├── auth/oidc.ts
 │   │   │   ├── session/session.ts
 │   │   │   ├── session/cookie.ts    # cookie name (importable by proxy)
 │   │   │   ├── rbac/permissions.ts
 │   │   │   ├── rbac/guards.ts       # requireRole, requirePermission, access.denied audit
+│   │   │   ├── rbac/denial.ts       # internal recordAccessDenied (not exported)
 │   │   │   ├── rbac/define-action.ts
+│   │   │   ├── approvals/approvals.ts  # defineApprovalKind, request/decide/cancel
+│   │   │   ├── masking/masking.ts   # mask/unmask, server-only, `@fit/core/masking`
 │   │   │   ├── audit/with-audit.ts
 │   │   │   ├── audit/queries.ts     # audit viewer + listAuditForEntity (Timeline)
-│   │   │   └── errors.ts
+│   │   │   └── errors.ts            # + SelfApprovalError, ValidationError, ConflictError, NotFoundError
 │   │   └── test/
 │   │       ├── helpers/          # db.ts, env.ts, global-setup.ts (migrate + seed test DB)
 │   │       ├── session.test.ts
 │   │       ├── rbac.test.ts
 │   │       ├── audit.test.ts
 │   │       ├── audit-append-only.test.ts
-│   │       └── audit-writes-only-via-core.test.ts
+│   │       ├── audit-writes-only-via-core.test.ts
+│   │       ├── approvals.test.ts
+│   │       ├── masking.test.ts
+│   │       └── masking-types.test.ts
 │   ├── db/
 │   │   ├── package.json
 │   │   ├── tsconfig.json
 │   │   ├── drizzle.config.ts
 │   │   ├── src/
 │   │   │   ├── index.ts         # client factory
-│   │   │   ├── schema.ts
+│   │   │   ├── schema.ts        # + approval_status enum, approval_requests
 │   │   │   ├── migrate.ts
 │   │   │   └── seed.ts
 │   │   └── migrations/          # SQL files generated by drizzle-kit, plus custom SQL
+│   │       │                    # 0002_approvals.sql, 0003_approvals_guard.sql
 │   └── ui/
 │       ├── package.json
 │       ├── tsconfig.json

@@ -24,8 +24,47 @@ Use this for each business app (KYC, refunds, feature flags). One app per sessio
 - [ ] Every business write goes through `withAudit(db, entry, fn)`. Never insert into `audit_log`
       directly (`audit-writes-only-via-core.test.ts` fails if you do).
 - [ ] Every page that reads data starts with `requirePagePermission(permission, "/route")`.
-- [ ] Approvals and masking: use the A2 design in ARCHITECTURE.md §4. Mask on the server; never
+- [ ] Approvals and masking: see ARCHITECTURE.md §4.2/§4.3. Mask on the server; never
       pass a whole sensitive row to a client component.
+
+### Approvals and masking patterns (A2)
+
+- **Approval kind:** declare it next to your app with `defineApprovalKind`:
+
+  ```ts
+  const issueRefund = defineApprovalKind<{ amount: number }>({
+    kind: "refund.issue", subjectType: "refund",
+    requestPermission: "approvals:request", approvePermission: "approvals:decide",
+    onRequested: async (tx, req) => {
+      // create the app's own record here (e.g. a refunds row keyed by req.id)
+      // so record + approval_requests row + audit row commit together
+    },
+    onApproved: async (tx, req) => { /* apply the effect of approval */ },
+  });
+  ```
+
+  Then call `requestApproval(db, actor, issueRefund, { subjectId, payload })`,
+  `decideApproval(db, actor, issueRefund, { id, decision, note, expectedVersion })`,
+  `cancelApproval(db, actor, { id, note })` — all exported from `@fit/core`. The engine
+  checks permissions, self-approval, staleness and writes the audit rows; keep
+  sensitive data out of `payload` where you can, and know it never reaches `audit_log`.
+- **Masked entity:** declare it next to your app with `defineMaskedEntity` from
+  `@fit/core/masking` (the subpath matters: the module imports `server-only`, so it is
+  not re-exported from `@fit/core`):
+
+  ```ts
+  import { defineMaskedEntity, mask } from "@fit/core/masking";
+
+  const customer = defineMaskedEntity<Customer>({
+    entityType: "customer",
+    policies: [{ field: "iban", style: "last4", unmaskPermission: "pii:unmask" }],
+    load: (tx, id) => /* select the row by id */,
+  });
+  ```
+
+  Render `mask(row, customer.policies)` — a `Masked<T>` — and pass only that to client
+  components. Call `unmask(db, actor, customer, { entityId, field, reason })` from a
+  server action when a user with `pii:unmask` needs the raw value; it audits the read.
 
 ## 4. UI
 - [ ] Pages live under `apps/web/app/(platform)/<app>/` so they get the `AppShell`.
