@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { auditLog, users } from "@fit/db";
-import { withAudit } from "../src/index.ts";
+import { listAudit, listAuditForEntity, withAudit } from "../src/index.ts";
 import { appDb, makeUser, uniqueId } from "./helpers/db.ts";
 
 const db = appDb();
@@ -77,5 +77,31 @@ describe("withAudit", () => {
     ).rejects.toThrow();
     expect(await displayName(user.id)).toBeNull();
     expect(await auditRowsFor(user.id)).toHaveLength(0);
+  });
+});
+
+describe("audit queries order by time", () => {
+  // IDs come from a sequence, times from clock_timestamp(); concurrent writers can get them in opposite orders.
+  async function rowsOutOfIdOrder() {
+    const entityId = uniqueId("order");
+    const later = new Date("2030-01-01T12:00:02Z");
+    const earlier = new Date("2030-01-01T12:00:01Z");
+    await db.insert(auditLog).values({ action: "order.later", entityType: "order_test", entityId, occurredAt: later });
+    await db.insert(auditLog).values({ action: "order.earlier", entityType: "order_test", entityId, occurredAt: earlier });
+    return entityId;
+  }
+
+  it("lists audit rows newest first by occurredAt, not by insertion order", async () => {
+    const entityId = await rowsOutOfIdOrder();
+    const desc = await listAudit(db, { search: entityId });
+    expect(desc.rows.map((r) => r.action)).toEqual(["order.later", "order.earlier"]);
+    const asc = await listAudit(db, { search: entityId, dir: "asc" });
+    expect(asc.rows.map((r) => r.action)).toEqual(["order.earlier", "order.later"]);
+  });
+
+  it("returns a record's history newest first by occurredAt", async () => {
+    const entityId = await rowsOutOfIdOrder();
+    const rows = await listAuditForEntity(db, "order_test", entityId);
+    expect(rows.map((r) => r.action)).toEqual(["order.later", "order.earlier"]);
   });
 });

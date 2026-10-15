@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, lte, sql } from "drizzle-orm";
 import { roles as rolesTable, sessions, userRoles, users, type Db, type Executor } from "@fit/db";
 import type { IdentityClaims } from "../auth/oidc.ts";
 import { permissionsFor, type Permission } from "../rbac/permissions.ts";
@@ -67,6 +67,8 @@ export async function createSession(
 ): Promise<{ token: string; expiresAt: Date }> {
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + ttlHours * 3600_000);
+  // Bounded cleanup: sessions abandoned without logout (and their ID tokens) go at the next sign-in.
+  await tx.delete(sessions).where(and(eq(sessions.userId, userId), lte(sessions.expiresAt, sql`now()`)));
   await tx.insert(sessions).values({ id: hashToken(token), userId, expiresAt, idToken });
   return { token, expiresAt };
 }

@@ -43,7 +43,11 @@ export async function listAudit(
     .from(auditLog)
     .leftJoin(users, eq(users.id, auditLog.actorUserId))
     .where(where)
-    .orderBy(opts.dir === "asc" ? asc(auditLog.id) : desc(auditLog.id))
+    .orderBy(
+      ...(opts.dir === "asc"
+        ? [asc(auditLog.occurredAt), asc(auditLog.id)]
+        : [desc(auditLog.occurredAt), desc(auditLog.id)]),
+    )
     .limit(pageSize)
     .offset((page - 1) * pageSize);
   const [totalRow] = await db
@@ -61,5 +65,5 @@ export async function listAuditForEntity(db: Db, entityType: string, entityId: s
     .from(auditLog)
     .leftJoin(users, eq(users.id, auditLog.actorUserId))
     .where(and(eq(auditLog.entityType, entityType), eq(auditLog.entityId, entityId)))
-    .orderBy(desc(auditLog.id));
+    .orderBy(desc(auditLog.occurredAt), desc(auditLog.id));
 }

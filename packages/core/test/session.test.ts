@@ -33,6 +33,21 @@ describe("sessions", () => {
     expect(await getSessionUser(db, token)).toBeNull();
   });
 
+  it("deletes the user's expired sessions when they sign in again", async () => {
+    const { id } = await syncUserFromClaims(db, { subject: uniqueId("gc"), username: "gc", roles: [] });
+    await createSession(db, id, -1, "old-id-token");
+    const { token } = await createSession(db, id, 8);
+    const rows = await db.select().from(sessions).where(eq(sessions.userId, id));
+    expect(rows.map((r) => r.id)).toEqual([hashToken(token)]);
+  });
+
+  it("keeps the user's other live sessions when they sign in again", async () => {
+    const { id } = await syncUserFromClaims(db, { subject: uniqueId("gc2"), username: "gc2", roles: [] });
+    const first = await createSession(db, id, 8);
+    await createSession(db, id, 8);
+    expect(await getSessionUser(db, first.token)).not.toBeNull();
+  });
+
   it("logout revokes the session immediately", async () => {
     const { token } = await makeUser(db, ["analyst"]);
     expect(await getSessionUser(db, token)).not.toBeNull();

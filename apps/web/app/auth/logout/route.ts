@@ -1,10 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { buildLogoutUrl, getSessionUser, revokeSession, SESSION_COOKIE, withAudit } from "@fit/core";
 import { getConfig, getDb, getOidc } from "../../../lib/auth.ts";
+import { isSameOrigin } from "../../../lib/same-origin.ts";
 
-/** POST only, so a link or prefetch can't sign someone out. */
+/** POST only, from our own origin, so a link, prefetch or another site's form can't sign someone out. */
 export async function POST(request: NextRequest) {
   const config = getConfig();
+  if (!isSameOrigin(request.headers, config.appUrl)) {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
   const db = getDb();
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   let idToken: string | null = null;
