@@ -28,20 +28,18 @@ formal assessment.
 | 6 | Open redirect in the login callback | Holds | — |
 | 7 | Session cookie settings | Holds (gaps: no idle timeout, no security headers) | — |
 | 8a | Bypass the audit log: tamper with rows | Holds for the app role (gap: owner/superuser) | — |
-| 8b | Bypass the audit log: denied access unrecorded | **Breaks** | Fix PR 3 |
+| 8b | Bypass the audit log: denied access unrecorded | **Breaks** | [#19](https://github.com/tompritch30/fintech-internal-tools/pull/19) |
 | 9 | Injection | Holds | — |
 | 10 | Tamper with approval payloads | Holds | — |
 | 11a | Race conditions in approvals and refunds | Holds | — |
-| 11b | Split one refund to dodge approval | **Breaks** (found during the review) | Fix PR 2 |
+| 11b | Split one refund to dodge approval | **Breaks** (found during the review) | [#18](https://github.com/tompritch30/fintech-internal-tools/pull/18) |
 | 12 | Insider bulk-unmasking customer data (rate limit / alert?) | **Breaks**: no limit, no alert | Fix PR 1 (core) |
 
 Fix PRs (red test first, then fix):
 
-1. Unmask rate limit — `packages/core`, needs Thomas's approval.
-2. Refund split threshold — refunds app, stacked on PR #10's branch.
-3. Audit denied prefetch-header requests — `apps/web`. It reverses an A1 decision, so it is held for Thomas.
-
-PR links are in the session's dev-log row ([DEVIN-LOG.md](DEVIN-LOG.md), row 16).
+1. [PR #17](https://github.com/tompritch30/fintech-internal-tools/pull/17): unmask rate limit — `packages/core`, needs Thomas's approval.
+2. [PR #18](https://github.com/tompritch30/fintech-internal-tools/pull/18): refund split threshold — refunds app, stacked on PR #10's branch.
+3. [PR #19](https://github.com/tompritch30/fintech-internal-tools/pull/19): audit denied prefetch-header requests — `apps/web`. It reverses an A1 decision, so it is held for Thomas.
 
 ## Findings
 
@@ -205,7 +203,7 @@ PR links are in the session's dev-log row ([DEVIN-LOG.md](DEVIN-LOG.md), row 16)
     to core, and core then skips the audit row. These headers are client-controlled.
   - A1 chose to skip prefetches to avoid false rows. But the layout only renders links the user can use, so real
     prefetch denials are rare, and the skip costs the control its evidential value.
-- **Fix (PR 3, `apps/web` only):** always audit page denials, and update ARCHITECTURE.md to match.
+- **Fix ([#19](https://github.com/tompritch30/fintech-internal-tools/pull/19), `apps/web` only):** always audit page denials, and update ARCHITECTURE.md to match.
   The red test sends each prefetch header as a denied user and expects one row. Its positive control is
   a permitted user with the same header: no row.
 - **Controls:** CC7.2 · A.8.15, A.8.16 · PCI 10.2.1.4 (invalid access attempts).
@@ -261,7 +259,7 @@ PR links are in the session's dev-log row ([DEVIN-LOG.md](DEVIN-LOG.md), row 16)
   - `requestRefund` decides with `input.amountPence > config.approvalThresholdPence`, per refund. It never
     looks at what this payment has already had refunded without approval.
   - The available-funds check stops only refunding more than the payment.
-- **Fix (PR 2, refunds app):**
+- **Fix ([#18](https://github.com/tompritch30/fintech-internal-tools/pull/18), refunds app):**
   - Refunds on one payment that skip approval may not total more than the threshold. Once a refund would take that total over, it
     needs a different approver.
   - The check runs under the payment row lock, so two parallel requests can't both
@@ -281,7 +279,7 @@ PR links are in the session's dev-log row ([DEVIN-LOG.md](DEVIN-LOG.md), row 16)
     Result: **50/50 emails returned in 0.999 s**, and the approver's `field.unmask` rows went from 3 to 53.
   - Searching `apps/` and `packages/` for rate limiting, throttling or alerting found nothing.
   - Each unmask is audited, so the harvest is recorded after the fact. But nothing slows it or tells anyone.
-- **Fix (PR 1, `packages/core`, needs Thomas's approval):**
+- **Fix ([#17](https://github.com/tompritch30/fintech-internal-tools/pull/17), `packages/core`, needs Thomas's approval):**
   - `unmask` allows at most `UNMASK_RATE_LIMIT` (20 per rolling 60 minutes) per user, counted from that
     user's `field.unmask` audit rows.
   - A per-user Postgres advisory lock is taken in the same transaction, so parallel calls can't overshoot.
