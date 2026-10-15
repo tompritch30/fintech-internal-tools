@@ -50,6 +50,10 @@ export default async function HomePage() {
     can("kyc:request") ? claimableKycCases(db) : Promise.resolve(null),
   ]);
 
+  const kycStat =
+    [claimable !== null ? `${claimable} open to claim` : null, awaiting && can("kyc:approve") ? `${awaiting.byKind.kyc} waiting for your sign-off` : null]
+      .filter(Boolean)
+      .join(" · ") || undefined;
   return (
     <div className="stack">
       <PageHeader
@@ -71,7 +75,7 @@ export default async function HomePage() {
           />
         ) : null}
         {can("kyc:read") ? (
-          <AppTile href="/kyc" icon={<IdCard />} title="KYC review" description="Claim and decide customer due-diligence cases." stat={claimable !== null ? `${claimable} open to claim` : awaiting && can("kyc:approve") ? `${awaiting.byKind.kyc} waiting for your sign-off` : undefined} />
+          <AppTile href="/kyc" icon={<IdCard />} title="KYC review" description="Claim and decide customer due-diligence cases." stat={kycStat} />
         ) : null}
         {can("flags:read") ? (
           <AppTile href="/flags" icon={<ToggleRight />} title="Feature flags" description="See and change flags per environment. Prod changes need a second person." />
