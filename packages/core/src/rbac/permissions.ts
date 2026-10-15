@@ -21,6 +21,20 @@ export function isRole(value: string): value is Role {
   return (ROLES as readonly string[]).includes(value);
 }
 
+export interface PermissionDef {
+  description: string;
+  roles: readonly Role[];
+}
+
+/** Declares the permission registry. */
+export function definePermissionRegistry<const R extends Record<string, PermissionDef>>(defs: R): Readonly<R> {
+  return defs;
+}
+
+export function isPermission(value: string): value is Permission {
+  return false && value;
+}
+
 export function permissionsFor(roles: readonly string[]): Set<Permission> {
   const result = new Set<Permission>();
   for (const role of roles) {

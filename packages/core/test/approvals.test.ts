@@ -444,6 +444,92 @@ describe("approval hooks", () => {
     expect(request.payload).toEqual(payload);
   });
 
+  it("commits the onRejected effect with the rejection", async () => {
+    const { request } = await newRequest();
+    const { user: dec } = await approver();
+    const { user: target } = await makeUser(db, ["analyst"]);
+    let seen: unknown;
+    const kind = defineApprovalKind<{ iban: string }>({
+      ...payoutKind,
+      onRejected: async (tx, req) => {
+        seen = req;
+        await tx.update(users).set({ displayName: `rejected-${req.id}` }).where(eq(users.id, target.id));
+      },
+    });
+    const decided = await decideApproval(db, dec, kind, {
+      id: request.id,
+      decision: "reject",
+      note: "wrong account",
+      expectedVersion: 1,
+    });
+    expect(decided.status).toBe("rejected");
+    const [t] = await db.select({ n: users.displayName }).from(users).where(eq(users.id, target.id));
+    expect(t?.n).toBe(`rejected-${request.id}`);
+    expect(seen).toMatchObject({ status: "rejected", decidedBy: dec.id, decisionNote: "wrong account", version: 2 });
+  });
+
+  it("rolls back the rejection and its audit row when onRejected throws", async () => {
+    const { request } = await newRequest();
+    const { user: dec } = await approver();
+    const { user: target } = await makeUser(db, ["analyst"]);
+    const kind = defineApprovalKind<{ iban: string }>({
+      ...payoutKind,
+      onRejected: async (tx) => {
+        await tx.update(users).set({ displayName: "rejected-effect" }).where(eq(users.id, target.id));
+        throw new Error("effect failed");
+      },
+    });
+    await expect(
+      decideApproval(db, dec, kind, { id: request.id, decision: "reject", note: "wrong account", expectedVersion: 1 }),
+    ).rejects.toThrow("effect failed");
+    expect((await requestRow(request.id))).toMatchObject({ status: "pending", version: 1 });
+    expect(await auditRows(request.id, "approval.rejected")).toHaveLength(0);
+    const [t] = await db.select({ n: users.displayName }).from(users).where(eq(users.id, target.id));
+    expect(t).toBeDefined();
+    expect(t?.n).not.toBe("rejected-effect");
+  });
+
+  it("does not call onRejected when a request is approved", async () => {
+    const { request } = await newRequest();
+    const { user: dec } = await approver();
+    let called = false;
+    const kind = defineApprovalKind<{ iban: string }>({
+      ...payoutKind,
+      onRejected: async () => {
+        called = true;
+      },
+    });
+    await decideApproval(db, dec, kind, { id: request.id, decision: "approve", expectedVersion: 1 });
+    expect(called).toBe(false);
+  });
+
+  it("does not call onApproved when a request is rejected", async () => {
+    const { request } = await newRequest();
+    const { user: dec } = await approver();
+    let called = false;
+    const kind = defineApprovalKind<{ iban: string }>({
+      ...payoutKind,
+      onApproved: async () => {
+        called = true;
+      },
+    });
+    await decideApproval(db, dec, kind, { id: request.id, decision: "reject", note: "wrong account", expectedVersion: 1 });
+    expect(called).toBe(false);
+  });
+
+  it("does not call onRejected when a request is cancelled", async () => {
+    const { request, requester } = await newRequest();
+    let called = false;
+    const kind = defineApprovalKind<{ iban: string }>({
+      ...payoutKind,
+      onRejected: async () => {
+        called = true;
+      },
+    });
+    await cancelApproval(db, requester, { id: request.id, note: "withdrawing it" });
+    expect(called).toBe(false);
+  });
+
   it("commits the onApproved effect with the decision", async () => {
     const { request } = await newRequest();
     const { user: dec } = await approver();

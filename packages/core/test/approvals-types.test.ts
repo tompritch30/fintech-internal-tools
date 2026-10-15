@@ -51,6 +51,9 @@ describe("approval payload types", () => {
       onApproved: async (_tx, req) => {
         expectTypeOf(req.payload).toEqualTypeOf<RefundPayload>();
       },
+      onRejected: async (_tx, req) => {
+        expectTypeOf(req.payload).toEqualTypeOf<RefundPayload>();
+      },
     });
     expect(kind.kind).toBe("t.refund");
   });
