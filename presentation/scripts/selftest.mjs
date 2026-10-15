@@ -56,6 +56,10 @@ try {
   try { barChart({ bars: [{ label: "Unknown", value: null }] }, fonts); } catch { threw = true; }
   ok &&= threw;
   console.log(`${threw ? "✓" : "✗"} chart: a bar without a measured value is refused`);
+  let threwAccent = false;
+  try { barChart({ bars: [{ label: "A", value: 1, highlight: true }, { label: "B", value: 2, highlight: true }] }, fonts); } catch { threwAccent = true; }
+  ok &&= threwAccent;
+  console.log(`${threwAccent ? "✓" : "✗"} chart: more than one highlighted bar is refused`);
 } finally {
   await browser.close();
 }

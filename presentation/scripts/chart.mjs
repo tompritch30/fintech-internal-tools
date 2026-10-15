@@ -24,6 +24,7 @@ export function barChart(spec, fonts = {}) {
   for (const b of bars) {
     if (typeof b.value !== "number") throw new Error(`chart bar "${b.label}" has no measured value; put it in a table`);
   }
+  if (bars.filter((b) => b.highlight).length > 1) throw new Error("chart highlights more than one bar; blue is one accent per slide");
   const fmt = (v) => `${spec.valuePrefix ?? ""}${v.toLocaleString("en-US")}${spec.valueSuffix ?? ""}`;
   const height = bars.length * BAR_H + (bars.length - 1) * GAP + 40;
   const width = spec.width ?? CHART_W;

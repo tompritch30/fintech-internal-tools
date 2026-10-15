@@ -116,8 +116,9 @@ function measure(limits) {
     }
 
     // A drawing shown at a different shape from its file letterboxes, so its frame and corner marks float.
+    // Charts are exempt: they have no frame, and chart-text-too-small catches one shrunk by letterboxing.
     for (const img of s.querySelectorAll("img")) {
-      if (!img.naturalWidth || getComputedStyle(img).objectFit === "contain" || chrome(img)) continue;
+      if (!img.naturalWidth || /(^|\/)charts\//.test(img.getAttribute("src")) || chrome(img)) continue;
       const r = img.getBoundingClientRect();
       const drift = Math.abs(r.width / r.height - img.naturalWidth / img.naturalHeight) / (img.naturalWidth / img.naturalHeight);
       if (drift > 0.01) fail.push(["image-aspect", `${img.getAttribute("src")} shown at ${Math.round(r.width)}×${Math.round(r.height)} but drawn at ${img.naturalWidth}×${img.naturalHeight}; match its shape`]);

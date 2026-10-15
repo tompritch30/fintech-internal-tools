@@ -81,7 +81,7 @@ rendered PNG, not just the slide you changed. The script catches most of this; t
 | One left edge for label, title, content, logo | `off-left-edge` | chart labels and table text start on it too |
 | One spacing step (48 px): label→title equals title→content | `uneven-gaps` | even gaps inside diagrams and between table rows |
 | Content uses the space; no blank band at the bottom | `unused-space` | the slide doesn't look top-heavy |
-| Blue once per slide at most (one bar, one header, one step or the corner marks) | `too-many-accents` | no other colours anywhere |
+| Blue once per slide at most (one bar, one header, one step or the corner marks) | `too-many-accents`; `charts` refuses more than one highlighted bar | no other colours anywhere |
 | Two text styles per slide | `too-many-text-styles` | — |
 | Readable: ≥24 px, contrast ≥3:1 | `text-too-small`, `low-contrast` | a VP gets it in five seconds |
 | Source line fits on one line | `overflow` (clipped footer) | it's plain words |

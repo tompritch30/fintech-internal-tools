@@ -323,3 +323,13 @@ A subtitle that goes on far too long to fit on one line beside the art
 
 <!-- Notes. -->
 
+---
+
+<!-- expect: image-aspect -->
+<!-- also: unused-space -->
+
+# A framed drawing letterboxed in a Markdown image is caught
+
+![w:600 h:200](assets/title-art-dark.svg)
+
+<!-- Notes. -->
