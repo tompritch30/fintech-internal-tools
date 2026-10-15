@@ -411,8 +411,17 @@ export async function changeFlag(ctx: ActionContext, rawInput: FlagChangeInput):
     return { outcome, flag };
   };
 
+  /** A resubmitted request reports its own result, and never claims a value prod no longer holds. */
+  const resubmittedView = async (change: FlagChangeView) => {
+    const result = await view(resubmittedOutcome(change));
+    if (result.outcome === "applied" && !sameValue(result.flag.values.prod, change.after)) {
+      throw new ConflictError("this request was applied earlier, but prod has changed since. Check the current value.");
+    }
+    return result;
+  };
+
   const resubmitted = input.environment === "prod" ? await findResubmission(ctx.db, ctx, input) : null;
-  if (resubmitted) return view(resubmittedOutcome(resubmitted));
+  if (resubmitted) return resubmittedView(resubmitted);
   const before = await getFlagView(ctx.db, input.flagId);
   if (!before) throw new NotFoundError(`flag ${input.flagId} not found`);
   const current = before.values[input.environment];
@@ -446,7 +455,7 @@ export async function changeFlag(ctx: ActionContext, rawInput: FlagChangeInput):
   } catch (err) {
     if (!(err instanceof AlreadySubmitted)) throw err;
     const existing = await loadChange(ctx.db, input.changeId);
-    if (existing) return view(resubmittedOutcome(existing));
+    if (existing) return resubmittedView(existing);
   }
   return view("pending_approval");
 }

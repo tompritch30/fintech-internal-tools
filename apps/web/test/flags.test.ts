@@ -326,6 +326,19 @@ describe("rule 3: turning a flag on or changing it in prod needs a different app
     expect(await changesFor(flag.id)).toHaveLength(1);
   });
 
+  it("resubmitting an approved prod request after prod moved on doesn't claim the old value is live", async () => {
+    const flag = await newFlag();
+    const maker = await analyst();
+    const req = await input(flag.id, "prod", { enabled: true, rolloutPercentage: 15 });
+    const change = (await changeFlag(maker, req)).flag.pendingChange;
+    if (!change) throw new Error("expected a pending change");
+    await approveFlagChange(await approver(), { changeId: change.id, expectedVersion: change.approval.version });
+    await killFlag(maker, { flagId: flag.id, reason: "Incident" });
+    await expect(changeFlag(maker, req)).rejects.toThrow(/prod has changed since/);
+    expect(await valueOf(flag.id, "prod")).toMatchObject({ enabled: false, rolloutPercentage: 15 });
+    expect(await changesFor(flag.id)).toHaveLength(1);
+  });
+
   it("resubmitting a rejected prod request says it was rejected and creates nothing new", async () => {
     const flag = await newFlag();
     const maker = await analyst();
