@@ -268,8 +268,9 @@ New sources are numbered [S21]–[S31] and listed at the end of this section. Th
 **Arithmetic on published figures only (no usage estimate):**
 - Teams full seat: $40 × 12 = **$480 per full seat per year**, before any on-demand credits.
 - Teams minimum: $80 × 12 = **$960 per year**.
-- A Teams account at the 200-user cap with every user on a full seat: 200 × $480 = **$96,000 per year** in seat charges. Usage past quota is extra and its rate isn't published.
-- For comparison, the client-supplied figure is $250,000/year for Power Apps (not sourced). **The Devin spend needed to build and maintain the apps can't be derived from published data.** It depends on usage past quota (rate not published) or an Enterprise ACU rate and volume (not published).
+- Starting team of ~60 engineers (client-supplied headcount, not sourced), all on full seats: 60 × $480 = **$28,800 per year** in seat charges. Seat cost then scales by $480 per extra full seat, up to the 200-user Teams cap (200 × $480 = $96,000). Usage past quota is extra and its rate isn't published.
+- **The strongest usage input is our own measured spend, not published rates.** `docs/DEVIN-LOG.md` records the actual Devin cost of each session on this project (for example, round-1 research cost $2.56, rows 2 + 3). Once the apps are built, the measured Devin cost per app is first-party data for the cost slide.
+- For comparison, the client-supplied figure is $250,000/year for Power Apps (not sourced). **Devin usage spend can't be derived from published data.** It depends on usage past quota (rate not published) or an Enterprise ACU rate and volume (not published). Use the measured per-session costs in `docs/DEVIN-LOG.md` instead.
 
 **Not published (Devin pricing):**
 - Enterprise ACU price, and any minimum commitment.
