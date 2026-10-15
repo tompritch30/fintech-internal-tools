@@ -1,6 +1,6 @@
 // Dummy data only. Subjects match the user ids in infra/keycloak/internal-tools-realm.json.
 import { fileURLToPath } from "node:url";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { createDb, type Db } from "./index.ts";
 import { auditLog, flags, flagValues, kycCases, kycDocuments, payments, roles, userRoles, users } from "./schema.ts";
 import { loadRootEnv } from "./root-env.ts";
@@ -137,6 +137,8 @@ export const SEED_FLAGS: readonly { key: string; description: string; dev: SeedV
 
 export async function seed(db: Db): Promise<void> {
   await db.transaction(async (tx) => {
+    // One seed at a time, so overlapping runs can't both write the same payment's capture row.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('fit-seed'))`);
     await tx.insert(roles).values([...SEED_ROLES]).onConflictDoNothing();
 
     for (const u of SEED_USERS) {
@@ -164,6 +166,7 @@ export async function seed(db: Db): Promise<void> {
 
     // Payments are inserted once; refunds made later only change refunded_pence.
     const seededPayments = seedPayments();
+    const byReference = new Map(seededPayments.map((p) => [p.reference, p]));
     await tx.insert(payments).values(seededPayments).onConflictDoNothing({ target: payments.reference });
 
     // Each seeded payment gets one `payment.captured` row, so its history starts at capture. This also
@@ -178,7 +181,11 @@ export async function seed(db: Db): Promise<void> {
     );
     const uncaptured = (
       await tx.select().from(payments).where(inArray(payments.reference, seededPayments.map((p) => p.reference)))
-    ).filter((p) => !captured.has(p.id));
+    ).filter((p) => {
+      // A payment that only shares a seeded reference isn't a seeded payment: don't give it a capture.
+      const s = byReference.get(p.reference);
+      return !captured.has(p.id) && s?.customerEmail === p.customerEmail && s.amountPence === p.amountPence;
+    });
     if (uncaptured.length > 0) {
       await tx.insert(auditLog).values(
         uncaptured.map((p) => ({
