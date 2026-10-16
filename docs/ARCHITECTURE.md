@@ -119,7 +119,7 @@ flowchart LR
   token. The table stores only its SHA-256 hash, so a database read can't be replayed
   as a cookie.
 - Cookie: `httpOnly`, `SameSite=Lax`, `Path=/`, and no `Domain`. When `APP_URL` is https it is
-  `__Host-fit_session` and `Secure`. On local http it is plain `fit_session` without `Secure`,
+  `__Host-fit_session` and `Secure`. On local http (loopback host only) it is plain `fit_session` without `Secure`; http on any other host keeps the `__Host-` name and `Secure`,
   because some browsers (desktop Chrome 137) reject `__Host-` over `http://localhost` and login
   loops (#41). Same approach as Auth.js's secure-cookie prefix (`packages/core/src/session/cookie.ts`).
 - Sessions expire after `SESSION_TTL_HOURS` (absolute) or `SESSION_IDLE_MINUTES`
