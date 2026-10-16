@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { ConflictError, ForbiddenError, NotFoundError, SelfApprovalError, ValidationError } from "@fit/core";
 import { defineAction } from "../../../lib/auth.ts";
+import { revealFailure } from "../../../lib/reveal-errors.ts";
 import type { FormState } from "./format.ts";
 import { claimCase, decideCase, openCaseDocument, revealCaseField, signOffCase, type KycDecision, type KycMaskedField } from "./kyc.ts";
 
@@ -73,7 +74,7 @@ export const revealFieldAction = defineAction("pii:unmask", "kyc.reveal", async 
     revalidatePath(`/kyc/cases/${caseId}`);
     return { revealed: value ?? "" };
   } catch (err) {
-    return failure(err);
+    return revealFailure(err);
   }
 });
 
@@ -83,6 +84,6 @@ export const openDocumentAction = defineAction("pii:unmask", "kyc.openDocument",
     revalidatePath(`/kyc/cases/${doc.caseId}`);
     return { revealed: doc.content };
   } catch (err) {
-    return failure(err);
+    return revealFailure(err);
   }
 });

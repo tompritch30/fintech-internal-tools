@@ -335,10 +335,16 @@ export async function refundHistory(db: Db, refundId: string): Promise<AuditList
   return [...own, ...approval].sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime() || b.id - a.id);
 }
 
-/** Audit history of a payment (its capture, then any reveals), newest first. */
+/** Audit history of a payment: its capture, reveals, and every refund on it with its approval, newest first. */
 export async function paymentHistory(db: Db, paymentId: string): Promise<AuditListItem[]> {
   if (!UUID.test(paymentId)) return [];
-  return listAuditForEntity(db, "payment", paymentId);
+  const onPayment = await db.select({ id: refunds.id, approvalRequestId: refunds.approvalRequestId }).from(refunds).where(eq(refunds.paymentId, paymentId));
+  const lists = await Promise.all([
+    listAuditForEntity(db, "payment", paymentId),
+    ...onPayment.map((r) => listAuditForEntity(db, "refund", r.id)),
+    ...onPayment.flatMap((r) => (r.approvalRequestId ? [listAuditForEntity(db, "approval_request", r.approvalRequestId)] : [])),
+  ]);
+  return lists.flat().sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime() || b.id - a.id);
 }
 
 // ---------------------------------------------------------------------------

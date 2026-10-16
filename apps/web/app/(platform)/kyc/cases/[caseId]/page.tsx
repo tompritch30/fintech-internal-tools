@@ -146,6 +146,7 @@ export default async function KycCasePage({ params }: { params: Promise<{ caseId
           { label: "Decision note", value: kase.decisionNote ?? "—" },
           { label: "Sign-off", value: kase.approval ? (SIGN_OFF_STATUS[kase.approval.status] ?? kase.approval.status) : kase.highRisk ? "Needed on approval" : "Not needed" },
           { label: "Signed off by", value: kase.approval?.decidedByName ?? "—" },
+          { label: "Sign-off note", value: kase.approval?.decisionNote ?? "—" },
           { label: "Closed", value: kase.closedAt ? formatWhen(kase.closedAt) : "Not closed" },
           { label: "Retained until", value: kase.retentionUntil ? formatDay(kase.retentionUntil) : "Not closed" },
         ]}
