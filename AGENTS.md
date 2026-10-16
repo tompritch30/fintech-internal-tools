@@ -85,5 +85,5 @@ this table in the same PR.
 
 Every session appends one row to `docs/DEVIN-LOG.md`, in its existing column format.
 Fill in your own facts (what was asked, time, PR link, what went wrong or was
-corrected, outcome). Leave Thomas's columns as `_Thomas to fill_` and cost as
+corrected, outcome). Leave Thomas's columns as `Not logged` and cost as
 "See billing page".

@@ -18,8 +18,8 @@ How the numbers were counted:
 | Migrations | 0000–0003, 0007 | 0004, 0005, 0006 | 0008, 0009 | 0010, 0011 |
 | Build PRs | #3, #4, #6, #7, #9, #15, #17, #19, #23 | #10, #18 | #22 | #24 |
 | Review findings | 9 (A1 6, A2 3), 1 on #9; 3 security-review breaks (§3) | 2 on #10 (both fixed) | 1 on #22 | 0 threads on #24 |
-| Devin cost | _[cost: see billing page]_ | _[cost: see billing page]_ | _[cost: see billing page]_ | _[cost: see billing page]_ |
-| Thomas review time | _[Thomas to fill]_ | _[Thomas to fill]_ | _[Thomas to fill]_ | _[Thomas to fill]_ |
+| Devin cost | $33.87 | $23.94 | $7.30 | $8.26 |
+| Thomas review time | Not logged | Not logged | Not logged | Not logged |
 
 Web platform tests: `actions-use-define-action` 3, `demo-note` 2, `logout-origin` 3, `proxy` 9, `session-cookie` 2 (plus `auth-prefetch-audit`, which uses `it.each`). PR #30 added 9 more (`page-param` 6, `root-env` 3).
 
@@ -121,17 +121,20 @@ Three review findings on [#35](https://github.com/tompritch30/fintech-internal-t
 
 From the start of A1 to the third app merging took about 5½ hours of wall-clock time (17:08 → 22:39), with sessions running in parallel.
 
-## 5. Costs (placeholders)
+## 5. Costs
 
-Devin can't see its own spend during a session (DEVIN-LOG cost note). Fill these in from the billing page.
+From the Devin Usage page (cost per session), read on 16 Oct 2026 after the last submission sessions. The deck's A3 total ($132.27) and KEY-DECISIONS ("$132 including security review, QA and deck work") were read earlier that day, before the last two sessions finished. The per-app, platform, research, security review and UX lines match; only QA fixes and presentation and docs have grown since.
 
-| Item | Cost |
-|---|---|
-| Research (rows 1–4) | _[from DEVIN-LOG / billing]_ |
-| Platform A1 + A2 + hardening | _[billing page]_ |
-| Refunds | _[billing page]_ |
-| KYC | _[billing page]_ |
-| Feature flags | _[billing page]_ |
-| Review, security review, governance, docs | _[billing page]_ |
-| **Total** | _[billing page]_ |
-| Thomas review time, total | _[Thomas to fill]_ |
+| Item | Sessions on the Usage page | Cost |
+|---|---|---|
+| Research (rows 1–4) | Research phase; Research round 2 | $4.58 |
+| Platform A1 + A2 + hardening | Session A1; Build Prevals and Masking; Use DEVIN-LOG.md; Restyle Packages UI and App Shell; Add Merge Queue Support; Create KYC and Flag Issues | $33.87 |
+| Refunds | Build Refunds Business App | $23.94 |
+| KYC | Work on Issue #12 | $7.30 |
+| Feature flags | Implement issue #13 with new-internal-tool | $8.26 |
+| Security review | Audit Core and Refunds | $9.85 |
+| UX polish | Standardize Refunds and KYC UI | $8.75 |
+| Pre-flight and QA fixes | Fix Submission Blockers | $23.62 |
+| Presentation and docs | Draft Power Apps Evaluation Docs; Build Marp Presentation Setup; Draft Submission Pack Docs | $39.22 |
+| **Total** | 17 sessions | **$159.39** |
+| Thomas review time, total | Not logged per PR; about <N> hours in total, including research, planning and the deck |
