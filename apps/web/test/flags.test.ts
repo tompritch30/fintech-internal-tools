@@ -639,14 +639,15 @@ describe("seeded flags: history starts with their seeded values", () => {
     expect(await seededRows(ids)).toHaveLength(ids.length);
   });
 
-  it("a backfilled flag.seeded row is dated at the flag's creation, so later changes stay above it", async () => {
+  it("a backfilled flag.seeded row is dated when it was written (audit_log is never backdated) and keeps the flag's createdAt in after", async () => {
     const flag = await newFlag();
     await changeFlag(await analyst(), await input(flag.id, "dev", { enabled: true, rolloutPercentage: 40 }));
+    const [changed] = await owner.select().from(auditLog).where(and(eq(auditLog.entityId, flag.id), eq(auditLog.action, "flag.value_changed")));
     await recordSeededFlags(owner, [{ key: flag.key, description: "Test flag", dev: OFF, staging: OFF, prod: OFF }]);
     const [row] = await seededRows([flag.id]);
-    expect(row?.occurredAt.getTime()).toBe(flag.createdAt.getTime());
-    const history = await flagHistory(db, flag.id);
-    expect(history.map((h) => h.action)).toEqual(["flag.value_changed", "flag.seeded"]);
+    expect(row!.occurredAt.getTime()).toBeGreaterThanOrEqual(changed!.occurredAt.getTime());
+    expect(row!.occurredAt.getTime()).toBeGreaterThan(flag.createdAt.getTime());
+    expect(row?.after).toMatchObject({ key: flag.key, createdAt: flag.createdAt.toISOString() });
   });
 
   it("a flag that only shares a seed key gets no starting values", async () => {
