@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MIN_UNMASK_REASON_LENGTH } from "@fit/core";
 import { ActionDialog, ActionPanel, Input, RecordHeader, RecordSection, RevealButton, StatusBadge, Table, Timeline, linkClass, type Column } from "@fit/ui";
+import { withActorNames } from "../../../../../lib/actor-names.ts";
 import { getDb, requirePagePermission } from "../../../../../lib/auth.ts";
 import { requestRefundAction, revealEmailAction, revealNameAction } from "../../actions.ts";
 import { formatPence, formatWhen, statusOf } from "../../format.ts";
@@ -32,7 +33,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ paymen
   const db = getDb();
   const payment = await getPaymentView(db, paymentId);
   if (!payment) notFound();
-  const [refunds, history] = await Promise.all([listRefundsForPayment(db, payment.id), paymentHistory(db, payment.id)]);
+  const [refunds, history] = await Promise.all([listRefundsForPayment(db, payment.id), paymentHistory(db, payment.id).then((h) => withActorNames(db, h))]);
   const { approvalThresholdPence } = loadRefundConfig();
   const { actions, waiting } = paymentActions(user, payment);
   const canReveal = user.permissions.has("pii:unmask");
@@ -96,7 +97,8 @@ export default async function PaymentPage({ params }: { params: Promise<{ paymen
           items={history.map((h) => ({
             id: h.id,
             occurredAt: h.occurredAt,
-            actor: h.actor ?? "card system",
+            actor: h.actorName ?? "card system",
+            actorTitle: h.actor,
             action: h.action,
             reason: h.reason,
           }))}

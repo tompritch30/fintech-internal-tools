@@ -5,6 +5,7 @@ export * from "./components/AppTile.tsx";
 export * from "./components/Badge.tsx";
 export * from "./components/Button.tsx";
 export * from "./components/CommandBar.tsx";
+export * from "./components/DangerZone.tsx";
 export * from "./components/EmptyState.tsx";
 export * from "./components/FilterBar.tsx";
 export * from "./components/Input.tsx";

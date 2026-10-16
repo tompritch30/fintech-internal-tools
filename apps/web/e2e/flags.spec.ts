@@ -44,7 +44,7 @@ test("turning a flag on in prod waits for a different approver, and the kill swi
   await page.getByRole("button", { name: "Approve prod change" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Prod on · 20%");
   const history = page.getByRole("list", { name: "History" });
-  await expect(history).toContainText("prod: Off · 0% → On · 20%");
+  await expect(history).toContainText("prod: Off → On · 20%");
   await expect(history).toContainText("approval.approved");
   await signOut(page);
 
@@ -55,7 +55,7 @@ test("turning a flag on in prod waits for a different approver, and the kill swi
   await kill.getByRole("button", { name: "Turn off in prod now" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Prod off");
   await expect(history.getByRole("listitem").first()).toContainText("flag.killed");
-  await expect(history.getByRole("listitem").first()).toContainText("prod: On · 20% → Off · 20%");
+  await expect(history.getByRole("listitem").first()).toContainText("prod: On · 20% → Off");
 });
 
 test("an engineer changes dev directly and the history shows before and after", async ({ page }) => {

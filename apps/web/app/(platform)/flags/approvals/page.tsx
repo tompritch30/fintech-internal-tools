@@ -12,7 +12,7 @@ const columns: ListColumn<FlagChangeView>[] = [
   { key: "flagKey", label: "Flag", render: (c) => c.flagKey },
   { key: "change", label: "Prod change", render: (c) => `${describeFlagValue(c.before)} → ${describeFlagValue(c.after)}` },
   { key: "reason", label: "Reason", render: (c) => c.reason },
-  { key: "requestedBy", label: "Requested by", render: (c) => c.requestedByName },
+  { key: "requestedBy", label: "Requested by", render: (c) => <span title={c.requestedByUsername}>{c.requestedByName}</span> },
   {
     key: "open",
     label: "",

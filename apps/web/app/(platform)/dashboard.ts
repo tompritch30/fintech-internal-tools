@@ -1,7 +1,9 @@
 import "server-only";
 import { and, count, desc, eq, inArray, ne, notLike, sql } from "drizzle-orm";
 import type { SessionUser } from "@fit/core";
-import { approvalRequests, auditLog, kycCases, payments, refunds, users, type Db } from "@fit/db";
+import { approvalRequests, auditLog, flagChanges, flags, kycCases, payments, refunds, users, type Db } from "@fit/db";
+import { flagChangeApproval } from "./flags/flags.ts";
+import { describeFlagValue } from "./flags/format.ts";
 import { kycApproval } from "./kyc/kyc.ts";
 import { refundApproval } from "./refunds/refunds.ts";
 
@@ -9,10 +11,12 @@ type Viewer = Pick<SessionUser, "id" | "permissions">;
 
 export interface AwaitingItem {
   id: string;
-  kind: "Refund" | "KYC sign-off";
+  kind: "Refund" | "KYC sign-off" | "Flag change";
   title: string;
   href: string;
+  /** Display name, falling back to the username. */
   requestedByName: string;
+  requestedByUsername: string;
   requestedAt: Date;
 }
 
@@ -31,16 +35,16 @@ const requesterName = sql<string>`coalesce(${users.displayName}, ${users.usernam
  * Pending approvals this user could decide: kinds they hold the approve permission for,
  * excluding ones they requested (the four-eyes rule would refuse those anyway).
  */
-export async function awaitingMyApproval(db: Db, user: Viewer, opts: { limit?: number } = {}): Promise<{ items: AwaitingItem[]; total: number; byKind: { refunds: number; kyc: number } }> {
+export async function awaitingMyApproval(db: Db, user: Viewer, opts: { limit?: number } = {}): Promise<{ items: AwaitingItem[]; total: number; byKind: { refunds: number; kyc: number; flags: number } }> {
   const limit = opts.limit ?? LIMIT;
   const pendingFromOthers = (kind: string) =>
     and(eq(approvalRequests.kind, kind), eq(approvalRequests.status, "pending"), ne(approvalRequests.requestedBy, user.id));
   const items: AwaitingItem[] = [];
-  const byKind = { refunds: 0, kyc: 0 };
+  const byKind = { refunds: 0, kyc: 0, flags: 0 };
   if (user.permissions.has(refundApproval.approvePermission)) {
     const where = pendingFromOthers(refundApproval.kind);
     const rows = await db
-      .select({ id: refunds.id, reference: payments.reference, amountPence: refunds.amountPence, requestedByName: requesterName, requestedAt: approvalRequests.requestedAt })
+      .select({ id: refunds.id, reference: payments.reference, amountPence: refunds.amountPence, requestedByName: requesterName, requestedByUsername: users.username, requestedAt: approvalRequests.requestedAt })
       .from(refunds)
       .innerJoin(approvalRequests, eq(approvalRequests.id, refunds.approvalRequestId))
       .innerJoin(payments, eq(payments.id, refunds.paymentId))
@@ -57,6 +61,7 @@ export async function awaitingMyApproval(db: Db, user: Viewer, opts: { limit?: n
         title: `${r.reference} · ${new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(r.amountPence / 100)}`,
         href: `/refunds/requests/${r.id}`,
         requestedByName: r.requestedByName,
+        requestedByUsername: r.requestedByUsername,
         requestedAt: r.requestedAt,
       });
     }
@@ -64,7 +69,7 @@ export async function awaitingMyApproval(db: Db, user: Viewer, opts: { limit?: n
   if (user.permissions.has(kycApproval.approvePermission)) {
     const where = pendingFromOthers(kycApproval.kind);
     const rows = await db
-      .select({ id: kycCases.id, reference: kycCases.reference, requestedByName: requesterName, requestedAt: approvalRequests.requestedAt })
+      .select({ id: kycCases.id, reference: kycCases.reference, requestedByName: requesterName, requestedByUsername: users.username, requestedAt: approvalRequests.requestedAt })
       .from(approvalRequests)
       .innerJoin(kycCases, sql`${kycCases.id}::text = ${approvalRequests.subjectId}`)
       .innerJoin(users, eq(users.id, approvalRequests.requestedBy))
@@ -74,11 +79,38 @@ export async function awaitingMyApproval(db: Db, user: Viewer, opts: { limit?: n
     const [n] = await db.select({ n: count() }).from(approvalRequests).where(where);
     byKind.kyc = n?.n ?? 0;
     for (const r of rows) {
-      items.push({ id: r.id, kind: "KYC sign-off", title: r.reference, href: `/kyc/cases/${r.id}`, requestedByName: r.requestedByName, requestedAt: r.requestedAt });
+      items.push({ id: r.id, kind: "KYC sign-off", title: r.reference, href: `/kyc/cases/${r.id}`, requestedByName: r.requestedByName, requestedByUsername: r.requestedByUsername, requestedAt: r.requestedAt });
+    }
+  }
+  if (user.permissions.has(flagChangeApproval.approvePermission)) {
+    const where = pendingFromOthers(flagChangeApproval.kind);
+    const rows = await db
+      .select({ change: flagChanges, flagKey: flags.key, requestedByName: requesterName, requestedByUsername: users.username, requestedAt: approvalRequests.requestedAt })
+      .from(flagChanges)
+      .innerJoin(approvalRequests, eq(approvalRequests.id, flagChanges.approvalRequestId))
+      .innerJoin(flags, eq(flags.id, flagChanges.flagId))
+      .innerJoin(users, eq(users.id, approvalRequests.requestedBy))
+      .where(where)
+      .orderBy(approvalRequests.requestedAt)
+      .limit(limit);
+    const [n] = await db.select({ n: count() }).from(approvalRequests).where(where);
+    byKind.flags = n?.n ?? 0;
+    for (const { change: c, ...r } of rows) {
+      const before = describeFlagValue({ enabled: c.beforeEnabled, rolloutPercentage: c.beforeRolloutPercentage });
+      const after = describeFlagValue({ enabled: c.afterEnabled, rolloutPercentage: c.afterRolloutPercentage });
+      items.push({
+        id: c.id,
+        kind: "Flag change",
+        title: `${r.flagKey}: ${c.environment} ${before} → ${after}`,
+        href: `/flags/${c.flagId}`,
+        requestedByName: r.requestedByName,
+        requestedByUsername: r.requestedByUsername,
+        requestedAt: r.requestedAt,
+      });
     }
   }
   items.sort((a, b) => a.requestedAt.getTime() - b.requestedAt.getTime());
-  return { items: items.slice(0, limit), total: byKind.refunds + byKind.kyc, byKind };
+  return { items: items.slice(0, limit), total: byKind.refunds + byKind.kyc + byKind.flags, byKind };
 }
 
 const RECORD_LINKS: Record<string, { permission: string; href: (id: string) => string }> = {

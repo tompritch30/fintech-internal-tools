@@ -14,7 +14,8 @@ Every record page has this shape, in this order:
 
 1. `RecordHeader`: title, status (`StatusBadge` value) and owner. Optional `back` link and
    `ownerLabel` ("Requested by", "Merchant"). Nothing else in the header.
-2. One `ActionPanel`: the only place a record's actions live.
+2. One `ActionPanel`: the only place a record's actions live. One exception: an emergency or
+   hard-to-undo action (the flags kill switch) goes in a `DangerZone` section of its own.
 3. `RecordSection`s with titles such as **Details**, **Documents**, **Decision**, **History**.
    Use `fields` for label/value grids. History is `<Timeline>` fed by the audit log.
 

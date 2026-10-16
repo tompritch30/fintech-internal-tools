@@ -4,6 +4,8 @@ export interface TimelineItem {
   id: string | number;
   occurredAt: Date;
   actor: string | null;
+  /** Shown on hover over the actor, e.g. their username. */
+  actorTitle?: string | null;
   action: string;
   /** Short description of what changed. */
   summary?: string;
@@ -25,7 +27,7 @@ export function Timeline({ label = "History", items }: { label?: string; items: 
               {item.summary ? <span className="text-muted-foreground">{` — ${item.summary}`}</span> : null}
             </div>
             <div className="mt-0.5 text-xs text-muted-foreground">
-              {item.actor ?? "system"} ·{" "}
+              <span title={item.actorTitle ?? undefined}>{item.actor ?? "system"}</span> ·{" "}
               <time dateTime={item.occurredAt.toISOString()}>{item.occurredAt.toISOString().replace("T", " ").slice(0, 19)} UTC</time>
             </div>
             {item.reason ? (
