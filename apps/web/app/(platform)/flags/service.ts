@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { and, count, eq, gt, sql } from "drizzle-orm";
+import { and, count, eq, gte, sql } from "drizzle-orm";
 import { withAudit } from "@fit/core";
 import { auditLog, type Db, type FlagEnvironment } from "@fit/db";
 import { ENVIRONMENTS, serviceFlagValues, type FlagsServiceConfig } from "./flags.ts";
@@ -14,16 +14,54 @@ function tokenMatches(header: string | null, expected: string): boolean {
 
 const DENIED_RESOURCE = "api:flags";
 /**
- * Refusals audited per rolling minute. The row that reaches it is marked `capped: true`, so the log
- * shows refusals carried on; past it the caller still gets 401 but no new row.
+ * Refusals audited per window. The row that reaches it is marked `capped: true`. Past it the caller
+ * still gets 401, and the refusals are counted and written as one `access.denied.suppressed` row
+ * for the window once it ends, so the log stays bounded and no refusal goes unrecorded.
  */
 export const DENIED_AUDIT_PER_MINUTE = 30;
+export const DENIED_AUDIT_WINDOW_SECONDS = 60;
+
+/** Refusals past the cap, by window start (epoch ms), waiting for their window to end. */
+const suppressed = new Map<number, { count: number; windowSeconds: number }>();
+
+const windowStartOf = (now: number, windowSeconds: number) => Math.floor(now / (windowSeconds * 1000)) * windowSeconds * 1000;
+
+/** Writes one summary row for each window that has ended (or every window when `before` is null). */
+async function flushSuppressed(db: Db, before: number | null) {
+  const due = [...suppressed].filter(([start]) => before === null || start < before);
+  for (const [start] of due) suppressed.delete(start);
+  for (const [start, { count, windowSeconds }] of due) {
+    try {
+      await withAudit(
+        db,
+        {
+          actor: { id: null, subject: null },
+          action: "access.denied.suppressed",
+          entityType: "resource",
+          entityId: DENIED_RESOURCE,
+          metadata: {
+            required: "flags:service-token",
+            suppressed: count,
+            windowStart: new Date(start).toISOString(),
+            windowEnd: new Date(start + windowSeconds * 1000).toISOString(),
+          },
+        },
+        async () => undefined,
+      );
+    } catch (error) {
+      const pending = suppressed.get(start);
+      suppressed.set(start, { count: count + (pending?.count ?? 0), windowSeconds });
+      throw error;
+    }
+  }
+}
 
 /**
  * Writes an access.denied row for a refused call. The caller is unauthenticated, so rows are
- * capped per minute to stop anyone flooding the append-only log. The token is never stored.
+ * capped per window to stop anyone flooding the append-only log. The token is never stored.
  */
-async function auditRefusal(db: Db, token: "missing" | "invalid", limit: number) {
+async function auditRefusal(db: Db, token: "missing" | "invalid", limit: number, windowSeconds: number) {
+  const start = windowStartOf(Date.now(), windowSeconds);
   await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`access.denied:${DENIED_RESOURCE}`}))`);
     const [recent] = await tx
@@ -34,11 +72,19 @@ async function auditRefusal(db: Db, token: "missing" | "invalid", limit: number)
           eq(auditLog.entityType, "resource"),
           eq(auditLog.entityId, DENIED_RESOURCE),
           eq(auditLog.action, "access.denied"),
-          gt(auditLog.occurredAt, sql`clock_timestamp() - interval '1 minute'`),
+          gte(auditLog.occurredAt, new Date(start)),
         ),
       );
     const n = recent?.n ?? 0;
-    if (n >= limit) return;
+    if (n >= limit) {
+      const entry = suppressed.get(start);
+      suppressed.set(start, { count: (entry?.count ?? 0) + 1, windowSeconds });
+      if (!entry) {
+        // Close the window out even if no further call arrives.
+        setTimeout(() => void flushSuppressed(db, windowStartOf(Date.now(), windowSeconds)).catch(() => undefined), start + windowSeconds * 1000 - Date.now() + 100).unref();
+      }
+      return;
+    }
     await withAudit(
       tx,
       {
@@ -64,13 +110,17 @@ export async function handleFlagsServiceRequest(
   db: Db,
   request: Request,
   config: FlagsServiceConfig,
-  { deniedAuditPerMinute = DENIED_AUDIT_PER_MINUTE }: { deniedAuditPerMinute?: number } = {},
+  {
+    deniedAuditPerMinute = DENIED_AUDIT_PER_MINUTE,
+    deniedAuditWindowSeconds = DENIED_AUDIT_WINDOW_SECONDS,
+  }: { deniedAuditPerMinute?: number; deniedAuditWindowSeconds?: number } = {},
 ): Promise<Response> {
+  await flushSuppressed(db, windowStartOf(Date.now(), deniedAuditWindowSeconds));
   if (request.method !== "GET") return json(405, { error: "method not allowed" }, { allow: "GET" });
   if (!config.serviceToken) return json(503, { error: "the flags endpoint is not configured" });
   const authorization = request.headers.get("authorization");
   if (!tokenMatches(authorization, config.serviceToken)) {
-    await auditRefusal(db, authorization ? "invalid" : "missing", deniedAuditPerMinute);
+    await auditRefusal(db, authorization ? "invalid" : "missing", deniedAuditPerMinute, deniedAuditWindowSeconds);
     return json(401, { error: "unauthorised" }, { "www-authenticate": "Bearer" });
   }
   const environment = new URL(request.url).searchParams.get("environment");

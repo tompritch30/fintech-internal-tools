@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { and, count, eq, gt, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 import { ConflictError, ForbiddenError, SelfApprovalError, ValidationError, permissionsFor } from "@fit/core";
 import { auditLog, createDb, flagChanges, flagValues, flags, type FlagEnvironment } from "@fit/db";
@@ -598,32 +598,10 @@ describe("rule 7: services read current values from a read-only endpoint", () =>
   });
 
   it("caps refused-call audit rows per minute, marking the row that hits the cap, so an unauthenticated caller can't flood the log", async () => {
-    // same window and clock as the handler; if a row would age out mid-test, wait for it to go first
-    const inWindow = async () => {
-      const [w] = await db
-        .select({
-          n: count(),
-          age: sql<number>`coalesce(extract(epoch from clock_timestamp() - min(${auditLog.occurredAt})), 0)`.mapWith(Number),
-        })
-        .from(auditLog)
-        .where(
-          and(
-            eq(auditLog.action, "access.denied"),
-            eq(auditLog.entityType, "resource"),
-            eq(auditLog.entityId, "api:flags"),
-            gt(auditLog.occurredAt, sql`clock_timestamp() - interval '1 minute'`),
-          ),
-        );
-      return w ?? { n: 0, age: 0 };
-    };
-    let w = await inWindow();
-    if (w.age > 50) {
-      await new Promise((resolve) => setTimeout(resolve, (60 - w.age) * 1000 + 200));
-      w = await inWindow();
-    }
-    const recent = w.n;
+    // start at the top of a fresh 2 s window so the whole burst lands in it
+    await new Promise((resolve) => setTimeout(resolve, 2000 - (Date.now() % 2000) + 50));
     const before = (await serviceDenials()).length;
-    const options = { deniedAuditPerMinute: recent + 2 };
+    const options = { deniedAuditPerMinute: 2, deniedAuditWindowSeconds: 2 };
     for (let i = 0; i < 5; i++) {
       const res = await handleFlagsServiceRequest(db, serviceRequest("?environment=prod", `wrong-${i}-0123456789abcdef`), config, options);
       expect(res.status).toBe(401);
@@ -647,6 +625,7 @@ describe("rule 7: services read current values from a read-only endpoint", () =>
     const before = (await summaries()).length;
     // start at the top of a fresh window so the whole burst lands in it
     await new Promise((resolve) => setTimeout(resolve, windowSeconds * 1000 - (Date.now() % (windowSeconds * 1000)) + 50));
+    const windowStart = new Date(Math.floor(Date.now() / (windowSeconds * 1000)) * windowSeconds * 1000).toISOString();
     const options = { deniedAuditPerMinute: 1, deniedAuditWindowSeconds: windowSeconds };
     for (let i = 0; i < 4; i++) {
       const res = await handleFlagsServiceRequest(db, serviceRequest("?environment=prod", `wrong-${i}-0123456789abcdef`), config, options);
@@ -656,7 +635,8 @@ describe("rule 7: services read current values from a read-only endpoint", () =>
     // the next call (here an accepted one) closes the window out
     expect((await handleFlagsServiceRequest(db, serviceRequest("?environment=prod"), config, options)).status).toBe(200);
     expect((await handleFlagsServiceRequest(db, serviceRequest("?environment=prod"), config, options)).status).toBe(200);
-    const rows = (await summaries()).slice(before);
+    // earlier tests' windows get their own summaries; this window has exactly one
+    const rows = (await summaries()).slice(before).filter((r) => (r.metadata as { windowStart?: string }).windowStart === windowStart);
     expect(rows).toHaveLength(1);
     expect(rows[0]!.metadata).toMatchObject({ required: "flags:service-token", suppressed: 3 });
     expect(rows[0]!.actorUserId).toBeNull();
