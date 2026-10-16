@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Badge, ListView, type ListColumn } from "@fit/ui";
+import { ListView, StatusBadge, type ListColumn } from "@fit/ui";
 import { getDb, requirePagePermission } from "../../../lib/auth.ts";
 import { ENVIRONMENTS, listFlags, type FlagListItem, type FlagValue } from "./flags.ts";
 import { describeFlagValue } from "./format.ts";
@@ -7,7 +7,7 @@ import { parsePageParam } from "../../../lib/page-param.ts";
 
 const PAGE_SIZE = 20;
 
-const valueBadge = (v: FlagValue) => <Badge tone={v.enabled ? "success" : "neutral"}>{describeFlagValue(v)}</Badge>;
+const valueBadge = (v: FlagValue) => <StatusBadge label={describeFlagValue(v)} />;
 
 const columns: ListColumn<FlagListItem>[] = [
   {
@@ -21,7 +21,7 @@ const columns: ListColumn<FlagListItem>[] = [
   },
   { key: "description", label: "Description", render: (f) => f.description },
   ...ENVIRONMENTS.map((env) => ({ key: env, label: env, render: (f: FlagListItem) => valueBadge(f.values[env]) })),
-  { key: "pending", label: "Prod change", render: (f) => (f.hasPendingChange ? <Badge tone="warning">Awaiting approval</Badge> : "—") },
+  { key: "pending", label: "Prod change", render: (f) => (f.hasPendingChange ? <StatusBadge label="Awaiting approval" /> : "—") },
 ];
 
 export default async function FlagsPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {

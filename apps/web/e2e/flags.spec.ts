@@ -34,7 +34,7 @@ test("turning a flag on in prod waits for a different approver, and the kill swi
   await prodForm.getByLabel("Reason").fill(reason);
   await prodForm.getByRole("button", { name: "Request prod change" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Prod off");
-  await expect(page.getByText("A prod change is waiting for approval")).toBeVisible();
+  await expect(page.getByText("You requested this prod change. Waiting for a different approver.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Approve prod change" })).toHaveCount(0);
   await signOut(page);
 
