@@ -223,6 +223,35 @@ export async function seed(db: Db): Promise<void> {
         .onConflictDoNothing();
     }
 
+    // Each seeded flag gets one `flag.seeded` row with its starting values, so its history doesn't
+    // start empty. Backfills flags seeded before the row existed; a rerun adds nothing.
+    const seededFlags = await tx.select({ id: flags.id, key: flags.key }).from(flags).where(inArray(flags.key, SEED_FLAGS.map((f) => f.key)));
+    const flagsWithRow = new Set(
+      (
+        await tx
+          .select({ entityId: auditLog.entityId })
+          .from(auditLog)
+          .where(and(eq(auditLog.entityType, "flag"), eq(auditLog.action, "flag.seeded")))
+      ).map((r) => r.entityId),
+    );
+    const bySeedKey = new Map(SEED_FLAGS.map((f) => [f.key, f]));
+    const unseeded = seededFlags.filter((f) => !flagsWithRow.has(f.id));
+    if (unseeded.length > 0) {
+      await tx.insert(auditLog).values(
+        unseeded.map((f) => {
+          const s = bySeedKey.get(f.key)!;
+          return {
+            actorSubject: "seed",
+            action: "flag.seeded",
+            entityType: "flag",
+            entityId: f.id,
+            reason: "Starting values (seeded dummy data)",
+            after: { key: f.key, dev: s.dev, staging: s.staging, prod: s.prod },
+          };
+        }),
+      );
+    }
+
     // audit_log is append-only, so sample rows are inserted once and never replaced.
     const existing = await tx
       .select({ id: auditLog.id })

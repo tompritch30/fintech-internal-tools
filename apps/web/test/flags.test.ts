@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 import { ConflictError, ForbiddenError, SelfApprovalError, ValidationError, permissionsFor } from "@fit/core";
 import { auditLog, createDb, flagChanges, flagValues, flags, type FlagEnvironment } from "@fit/db";
-import { SEED_FLAGS } from "@fit/db/seed";
+import { SEED_FLAGS, seed } from "@fit/db/seed";
 import { expectDbError, makeUser, ownerDb } from "../../../packages/core/test/helpers/db.ts";
 import { TEST_DATABASE_URL } from "../../../packages/core/test/helpers/env.ts";
 import {
@@ -609,5 +609,41 @@ describe("rule 7: services read current values from a read-only endpoint", () =>
     expect(loadFlagsServiceConfig({ FLAGS_SERVICE_TOKEN: "  " })).toEqual({ serviceToken: null });
     expect(loadFlagsServiceConfig({ FLAGS_SERVICE_TOKEN: TOKEN })).toEqual({ serviceToken: TOKEN });
     expect(() => loadFlagsServiceConfig({ FLAGS_SERVICE_TOKEN: "short" })).toThrow(/at least 16/);
+  });
+});
+
+describe("seeded flags: history starts with their seeded values", () => {
+  const seededRows = async (flagIds: string[]) =>
+    owner.select().from(auditLog).where(and(eq(auditLog.entityType, "flag"), eq(auditLog.action, "flag.seeded"), inArray(auditLog.entityId, flagIds)));
+  const seededFlagIds = async () =>
+    (await owner.select({ id: flags.id }).from(flags).where(inArray(flags.key, SEED_FLAGS.map((f) => f.key)))).map((f) => f.id);
+
+  it("every seeded flag's history ends with one flag.seeded row holding its starting values", async () => {
+    await seed(owner);
+    const ids = await seededFlagIds();
+    expect(ids).toHaveLength(SEED_FLAGS.length);
+    for (const id of ids) {
+      const history = await flagHistory(db, id);
+      expect(history.at(-1)).toMatchObject({ action: "flag.seeded", entityType: "flag", entityId: id });
+    }
+    const [first] = SEED_FLAGS;
+    const [flag] = await owner.select().from(flags).where(eq(flags.key, first!.key));
+    const [row] = await seededRows([flag!.id]);
+    expect(row?.after).toMatchObject({ key: first!.key, dev: first!.dev, staging: first!.staging, prod: first!.prod });
+  });
+
+  it("running the seed again adds no second flag.seeded row", async () => {
+    await seed(owner);
+    await seed(owner);
+    const ids = await seededFlagIds();
+    expect(await seededRows(ids)).toHaveLength(ids.length);
+  });
+
+  it("a flag the seed didn't create gets no flag.seeded row", async () => {
+    const flag = await newFlag();
+    await seed(owner);
+    expect(await seededRows([flag.id])).toEqual([]);
+    // Positive control: the seeded flags do have theirs.
+    expect((await seededRows(await seededFlagIds())).length).toBe(SEED_FLAGS.length);
   });
 });
