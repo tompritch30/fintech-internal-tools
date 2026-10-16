@@ -26,7 +26,7 @@ export default async function FlagPage({ params }: { params: Promise<{ flagId: s
   const history = await flagHistory(db, flag.id);
   const prod = flag.values.prod;
   const pending = flag.pendingChange;
-  const { actions, waiting } = flagActions(user, { prodEnabled: prod.enabled, pending });
+  const { actions, waiting } = flagActions(user, { prodEnabled: prod.enabled, prodVersion: prod.version, pending });
 
   return (
     <div className="stack">
@@ -40,8 +40,10 @@ export default async function FlagPage({ params }: { params: Promise<{ flagId: s
       <ActionPanel label="Flag actions" waiting={waiting}>
         {actions.length > 0 ? (
           <div className="flex w-full flex-col gap-4">
-            {pending ? <p className="text-sm text-muted-foreground">{waiting} You can still turn the flag off in prod.</p> : null}
-            {actions.includes("approve") && pending ? <DecisionForms changeId={pending.id} version={pending.approval.version} /> : null}
+            {pending ? <p className="text-sm text-muted-foreground">{waiting}</p> : null}
+            {actions.includes("reject") && pending ? (
+              <DecisionForms changeId={pending.id} version={pending.approval.version} canApprove={actions.includes("approve")} />
+            ) : null}
             {actions.includes("kill") ? <KillSwitchForm flagId={flag.id} /> : null}
             {actions.includes("change")
               ? ENVIRONMENTS.filter((env) => !(env === "prod" && pending)).map((env) => (

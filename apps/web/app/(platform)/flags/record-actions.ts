@@ -18,7 +18,7 @@ export interface FlagAvailableActions {
 
 export function flagActions(
   user: Viewer,
-  flag: { prodEnabled: boolean; pending: { requestedBy: string } | null },
+  flag: { prodEnabled: boolean; prodVersion: number; pending: { requestedBy: string; baseVersion: number } | null },
 ): FlagAvailableActions {
   const actions: FlagAction[] = [];
   if (user.permissions.has("flags:request")) {
@@ -26,15 +26,21 @@ export function flagActions(
     if (flag.prodEnabled) actions.push("kill");
   }
   const { pending } = flag;
-  if (pending && user.permissions.has("flags:approve") && pending.requestedBy !== user.id) actions.push("approve", "reject");
+  // Prod moved on (e.g. the kill switch) since the request: the server refuses approval, so only reject is left.
+  const stale = pending !== null && pending.baseVersion !== flag.prodVersion;
+  if (pending && user.permissions.has("flags:approve") && pending.requestedBy !== user.id) {
+    actions.push(...(stale ? (["reject"] as const) : (["approve", "reject"] as const)));
+  }
   let waiting = "No changes pending. Changing a flag needs the analyst role.";
   if (pending) {
-    waiting =
-      pending.requestedBy === user.id
+    waiting = stale
+      ? "Prod changed after this was requested, so it can't be approved. Reject it so it can be requested again."
+      : pending.requestedBy === user.id
         ? "You requested this prod change. Waiting for a different approver."
         : actions.includes("approve")
           ? "A prod change is waiting for your decision."
           : "A prod change is waiting for approval.";
+    if (actions.includes("kill")) waiting += " You can still turn the flag off in prod.";
   }
   return { actions, waiting };
 }

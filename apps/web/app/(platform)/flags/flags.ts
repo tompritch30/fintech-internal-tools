@@ -57,6 +57,8 @@ export interface FlagChangeView {
   requestedBy: string;
   requestedByName: string;
   requestedAt: Date;
+  /** Prod's version when requested; approval is refused once prod has moved past it. */
+  baseVersion: number;
   approval: { id: string; version: number; status: string };
 }
 
@@ -198,6 +200,7 @@ async function loadChanges(db: Executor, where: SQL | undefined): Promise<FlagCh
     requestedBy: c.requestedBy,
     requestedByName,
     requestedAt: c.requestedAt,
+    baseVersion: c.baseVersion,
     approval: { id: c.approvalRequestId, version: approvalVersion, status: approvalStatus },
   }));
 }
