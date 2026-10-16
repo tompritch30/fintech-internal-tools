@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { and, eq } from "drizzle-orm";
+import { and, count, eq, gt, sql } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 import { ConflictError, ForbiddenError, SelfApprovalError, ValidationError, permissionsFor } from "@fit/core";
 import { auditLog, createDb, flagChanges, flagValues, flags, type FlagEnvironment } from "@fit/db";
@@ -597,7 +597,18 @@ describe("rule 7: services read current values from a read-only endpoint", () =>
   });
 
   it("caps refused-call audit rows per minute, marking the row that hits the cap, so an unauthenticated caller can't flood the log", async () => {
-    const recent = (await serviceDenials()).filter((r) => r.occurredAt.getTime() > Date.now() - 50_000).length;
+    // same window and clock as the handler, so rows ageing out can't skew the count
+    const [{ n: recent } = { n: 0 }] = await db
+      .select({ n: count() })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.action, "access.denied"),
+          eq(auditLog.entityType, "resource"),
+          eq(auditLog.entityId, "api:flags"),
+          gt(auditLog.occurredAt, sql`clock_timestamp() - interval '1 minute'`),
+        ),
+      );
     const before = (await serviceDenials()).length;
     const options = { deniedAuditPerMinute: recent + 2 };
     for (let i = 0; i < 5; i++) {

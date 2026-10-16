@@ -483,7 +483,7 @@ No KYC fix PR: no KYC attack worked. The KYC gaps below are tracked here, not fi
   `metadata: { required: "flags:service-token", token: "missing" | "invalid" }`. The presented token
   is never stored. The caller is unauthenticated, so rows are capped at 30 per rolling minute (counted
   under an advisory lock) to stop anyone flooding the append-only log. Past the cap the caller still
-  gets 401. The row that reaches the cap is marked `capped: true`, so the log shows refusals carried on unrecorded, and later ones go to the server log (Devin Review on #35 flagged that a silent cap would hide them). The right token always works.
+  gets 401. The row that reaches the cap is marked `capped: true`, so the log shows refusals carried on unrecorded (Devin Review on #35 flagged that a silent cap would hide them; logging each one to stdout instead just moves the flood, so it isn't done). The right token always works.
   Red tests: "records a refused service call as an access.denied row, without the presented token"
   (positive control: an accepted call writes no row) and "caps refused-call audit rows per minute,
   marking the row that hits the cap, so an unauthenticated caller can't flood the log" (positive control: the right token still works past

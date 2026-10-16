@@ -14,8 +14,8 @@ function tokenMatches(header: string | null, expected: string): boolean {
 
 const DENIED_RESOURCE = "api:flags";
 /**
- * Refusals audited per rolling minute. The row that reaches it is marked `capped: true`; past it the
- * caller still gets 401 and the refusal goes to the server log instead of a new row.
+ * Refusals audited per rolling minute. The row that reaches it is marked `capped: true`, so the log
+ * shows refusals carried on; past it the caller still gets 401 but no new row.
  */
 export const DENIED_AUDIT_PER_MINUTE = 30;
 
@@ -38,10 +38,7 @@ async function auditRefusal(db: Db, token: "missing" | "invalid", limit: number)
         ),
       );
     const n = recent?.n ?? 0;
-    if (n >= limit) {
-      console.warn(`flags service: refused call not audited (${limit} refusals already recorded this minute)`);
-      return;
-    }
+    if (n >= limit) return;
     await withAudit(
       tx,
       {
