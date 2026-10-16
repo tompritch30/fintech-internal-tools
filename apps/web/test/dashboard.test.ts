@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 import { requirePermission } from "@fit/core";
-import { createDb, kycCases, payments } from "@fit/db";
+import { and, eq } from "drizzle-orm";
+import { createDb, flagValues, flags, kycCases, payments } from "@fit/db";
 import { makeUser, ownerDb } from "../../../packages/core/test/helpers/db.ts";
 import { TEST_DATABASE_URL } from "../../../packages/core/test/helpers/env.ts";
 import { awaitingMyApproval, myRecentActivity } from "../app/(platform)/dashboard.ts";
+import { changeFlag } from "../app/(platform)/flags/flags.ts";
 import { claimCase, decideCase } from "../app/(platform)/kyc/kyc.ts";
 import { requestRefund } from "../app/(platform)/refunds/refunds.ts";
 
@@ -90,6 +92,20 @@ describe("dashboard: recent activity", () => {
     expect(actions).not.toContain("access.denied");
     // Positive control: the user's own refund request is still there.
     expect(actions).toContain("refund.requested");
+  });
+
+  it("names each record in plain words and links a flag change to its flag", async () => {
+    const [flag] = await owner.insert(flags).values({ key: `dash-${randomUUID().slice(0, 8)}`, description: "Dashboard test flag" }).returning();
+    if (!flag) throw new Error("flag insert failed");
+    await owner.insert(flagValues).values((["dev", "staging", "prod"] as const).map((environment) => ({ flagId: flag.id, environment, enabled: false, rolloutPercentage: 0 })));
+    const [dev] = await owner.select().from(flagValues).where(and(eq(flagValues.flagId, flag.id), eq(flagValues.environment, "dev")));
+    const engineer = await as(["analyst"]);
+    await changeFlag(engineer, { flagId: flag.id, environment: "dev", enabled: true, rolloutPercentage: 10, reason: "Dashboard test", expectedVersion: dev?.version ?? 0, changeId: randomUUID() });
+    const change = (await myRecentActivity(db, engineer.user)).find((a) => a.action === "flag.value_changed");
+    expect(change).toMatchObject({ record: `Feature flag ${flag.id.slice(0, 8)}`, href: `/flags/${flag.id}` });
+    // Positive control: refunds keep their link and read as "Refund …", not the raw entity type.
+    const { maker, refund } = await pendingRefundBy(["analyst"]);
+    expect((await myRecentActivity(db, maker.user)).find((a) => a.action === "refund.requested")).toMatchObject({ record: `Refund ${refund.id.slice(0, 8)}`, href: `/refunds/requests/${refund.id}` });
   });
 
   it("never shows another user's actions", async () => {

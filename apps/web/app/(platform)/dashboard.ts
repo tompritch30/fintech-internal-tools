@@ -85,6 +85,18 @@ const RECORD_LINKS: Record<string, { permission: string; href: (id: string) => s
   refund: { permission: "refunds:read", href: (id) => `/refunds/requests/${id}` },
   payment: { permission: "refunds:read", href: (id) => `/refunds/payments/${id}` },
   kyc_case: { permission: "kyc:read", href: (id) => `/kyc/cases/${id}` },
+  flag: { permission: "flags:read", href: (id) => `/flags/${id}` },
+};
+
+/** Plain words for audit entity types; anything unlisted shows its raw type. */
+const RECORD_LABELS: Record<string, string> = {
+  refund: "Refund",
+  payment: "Payment",
+  kyc_case: "KYC case",
+  kyc_document: "KYC document",
+  flag: "Feature flag",
+  approval_request: "Approval",
+  demo_record: "Demo record",
 };
 
 /**
@@ -104,7 +116,7 @@ export async function myRecentActivity(db: Db, user: Viewer): Promise<ActivityIt
       id: r.id,
       occurredAt: r.occurredAt,
       action: r.action,
-      record: `${r.entityType} ${r.entityId.length > 24 ? r.entityId.slice(0, 8) : r.entityId}`,
+      record: `${RECORD_LABELS[r.entityType] ?? r.entityType} ${r.entityId.length > 24 ? r.entityId.slice(0, 8) : r.entityId}`,
       href: link && user.permissions.has(link.permission as never) ? link.href(r.entityId) : null,
     };
   });
