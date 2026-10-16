@@ -137,8 +137,8 @@ export const SEED_FLAGS: readonly { key: string; description: string; dev: SeedV
 
 /**
  * Gives each seeded flag one `flag.seeded` row with its starting values, so its history doesn't start
- * empty. Backfills flags seeded before the row existed; a rerun adds nothing. The row is dated at the
- * flag's creation, so it stays below any later change in the history.
+ * empty. Backfills flags seeded before the row existed; a rerun adds nothing. The row is dated when it is
+ * written (audit_log is never backdated); `after.createdAt` holds when the flag was created.
  */
 export async function recordSeededFlags(
   tx: Executor,
@@ -168,13 +168,13 @@ export async function recordSeededFlags(
   if (missing.length === 0) return;
   await tx.insert(auditLog).values(
     missing.map(({ flag, s }) => ({
-      occurredAt: flag.createdAt,
       actorSubject: "seed",
       action: "flag.seeded",
       entityType: "flag",
       entityId: flag.id,
       reason: "Starting values (seeded dummy data)",
-      after: { key: flag.key, dev: s.dev, staging: s.staging, prod: s.prod },
+      // audit_log is never backdated: occurred_at is when this row was written, createdAt is when the flag was.
+      after: { key: flag.key, createdAt: flag.createdAt.toISOString(), dev: s.dev, staging: s.staging, prod: s.prod },
     })),
   );
 }
