@@ -53,7 +53,7 @@
     },
     {
       "title": "Deck and submission",
-      "purpose": "The presentation/ Marp workspace (slides.md, themes/cognition.css, scripts/check.mjs layout checks, ECharts chart specs) and the submission files in docs/submission/ (deck.pdf, KEY-DECISIONS.md, EVIDENCE.md). Explain how to run the slide check and export.",
+      "purpose": "The presentation/ Marp workspace (slides.md, themes/cognition.css, scripts/check.mjs layout checks, ECharts chart specs) and the submission files: docs/submission/deck.pdf, docs/submission/EVIDENCE.md and KEY-DECISIONS.md at the repo root. Explain how to run the slide check and export.",
       "parent": null
     }
   ]

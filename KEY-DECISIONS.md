@@ -8,7 +8,7 @@ Building the screens is the easy part of replacing Power Apps. The real question
 
 ## What I built, and what I left out
 
-One shared platform (sign-in, permissions, maker-checker approvals, masking with a reason to reveal, an append-only audit log) and all three of the client's tools on top of it. I worked with Devin, back and forth, through refunds first, had it write a playbook from that session, then built the KYC queue and flag admin from a GitHub issue and the playbook - each in their own session each. I built all three, not just one, so I could measure what the next tool costs.
+One shared platform (sign-in, permissions, maker-checker approvals, masking with a reason to reveal, an append-only audit log) and all three of the client's tools on top of it. I worked with Devin, back and forth, through refunds first, had it write a playbook from that session (in docs/playbooks), then built the KYC queue and flag admin from a GitHub issue and the playbook - each in their own session each. I built all three, not just one, so I could measure what the next tool costs.
 
 I left out a real Entra tenant (Keycloak stands in), hosting, a real payment provider, the Dataverse migration and any visual builder. There isn't much benefit for POC.
 
@@ -31,11 +31,11 @@ It was the mainstream choices on purpose: they're what a fintech's engineers can
 
 ## Devin costs
 
-- Devin cost per tool: refunds $23.94 with me steering, then KYC $7.30 and flags $8.26 from the playbook. Shared platform $33.87. About $106 for the build, $132 including security review, QA and deck work. So I could show the cost effectiveness of using Devin and grounding for a VP presentation.
+- Devin cost per tool: refunds $23.94 with me steering, then KYC $7.30 and flags $8.26 from the playbook. Shared platform $33.87. About $106 for the build, $132 including security review, QA and deck work. So I could show the cost effectiveness of using Devin and grounding for a VP presentation. I tracked it in docs/DEVIN-LOG.md
 
 ## Where Devin needed me
 
-I ran a separate Devin session to attack the build. Four attacks worked. For example, my spec said refunds over £250 need a second approver, and Devin built exactly that, so an analyst could refund £1,000 as four £250 refunds with nobody approving. The security review caught it, but the tests didn't. The other three were bulk unmasking with no limit (now capped at 20 an hour) and two kinds of refused request that left no audit trace. All four were fixed before merge.
+I ran a separate Devin session to attack the build. Four attacks worked. For example, my spec said refunds over £250 need a second approver, and Devin built exactly that, so an analyst could refund £1,000 as four £250 refunds with nobody approving. The security review caught it, but the tests didn't. The other three were bulk unmasking with no limit (now capped at 20 an hour) and two kinds of refused request that left no audit trace. All four were fixed before merge. Can see in SECURITY-REVIEW.md
 
 I made a mistake when I merged a core pull request with a security thread still open, so I changed it so open threads block core merges to prevent that happening on core.
 
