@@ -7,7 +7,7 @@ import { Input } from "./Input.tsx";
 /**
  * A masked value with one Reveal button. The button opens a small dialog that asks for the
  * reason; the server action checks the permission, records the reason in the audit log and
- * returns the value. `display="block"` shows long content (e.g. a document) below the button.
+ * returns the value, which replaces the masked one. `display="block"` shows long content (e.g. a document) below the button.
  */
 export function RevealButton({
   what,
@@ -30,7 +30,7 @@ export function RevealButton({
 }) {
   const id = useId();
   return (
-    <div className={display === "inline" ? "flex flex-wrap items-center gap-2" : "flex flex-col gap-2"}>
+    <div className={display === "inline" ? "flex flex-wrap items-center gap-2 [&:has([data-revealed])>[data-masked]]:hidden" : "flex flex-col gap-2"}>
       <ActionDialog
         label={label}
         ariaLabel={`${label} ${what}`}
@@ -42,7 +42,7 @@ export function RevealButton({
         onResult={(state) =>
           display === "inline" ? (
             <span role="status" className="text-sm">
-              <strong data-testid={`revealed-${what.replace(/\W+/g, "-")}`}>{state.revealed}</strong>{" "}
+              <strong data-revealed data-testid={`revealed-${what.replace(/\W+/g, "-")}`}>{state.revealed}</strong>{" "}
               <span className="text-xs text-muted-foreground">(audited)</span>
             </span>
           ) : (
@@ -54,7 +54,7 @@ export function RevealButton({
       >
         <Input id={`${id}-reason`} name="reason" label="Reason" required minLength={minReasonLength} maxLength={500} autoFocus />
       </ActionDialog>
-      {masked !== undefined && display === "inline" ? <span className="order-first">{masked}</span> : null}
+      {masked !== undefined && display === "inline" ? <span data-masked className="order-first">{masked}</span> : null}
     </div>
   );
 }

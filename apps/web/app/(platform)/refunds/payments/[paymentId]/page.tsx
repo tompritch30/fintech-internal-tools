@@ -6,7 +6,7 @@ import { ActionDialog, ActionPanel, Input, RecordHeader, RecordSection, RevealBu
 import { withActorNames } from "../../../../../lib/actor-names.ts";
 import { getDb, requirePagePermission } from "../../../../../lib/auth.ts";
 import { requestRefundAction, revealEmailAction, revealNameAction } from "../../actions.ts";
-import { formatPence, formatWhen, statusOf } from "../../format.ts";
+import { formatPence, formatWhen, paymentStatus, statusOf } from "../../format.ts";
 import { paymentActions } from "../../record-actions.ts";
 import { getPaymentView, listRefundsForPayment, loadRefundConfig, paymentHistory, type RefundView } from "../../refunds.ts";
 
@@ -37,7 +37,6 @@ export default async function PaymentPage({ params }: { params: Promise<{ paymen
   const { approvalThresholdPence } = loadRefundConfig();
   const { actions, waiting } = paymentActions(user, payment);
   const canReveal = user.permissions.has("pii:unmask");
-  const fullyRefunded = payment.refundedPence === payment.amountPence;
   const masked = (value: string, what: string, action: typeof revealNameAction) =>
     canReveal ? (
       <RevealButton what={what} masked={value} action={action} hidden={{ paymentId: payment.id }} minReasonLength={MIN_UNMASK_REASON_LENGTH} />
@@ -50,7 +49,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ paymen
       <RecordHeader
         back={{ href: "/refunds", label: "Payments" }}
         title={`${payment.reference} · ${formatPence(payment.amountPence)}`}
-        status={fullyRefunded ? { label: "Fully refunded", kind: "done" } : { label: "Captured" }}
+        status={paymentStatus(payment)}
         owner={payment.merchant}
         ownerLabel="Merchant"
       />

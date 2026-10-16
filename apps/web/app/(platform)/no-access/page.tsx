@@ -1,14 +1,12 @@
 import { EmptyState } from "@fit/ui";
 import { requireUser } from "../../../lib/auth.ts";
+import { noAccessMessage } from "../../../lib/no-access.ts";
 
 export default async function NoAccessPage() {
-  const user = await requireUser();
+  const { title, body } = noAccessMessage(await requireUser());
   return (
-    <EmptyState title="You don't have access to this page">
-      <p>
-        Signed in as {user.username}. Ask your manager to request the right role in Entra ID. This attempt has been
-        recorded.
-      </p>
+    <EmptyState title={title}>
+      <p>{body}</p>
     </EmptyState>
   );
 }
