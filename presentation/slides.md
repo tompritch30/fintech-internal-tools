@@ -1,196 +1,219 @@
 ---
 marp: true
-theme: consultancy
+theme: cognition
 size: 16:9
 paginate: true
-header: Cognition · Draft
+header: '[![Cognition](assets/cognition-mark.svg) Cognition](https://cognition.com)'
 title: Power Apps or build with Devin (draft)
 ---
 
 <!--
-DRAFT DECK, first pass. Storyline from docs/submission/GHOST-DECK.md; evidence from
-docs/EVALUATION.md (draft, PR #20), docs/research/research.md [S#] and docs/DEVIN-LOG.md (row N).
-Rules: .agents/skills/slides/SKILL.md. Unsourced numbers are [bracketed placeholders].
+DRAFT DECK. Main deck: scene, business value, demo, cost. Detail and sources in the appendix.
+Evidence: docs/research/research.md, docs/DEVIN-LOG.md, docs/SECURITY-REVIEW.md, devin.ai/pricing
+(checked 2026-10-15). Rules: .agents/skills/slides/SKILL.md. Anything not measured is said so.
 -->
 
-<!-- _footer: "Source: $250K client-supplied; $20/user/month list price [S1]; Feb 2027 [S16]" -->
+<!-- _class: title -->
+<!-- _paginate: skip -->
 
-# Power Apps bills per user, so moving one app frees no seats
+<img class="logo" src="assets/cognition-mark.svg" alt="Cognition">
 
-- $250K is about 1,042 seats at $20 a month
-- More apps cost licensed users nothing extra
-- Feb 2027: unlicensed users get blocked
+# Power Apps or build with Devin
 
-<div class="visual flow"><div>Uses 3 apps<br>Pays 1 seat</div><div>2 apps move<br>Still pays</div><div>All 3 move<br>Seat freed</div></div>
+Cost and controls, tested on three internal apps
+
+<img class="art" src="assets/title-art-dark.svg" alt="Wireframe of the shared platform core with three apps plugged in">
+
+<!-- _footer: "Prepared for the VP of Engineering · October 2026" -->
 
 <!--
-DRAFT.
-VP question: If we build our own apps, do we stop paying $250K?
-What I'll say: Premium is per user with unlimited apps, so the licence saving isn't automatic.
-A seat is only freed when every app that person uses has moved. 1,042 = $250,000 ÷ ($20 × 12),
-far more than the 60 engineers, so most users aren't engineers. That assumes the whole $250K is
-Premium seats at list price (ASM-1). From February 2027, people using apps in managed
-environments without Premium get blocked [S16], which could mean more seats, not fewer.
+DRAFT. Title slide. The drawing is the idea in one picture: one shared core (sign-in,
+permissions, audit, approvals, masking) and each business app plugs into it.
 -->
 
 ---
 
-<!-- _footer: "Source: Microsoft Learn [S3] [S5] [S18]; EVALUATION §5" -->
+<!-- _footer: "Source: client spend figure; Microsoft Power Apps pricing and licensing pages" -->
 
-# On refunds and KYC, Power Apps leaves the key controls to us
+###### 01 · The scene
 
-| Control | Power Apps | What we must add |
+# Power Apps bills per user, so moving one app frees no seats
+
+- $250K a year is about 1,042 seats at $20 a month
+- Extra apps cost a licensed user nothing more
+- From February 2027, unlicensed users are blocked
+
+<div class="visual flow"><div><small>Today</small>Uses 3 apps, pays 1 seat</div><div><small>2 apps move</small>Still pays 1 seat</div><div><small>All 3 move</small>Seat freed</div></div>
+
+<!--
+DRAFT.
+VP question: If we build our own apps, do we stop paying $250K?
+What I'll say: Premium is per user with unlimited apps, so the saving isn't automatic. A seat is
+only freed when every app that person uses has moved. 1,042 = $250,000 ÷ ($20 × 12), and assumes
+the whole $250K is Premium seats at list price. From February 2027, people using apps in managed
+environments without a licence are blocked, which could mean more seats, not fewer.
+-->
+
+---
+
+<!-- _footer: "Source: Microsoft Learn on Approvals, column security and auditing; our database rules" -->
+
+###### 02 · Business value
+
+# Our build enforces the controls Power Apps leaves to each flow
+
+| Control | Power Apps | *Our build* |
 |---|---|---|
-| No self-approval | No built-in check; requester is free text [S18] | Build and test it in every flow |
-| Masking customer data | System admins bypass column security [S5] | Accept that admins see it |
-| Audit evidence | Change history kept, no native export [S3] | Pull it through the API |
+| No self-approval | No built-in check | Database rule, tested |
+| Masked customer data | Admins bypass column security | Masked on the server, no bypass |
+| Audit evidence | History kept, no native export | Append-only, same transaction |
 
 <!--
 DRAFT.
 VP question: Why not keep everything on Power Apps?
 What I'll say: these are the controls an auditor asks about for money movement and identity data.
 Power Apps can get there, but each is left to whoever builds the flow, and the admin bypass on
-masking can't be configured away. Non-delegable queries also look at only the first 500 rows
-(2,000 at most) and return wrong results without an error [S2].
+masking can't be configured away. In our build the database refuses the bad write.
 -->
 
 ---
 
-<!-- _footer: "Source: DEVIN-LOG rows 16, 18; docs/SECURITY-REVIEW.md" -->
+<!-- _footer: "Source: our dev log (refunds session) and our security review. The demo uses dummy data only" -->
 
-# Devin built refunds and KYC with controls the database enforces
+###### 03 · The demo
 
-- No self-approval: checked in code and by a database rule
-- Refunds: 34 rule tests, 30 shown failing first
-- Attack review: 3 of 12 areas broke; each fixed with a test
+# In the demo, a senior user can't approve their own refund
 
-<div class="visual placeholder">[Screenshot: demo still, the senior user refused when approving their own refund. Video not recorded yet]</div>
+- Sign-in through Keycloak, standing in for Entra
+- 30 of 34 refund rule tests shown failing first
+- Our attack review broke 3 areas; each is fixed
+
+<div class="visual placeholder">Demo still goes here once the video is recorded</div>
 
 <!--
 DRAFT.
 VP question: Does it work, and can we trust code Devin wrote?
-What I'll say: sign-in through an identity provider, permission checks on the server, an audit
-row in the same transaction as every change, and a database that refuses to edit or delete audit
-rows. Data is fake, Keycloak stands in for Entra. Every control is self-built, so assurance comes
-from our tests and reviews. The hostile review broke three things: bulk unmasking, splitting a
-refund to dodge approval, and unrecorded denials. Each got a failing test and a fix.
+What I'll say: walk the refund flow: request, try to self-approve, refused, a second approver
+approves, the audit row appears. Data is fake. Every control is self-built, so assurance comes
+from our tests and reviews; the hostile review broke three things and each got a failing test
+and a fix (appendix).
 -->
 
 ---
 
-<!-- _footer: "Source: $40/seat/month [S21] [S22]; $250K client-supplied; $74.48 DEVIN-LOG row 21" -->
+<!-- _footer: "Source: client figure; Microsoft and 2Data on price; devin.ai/pricing, 15 Oct 2026" -->
 
-# Devin seats cost 11.5% of today's spend; review time is the open cost
+###### 04 · Cost
 
-- 60 Teams seats: $28,800 a year
-- Whole proof of concept, on-demand: $74.48
-- Usage, review hours, hosting: [not measured]
+# Power Apps costs $250K a year; the pilot measures cost per app
 
-![Cost per year: Power Apps licences versus Devin seats; other costs not measured](assets/charts/cost.svg)
+| Cost | What we know | Measured in the pilot |
+|---|---|---|
+| Power Apps today | $250,000 a year | Who uses which app |
+| Power Apps next year | One advisor reports $20 → $22 from January 2027 | Seats needed once unlicensed users are blocked |
+| Building each app | Devin Teams: $80 a month plus $40 per seat | Devin usage and review hours per app |
 
 <!--
 DRAFT.
-VP question: What does the build path cost us?
-What I'll say: 60 × $40 × 12 = $28,800; $28,800 ÷ $250,000 = 11.5% (EVALUATION §3.4). Usage past
-the plan quota is billed at API pricing and the rate isn't published [S21], so measured spend is
-the best evidence: $74.48 on-demand across every session up to row 21, not split per app. The
-scarce input is engineer review time; I haven't measured it, and hosting isn't costed. No
-break-even claim.
--->
-
----
-
-<!-- _footer: "Source: EVALUATION §7; LaunchDarkly [S13]; Unleash [S14]" -->
-
-# Build refunds and KYC, buy feature flags, keep the rest on Power Apps
-
-| App | Decision | Before we switch off the Power App |
-|---|---|---|
-| Refunds | **Build** (built) | Ops sign off a parallel run |
-| KYC review | **Build** (built) | An auditor accepts five-year retention |
-| Feature flags | **Buy** | Price LaunchDarkly or Unleash |
-| All other apps | **Keep** | List which users use which apps |
-
-<!--
-DRAFT.
-VP question: What should I decide today?
-What I'll say: the case for building is controls, not licences. Low-risk apps cost nothing extra
-to keep on Premium. KYC records are kept five years after the relationship ends [S11] [S12]; an
-auditor must accept our retention guard before cut-over. We did build flags (PR #24) to trial
-SWE-2 on a low-risk app, but with mature products available I'd still buy.
-Next steps are in the appendix.
+VP question: What does each path cost us?
+What I'll say: today's figure is yours. Microsoft's own pages still show $20; the $22 is a
+secondary source, so it isn't in any sum. The build side is not one seat per engineer: a small
+team builds and reviews. Devin's list price is from devin.ai/pricing on 15 October 2026; usage
+past the included quota is billed at API pricing, which the page doesn't state. The whole proof
+of concept used $74.48 of on-demand usage, not split by app. No break-even claim until the pilot
+fills the right-hand column.
 -->
 
 ---
 
 <!-- _class: appendix -->
-<!-- _footer: "Source: docs/research/research.md; docs/DEVIN-LOG.md" -->
+<!-- _footer: "Source: our dev log, refunds session" -->
 
-# Appendix: every number in the deck comes from these sources
+###### Appendix
 
-| Ref | Source | Used on |
-|---|---|---|
-| S1, S20 | Microsoft, Power Apps pricing and licensing FAQ | 1, 4 |
-| S3, S5, S18 | Microsoft Learn: auditing, column security, Approvals connector | 2 |
-| S16 | Microsoft Learn: managed environment licensing | 1 |
-| S21, S22 | Cognition: Devin pricing and self-serve billing | 4 |
-| S11, S12, S13, S14 | 31 CFR 1020.220; UK MLR 2017 reg. 40; LaunchDarkly; Unleash | 5 |
-| Client | $250K a year on Power Apps; about 60 engineers (not verified) | 1, 4 |
-| Our log | Devin spend $74.48 (row 21); tests and reviews (rows 16, 18) | 3, 4 |
+# 30 of 34 refund rule tests were shown failing before the code
+
+![Refunds app: 34 rule tests written, 30 shown failing first](assets/charts/refund-tests.svg)
 
 <!--
-DRAFT. Only if asked. Full URLs and quotes are in docs/research/research.md.
+DRAFT. Only if asked. Test-first is the main evidence that the rules are real, not decoration.
 -->
 
 ---
 
 <!-- _class: appendix -->
-<!-- _footer: "Source: EVALUATION §3; [S1] [S21] [S22]; DEVIN-LOG row 21" -->
+<!-- _footer: "Source: client's spend figure; Microsoft pricing page; Thomas's billing total on 15 Oct 2026" -->
 
-# Appendix: what we know about cost, and what is still a placeholder
+###### Appendix
 
-| Line | Value | Working |
+# What we have measured on cost so far, and what we haven't
+
+| Item | Value | How we got it |
 |---|---|---|
-| Implied Power Apps seats | ≈1,042 | $250,000 ÷ ($20 × 12) |
-| Devin seats, 60 engineers | $28,800/year | 60 × $40 × 12 |
-| Devin on-demand to date | $74.48 | Billing running total, row 21 |
-| Devin cost per app | [not measured] | Needs a per-session billing split |
-| Review hours per app | [not measured] | Thomas to log |
-| Hosting per year | [not costed] | Not researched |
+| Implied Power Apps seats | About 1,042 | $250,000 ÷ ($20 × 12) |
+| Devin usage, whole proof of concept | $74.48 | Billing running total, all apps together |
+| Devin cost and review hours per app | Measured in the pilot | Needs a per-app billing split and a time log |
+| Hosting per year | Measured in the pilot | Not researched yet |
 
 <!--
-DRAFT. Show the arithmetic if asked. Break-even can't be stated until the bracketed lines are filled.
+DRAFT. Show the arithmetic if asked.
 -->
 
 ---
 
 <!-- _class: appendix -->
-<!-- _footer: "Source: docs/SECURITY-REVIEW.md §8b, §11b, §12; DEVIN-LOG row 18" -->
+<!-- _footer: "Source: our security review and dev log" -->
 
-# Appendix: our own attack review broke three controls, now fixed
+###### Appendix
 
-| Attack | What broke | Fix (PR) |
+# Our own attack review broke three controls, now fixed
+
+| Attack | What broke | Fix |
 |---|---|---|
-| Bulk unmasking | 50 of 50 emails revealed in 1 second | 20 reveals per hour per user (#17) |
-| Refund splitting | £1,000 refunded as four £250 refunds, no approver | Unapproved total per payment capped (#18) |
-| Hiding denials | A prefetch header skipped the denial audit row | Every page denial audited (#19) |
+| Bulk unmasking | 50 of 50 emails revealed in 1 second | 20 reveals per hour per user |
+| Refund splitting | £1,000 refunded as four £250 refunds | Unapproved total per payment capped |
+| Hiding denials | A prefetch header skipped the audit row | Every page denial audited |
 
 <!--
-DRAFT. Only if asked. Also: a core PR merged with a security finding still open (row 13); it was
-fixed and open review threads now block core merges.
+DRAFT. Only if asked. PRs #17, #18, #19.
 -->
 
 ---
 
 <!-- _class: appendix -->
-<!-- _footer: "Source: EVALUATION §7, §8" -->
+<!-- _footer: "Source: our evaluation's open items" -->
 
-# Appendix: three things to do before the next app
+###### Appendix
 
-1. Test sign-in against a real Entra tenant (owner: [TBD])
-2. Map which users use which apps (owner: [TBD])
-3. Measure review hours and Devin cost per app (owner: [TBD])
+# Three things to do before the next app
+
+| Step | Why | Owner |
+|---|---|---|
+| Test sign-in on a real Entra tenant | Keycloak stood in for Entra | [TBD] |
+| Map which users use which apps | Shows which seats a move frees | [TBD] |
+| Measure Devin cost and review hours per app | Fills the cost table | [TBD] |
 
 <!--
-DRAFT. Each step closes an open item in EVALUATION §8.
+DRAFT. Each step closes an open item in the evaluation.
+-->
+
+---
+
+<!-- _class: appendix -->
+
+<!-- _footer: "Source: every link and quote is in our research notes" -->
+
+###### Appendix · Sources
+
+# Every number in this deck comes from these sources
+
+| Source | What it gives us | Slides |
+|---|---|---|
+| Client, and Microsoft's pricing and licensing pages | $250K spend, $20 list price, February 2027 blocking | 1, 4, 6 |
+| Microsoft Learn, and 2Data licensing advisory | Control gaps; the reported $22 price | 2, 4 |
+| devin.ai/pricing, checked 15 October 2026 | Teams $80 a month plus $40 per seat | 4 |
+| Our dev log and security review | Tests, attack review, $74.48 usage | 3, 5–7 |
+
+<!--
+DRAFT. Full URLs and quotes are in docs/research/research.md.
 -->

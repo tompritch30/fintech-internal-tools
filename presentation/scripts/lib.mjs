@@ -6,7 +6,7 @@ import { Marp } from "@marp-team/marp-core";
 import { chromium } from "playwright";
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-export const THEME = join(ROOT, "themes", "consultancy.css");
+export const THEME = join(ROOT, "themes", "cognition.css");
 export const DIST = join(ROOT, "dist");
 
 // Slide size is fixed by the theme; screenshots and checks use the same pixels.
