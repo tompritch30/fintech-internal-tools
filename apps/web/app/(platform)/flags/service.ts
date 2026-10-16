@@ -115,7 +115,8 @@ export async function handleFlagsServiceRequest(
     deniedAuditWindowSeconds = DENIED_AUDIT_WINDOW_SECONDS,
   }: { deniedAuditPerMinute?: number; deniedAuditWindowSeconds?: number } = {},
 ): Promise<Response> {
-  await flushSuppressed(db, windowStartOf(Date.now(), deniedAuditWindowSeconds));
+  // a summary that can't be written stays queued for the next call; it never blocks the read
+  await flushSuppressed(db, windowStartOf(Date.now(), deniedAuditWindowSeconds)).catch(() => undefined);
   if (request.method !== "GET") return json(405, { error: "method not allowed" }, { allow: "GET" });
   if (!config.serviceToken) return json(503, { error: "the flags endpoint is not configured" });
   const authorization = request.headers.get("authorization");

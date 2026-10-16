@@ -492,6 +492,8 @@ No KYC fix PR: no KYC attack worked. The KYC gaps below are tracked here, not fi
   (positive control: an accepted call writes no row) and "caps refused-call audit rows per minute,
   marking the row that hits the cap, so an unauthenticated caller can't flood the log" (positive control: the right token still works past
   the cap) and "when the cap is hit, writes one summary row per window with how many refusals it didn't record".
+  A summary that can't be written stays queued for the next call and never blocks a valid read ("still serves a
+  valid caller when a pending summary row can't be written, and writes it on a later call").
 - **Controls:** CC7.2 · A.8.15, A.8.16 · PCI 10.2.1.4 (invalid access attempts).
 
 ### F10. Service endpoint authentication — holds (gap)
