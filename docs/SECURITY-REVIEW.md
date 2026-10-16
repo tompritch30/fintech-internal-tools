@@ -485,9 +485,9 @@ No KYC fix PR: no KYC attack worked. The KYC gaps below are tracked here, not fi
   counted under an advisory lock) to stop anyone flooding the append-only log. Past the cap the caller still
   gets 401. The row that reaches the cap is marked `capped: true`, and the refusals past it are counted and
   written as one `access.denied.suppressed` row per window (`metadata.suppressed`, `windowStart`, `windowEnd`),
-  so the log stays bounded and no refusal goes unrecorded (Devin Review on #35 flagged that a silent cap would
+  so the log stays bounded and refusals past the cap are still counted (Devin Review on #35 flagged that a silent cap would
   hide them; Thomas chose the summary row). The count is kept in memory until the window ends, so a crash
-  inside a window loses that window's count. The right token always works.
+  inside a window loses that window's count (see [Known limitations](#known-limitations-kyc-and-flags), L1). The right token always works.
   Red tests: "records a refused service call as an access.denied row, without the presented token"
   (positive control: an accepted call writes no row) and "caps refused-call audit rows per minute,
   marking the row that hits the cap, so an unauthenticated caller can't flood the log" (positive control: the right token still works past
@@ -524,6 +524,17 @@ No KYC fix PR: no KYC attack worked. The KYC gaps below are tracked here, not fi
 - **Gap:** only `flags:request` holders (analysts) can kill. An on-call user who holds only
   `approver` can't (probe: `ForbiddenError`). That's a policy choice to confirm, not a bypass.
 - **Controls:** CC7.4 (incident response), CC8.1 · A.5.26.
+
+## Known limitations (KYC and flags)
+
+Thomas accepted these three for the pilot: each is a rare edge case, and fixing it properly needs a migration.
+None of them lets a caller in or changes a flag. The worst case is a missing or split audit summary row.
+
+| | What can happen | How likely | Migration that would fix it |
+|---|---|---|---|
+| **L1. A suppressed-refusal count is lost on restart** (F9, [#35](https://github.com/tompritch30/fintech-internal-tools/pull/35)) | Refusals past the 30-a-minute cap are counted in the worker's memory and written as one `access.denied.suppressed` row when the window ends. If that worker crashes, restarts or is redeployed before then, the window's count is never written. The first 30 `access.denied` rows and the `capped: true` row are already in the log, so the burst is still visible, but not how big it was. | Low. It needs more than 30 refused calls in one minute (already a sign of attack) and the worker stopping inside that same 60-second window. | A per-window counter table (for example `denied_audit_window`: `resource`, `window_start` as primary key, `suppressed`, `flushed_at`). Over-cap refusals add to the counter in the same transaction as the cap check, so the count survives a restart, and any worker writes the summary row for a window that has ended. |
+| **L2. A window can have more than one summary row** (F9, #35) | Each worker keeps its own count, so N workers can write up to N summary rows for the same window. With one worker, a refusal that waits on the cap's advisory lock as the window closes can land after the summary was written, and gets its own small summary row with the same `windowStart`. No refusal is lost or counted twice. To get the total for a window, sum `metadata.suppressed` by `windowStart`. | Low. With one app process it needs a refusal in the last moment of a window that already hit the cap. With more processes it happens whenever more than one of them sees over-cap refusals in the same window. | The same counter table. A worker claims a window once (`UPDATE … SET flushed_at = now() WHERE flushed_at IS NULL RETURNING suppressed`) and writes exactly one summary row for it. |
+| **L3. A seeded flag can miss its `flag.seeded` row** ([#40](https://github.com/tompritch30/fintech-internal-tools/pull/40)) | When the seed backfills a database seeded before #40, it treats a flag as its own only if the key and description match `SEED_FLAGS` (or it created the flag in that run). If the description no longer matches (the seed list was edited, or the row was changed in the database), that flag gets no `flag.seeded` row. Its history then starts at its first edit, or shows "No history yet". Its values and every later change are still audited. | Very low. It only affects databases seeded before #40 whose seed hasn't run since the description stopped matching. Every current `SEED_FLAGS` description matches its seeded row. | A provenance column on `flags` (for example `seeded boolean not null default false`, or a `created_by`) set by the seed. The backfill then keys on that instead of the description. |
 
 ## Out of scope / not tested (KYC and flags)
 
