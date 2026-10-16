@@ -103,4 +103,4 @@ took, what it cost, what went wrong and what was corrected.
 
 ## Recommendation
 
-> **Placeholder: Thomas to write.**
+See [KEY-DECISIONS.md](KEY-DECISIONS.md) and the deck, [docs/submission/deck.pdf](docs/submission/deck.pdf).

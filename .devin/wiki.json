@@ -1,14 +1,14 @@
 {
   "repo_notes": [
     {
-      "content": "This repo is a proof of concept for one client question: keep paying for Power Apps, or build the internal apps that move money (refunds, KYC, feature flags) on a shared TypeScript/Postgres platform with Devin. Write for a reviewer reading it cold. Lead with that question and the evidence. Point to the existing docs (README.md, docs/ARCHITECTURE.md, docs/ADDING-AN-APP.md, docs/GOVERNANCE.md, docs/SECURITY-REVIEW.md, docs/DEVIN-LOG.md, docs/submission/KEY-DECISIONS.md, docs/submission/EVIDENCE.md, docs/submission/deck.pdf) instead of restating them. Never invent or estimate numbers (costs, counts, times). Quote a number only if it appears in those files, and name the file. All data is dummy data; the demo passwords are fake and local only.",
+      "content": "This repo is a proof of concept for one client question: keep paying for Power Apps, or build the internal apps that move money (refunds, KYC, feature flags) on a shared TypeScript/Postgres platform with Devin. Write for a reviewer reading it cold. Lead with that question and the evidence. Point to the existing docs (README.md, docs/ARCHITECTURE.md, docs/ADDING-AN-APP.md, docs/GOVERNANCE.md, docs/SECURITY-REVIEW.md, docs/DEVIN-LOG.md, KEY-DECISIONS.md, docs/submission/EVIDENCE.md, docs/submission/deck.pdf) instead of restating them. Never invent or estimate numbers (costs, counts, times). Quote a number only if it appears in those files, and name the file. All data is dummy data; the demo passwords are fake and local only.",
       "author": "Thomas"
     }
   ],
   "pages": [
     {
       "title": "What this repo answers",
-      "purpose": "The Power Apps vs build-with-Devin question, the recommendation, and where the evidence lives. Use README.md (The question, Recommendation), docs/submission/KEY-DECISIONS.md and docs/submission/deck.pdf with presentation/slides.md. Say what is production-shaped and what is mocked (README 'What's real and what's mocked').",
+      "purpose": "The Power Apps vs build-with-Devin question, the recommendation, and where the evidence lives. Use README.md (The question, Recommendation), KEY-DECISIONS.md and docs/submission/deck.pdf with presentation/slides.md. Say what is production-shaped and what is mocked (README 'What's real and what's mocked').",
       "parent": null
     },
     {
@@ -53,7 +53,7 @@
     },
     {
       "title": "Deck and submission",
-      "purpose": "The presentation/ Marp workspace (slides.md, themes/cognition.css, scripts/check.mjs layout checks, ECharts chart specs) and the submission files in docs/submission/ (deck.pdf, KEY-DECISIONS.md, EVIDENCE.md). Explain how to run the slide check and export.",
+      "purpose": "The presentation/ Marp workspace (slides.md, themes/cognition.css, scripts/check.mjs layout checks, ECharts chart specs) and the submission files: docs/submission/deck.pdf, docs/submission/EVIDENCE.md and KEY-DECISIONS.md at the repo root. Explain how to run the slide check and export.",
       "parent": null
     }
   ]
