@@ -6,7 +6,7 @@ import { auditLog, createDb, flags, kycCases, payments, users } from "@fit/db";
 import { seedKycCases } from "@fit/db/seed";
 import { makeUser, ownerDb } from "../../../packages/core/test/helpers/db.ts";
 import { TEST_DATABASE_URL } from "../../../packages/core/test/helpers/env.ts";
-import { csvCell, exportAudit, parseAuditFilters, searchAudit } from "../app/(platform)/audit/query.ts";
+import { csvCell, exportAudit, parseAuditFilters, recordLink, searchAudit, type AuditRow } from "../app/(platform)/audit/query.ts";
 import { requestRefund } from "../app/(platform)/refunds/refunds.ts";
 
 const db = createDb(TEST_DATABASE_URL);
@@ -143,8 +143,43 @@ describe("audit log: human record IDs, search and CSV export", () => {
   it("quotes CSV cells and stops spreadsheet formulas running", () => {
     expect(csvCell('said "no", twice')).toBe('"said ""no"", twice"');
     expect(csvCell("=HYPERLINK(1)")).toBe(`"'=HYPERLINK(1)"`);
-    for (const c of ["+", "-", "@", "\t", "\r"]) expect(csvCell(`${c}1`)).toBe(`"'${c}1"`);
+    for (const c of ["+", "-", "@", "\t"]) expect(csvCell(`${c}1`)).toBe(`"'${c}1"`);
+    // A formula after a line break is defused too (line breaks become \n).
+    expect(csvCell("ok\n=1+1")).toBe(`"ok\n'=1+1"`);
+    expect(csvCell("ok\r\n@SUM(1)\rnext")).toBe(`"ok\n'@SUM(1)\nnext"`);
     expect(csvCell(null)).toBe('""');
     expect(csvCell("Plain reason")).toBe('"Plain reason"');
+  });
+
+  it("links a record only for viewers who can open its page", () => {
+    const row = (recordHref: string | null) => ({ recordHref }) as AuditRow;
+    const perms = (...p: string[]) => new Set(p) as never;
+    expect(recordLink(row("/refunds/payments/x"), perms("audit:read"))).toBeNull();
+    expect(recordLink(row("/kyc/cases/y"), perms("audit:read", "refunds:read"))).toBeNull();
+    expect(recordLink(row(null), perms("refunds:read"))).toBeNull();
+    // Positive controls: with the app's read permission the link is there.
+    expect(recordLink(row("/refunds/payments/x"), perms("audit:read", "refunds:read"))).toBe("/refunds/payments/x");
+    expect(recordLink(row("/kyc/cases/y"), perms("kyc:read"))).toBe("/kyc/cases/y");
+    expect(recordLink(row("/flags/z"), perms("flags:read"))).toBe("/flags/z");
+  });
+
+  it("the export keeps the raw type and ID for records with no human ID", async () => {
+    const raw = `qa-raw-${randomUUID()}`;
+    await auditRow("platform", raw);
+    const admin = (await makeUser(db, ["admin"])).user;
+    const { csv } = await exportAudit({ db, user: admin }, { recordId: raw });
+    expect(csv).toContain(`"platform","platform ${raw}","${raw}"`);
+  });
+
+  it("a cut-off export says so without breaking the eight columns", async () => {
+    await records();
+    const admin = (await makeUser(db, ["admin"])).user;
+    const { csv, truncated, rowCount } = await exportAudit({ db, user: admin }, {}, 2);
+    expect(truncated).toBe(true);
+    expect(rowCount).toBe(2);
+    const lines = csv.trim().split("\r\n");
+    expect(lines).toHaveLength(4);
+    for (const line of lines) expect(line.match(/"(?:[^"]|"")*"/g)).toHaveLength(8);
+    expect(lines.at(-1)).toMatch(/^"Cut off: /);
   });
 });
