@@ -98,6 +98,17 @@ describe("dashboard: flag approvals and requester names", () => {
     expect(item).toMatchObject({ kind: "Flag change", title: `${flag.key}: prod Off → On · 25%`, href: `/flags/${flag.id}` });
   });
 
+  it("leaves out a flag change that prod has moved past, since it can only be rejected now", async () => {
+    const { flag } = await pendingFlagChangeBy(["analyst"]);
+    const approver = (await as(["approver"])).user;
+    const listed = async () => (await awaitingMyApproval(db, approver, ALL)).items.some((i) => i.href === `/flags/${flag.id}`);
+    expect(await listed()).toBe(true);
+    const prodRow = and(eq(flagValues.flagId, flag.id), eq(flagValues.environment, "prod"));
+    const [prod] = await owner.select().from(flagValues).where(prodRow);
+    await owner.update(flagValues).set({ version: (prod?.version ?? 0) + 1 }).where(prodRow);
+    expect(await listed()).toBe(false);
+  });
+
   it("counts waiting flag changes only for users who can approve them", async () => {
     await pendingFlagChangeBy(["analyst"]);
     expect((await awaitingMyApproval(db, (await as(["approver"])).user, ALL)).byKind.flags).toBeGreaterThan(0);
