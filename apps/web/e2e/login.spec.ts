@@ -47,5 +47,6 @@ test("analyst is denied the audit log, and admin sees that denial in it", async 
   await filters.getByRole("button", { name: "Apply filters" }).click();
   await expect(page).toHaveURL(/action=access.denied/);
   const row = page.getByRole("row").filter({ hasText: "access.denied" }).filter({ hasText: "/audit" }).first();
-  await expect(row).toContainText("analyst");
+  await expect(row).toContainText("Avery Analyst");
+  await expect(row.getByTitle("analyst", { exact: true })).toBeVisible();
 });
