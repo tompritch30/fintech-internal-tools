@@ -10,7 +10,7 @@ import {
   getSessionUser,
   loadConfig,
   requirePermission,
-  SESSION_COOKIE,
+  sessionCookie,
   type CoreConfig,
   type Permission,
   type SessionUser,
@@ -35,7 +35,7 @@ export function getOidc(): Promise<Configuration> {
 }
 
 export async function getCurrentUser(): Promise<SessionUser | null> {
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const token = (await cookies()).get(sessionCookieName())?.value;
   return getSessionUser(getDb(), token, getConfig().sessionIdleMinutes);
 }
 
@@ -63,11 +63,15 @@ export async function requirePagePermission(permission: Permission, resource: st
 /** Every exported server action must be built with this (enforced by test/actions-use-define-action.test.ts). */
 export const defineAction = createDefineAction(async () => ({ db: getDb(), user: await getCurrentUser() }));
 
+export function sessionCookieName(): string {
+  return sessionCookie(getConfig().appUrl).name;
+}
+
 export function sessionCookieOptions(expires: Date) {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: true,
+    secure: sessionCookie(getConfig().appUrl).secure,
     path: "/",
     expires,
   };

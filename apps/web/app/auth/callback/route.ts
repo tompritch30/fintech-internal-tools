@@ -2,14 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   completeLogin,
   createSession,
-  SESSION_COOKIE,
   syncUserFromClaims,
   withAudit,
   type IdentityClaims,
   type LoginAttempt,
 } from "@fit/core";
 import type { Tx } from "@fit/db";
-import { getConfig, getDb, getOidc, sessionCookieOptions } from "../../../lib/auth.ts";
+import { getConfig, getDb, getOidc, sessionCookieName, sessionCookieOptions } from "../../../lib/auth.ts";
 
 const LOGIN_ATTEMPT_COOKIE = "fit_login";
 
@@ -52,7 +51,7 @@ export async function GET(request: NextRequest) {
   );
 
   const response = NextResponse.redirect(`${config.appUrl}/`);
-  response.cookies.set(SESSION_COOKIE, session.token, sessionCookieOptions(session.expiresAt));
+  response.cookies.set(sessionCookieName(), session.token, sessionCookieOptions(session.expiresAt));
   response.cookies.delete({ name: LOGIN_ATTEMPT_COOKIE, path: "/auth" });
   return response;
 }

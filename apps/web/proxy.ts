@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
-import { SESSION_COOKIE } from "@fit/core/cookie";
+import { sessionCookie } from "@fit/core/cookie";
 import { applySecurityHeaders, contentSecurityPolicy } from "./lib/security-headers.ts";
 
 export function isPublicPath(pathname: string): boolean {
@@ -20,7 +20,9 @@ export function proxy(request: NextRequest) {
     dev: process.env.NODE_ENV === "development",
     idpOrigin: issuer ? new URL(issuer).origin : undefined,
   });
-  if (!isPublicPath(pathname) && !request.cookies.has(SESSION_COOKIE)) {
+  // No APP_URL here (misconfigured) falls back to the https name, the stricter of the two.
+  const { name } = sessionCookie(process.env.APP_URL || "https://localhost");
+  if (!isPublicPath(pathname) && !request.cookies.has(name)) {
     return applySecurityHeaders(NextResponse.redirect(new URL("/login", request.url)), csp);
   }
   const headers = new Headers(request.headers);

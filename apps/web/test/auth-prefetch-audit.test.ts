@@ -12,7 +12,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 
 vi.mock("next/headers", async () => {
-  const { SESSION_COOKIE } = await import("@fit/core/cookie");
+  const { sessionCookie } = await import("@fit/core/cookie");
+  const SESSION_COOKIE = sessionCookie(process.env.APP_URL ?? "http://localhost:3000").name;
   return {
     cookies: async () => ({
       get: (name: string) => (name === SESSION_COOKIE && mocks.sessionToken ? { value: mocks.sessionToken } : undefined),
