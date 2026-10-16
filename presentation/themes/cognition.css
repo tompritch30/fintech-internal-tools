@@ -284,3 +284,53 @@ section.plan > .visual.roadmap > p { font-size: 28px; margin-top: auto; padding-
 section.appendix.tco th:nth-child(n+2):nth-child(-n+4), section.appendix.tco td:nth-child(n+2):nth-child(-n+4) { white-space: nowrap; }
 section.appendix.tco td:first-child { width: 20%; }
 section.appendix.tco td:last-child { width: 40%; }
+
+/* Slide 1: what you get vs what each app builder adds. */
+.visual.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; font-size: 26px; }
+.visual.compare > div { border: 1px solid var(--ink); padding: 24px; display: flex; flex-direction: column; gap: 12px; }
+.visual.compare > div.gap { border: 2px dashed var(--ink); }
+.visual.compare > div > p { margin: 0; }
+/* Slide 2: apps sit directly on the shared platform. */
+.visual.arch { display: flex; flex-direction: column; justify-content: center; font-size: 26px; }
+.visual.arch > .apps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.visual.arch > .apps > div { border: 1px solid var(--ink); border-bottom: 0; padding: 16px 12px; text-align: center; min-height: 112px; display: flex; align-items: center; justify-content: center; }
+.visual.arch > .apps > div.next { border-style: dashed; color: var(--muted); }
+.visual.arch > .core { border: 3px solid var(--ink); padding: 20px; }
+.visual.arch > .core > p { margin: 0 0 16px; font-size: 24px; }
+.visual.arch > .core > .blocks { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.visual.arch > .core > .blocks > div { background: rgba(25, 25, 25, 0.06); padding: 12px 4px; text-align: center; font-size: 24px; }
+.visual.arch > .db { border: 1px solid var(--ink); border-top: 0; padding: 14px 20px; font-size: 24px; }
+/* Slide 4: bullets left, small cost table right. */
+section.long > table { font-size: 26px; }
+/* Sources on one page. */
+section.sources1 > ol.sources { font-size: 20px; line-height: 1.25; }
+section.sources1 > ol.sources > li { margin-bottom: 10px; }
+section.sources1 > ol.sources > li > small { font-size: 18px; }
+
+/* Owner edits: no section labels, title higher, no column rules or tick marks. */
+:root { --top: 72px; }
+section:not(.title) { background: var(--paper); }
+section:not(.title)::before { display: none; }
+
+/* Owner edit: platform diagram sits at the top of the content row. */
+.visual.arch { justify-content: flex-start; }
+
+/* Owner edit: appendix divider page. */
+section.divider { display: flex; flex-direction: column; justify-content: center; gap: var(--space); }
+section.divider > h1 { font-size: 96px; }
+section.divider > p { font-size: 32px; color: var(--muted); }
+
+/* Owner edit: main slides count 1 to 5; appendix pages use i to v. */
+section::after { content: attr(data-marpit-pagination) " / 5"; }
+/* Appendix numbers: Marp strips content on section::after, so draw them from the footer. */
+section[class*="pg-"]::after { display: none; }
+section[class*="pg-"] > footer { right: var(--margin-x); }
+section[class*="pg-"] > footer::after { position: absolute; right: 0; top: 0; color: var(--muted); }
+section.pg-i > footer::after { content: "i"; }
+section.pg-ii > footer::after { content: "ii"; }
+section.pg-iii > footer::after { content: "iii"; }
+section.pg-iv > footer::after { content: "iv"; }
+section.pg-v > footer::after { content: "v"; }
+/* Owner edit: lighter main slides, boxes sized to content, bigger text. */
+.visual.compare { align-items: stretch; align-self: start; height: auto; font-size: 30px; }
+section.big > table { font-size: 32px; }
