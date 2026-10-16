@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { createDb, flags, users } from "@fit/db";
-import { E2E_FLAGS, PAYMENT_CAPTURED_REASON, SEED_FLAGS, seedE2eFixtures, seedKycCases } from "@fit/db/seed";
+import { E2E_FLAGS, FLAG_SEEDED_REASON, PAYMENT_CAPTURED_REASON, SEED_FLAGS, seedE2eFixtures, seedKycCases } from "@fit/db/seed";
 import { ownerDb } from "../../../packages/core/test/helpers/db.ts";
 import { TEST_DATABASE_URL } from "../../../packages/core/test/helpers/env.ts";
 import { myRecentActivity } from "../app/(platform)/dashboard.ts";
@@ -31,6 +31,11 @@ describe("seed data looks like real use", () => {
   it("seeded payment captures give a realistic reason, not 'dummy data'", () => {
     expect(PAYMENT_CAPTURED_REASON).not.toMatch(/dummy|seed/i);
     expect(PAYMENT_CAPTURED_REASON.length).toBeGreaterThan(0);
+  });
+
+  it("seeded flags' starting values give a realistic reason, not 'dummy data'", () => {
+    expect(FLAG_SEEDED_REASON).not.toMatch(/dummy|seed/i);
+    expect(FLAG_SEEDED_REASON.length).toBeGreaterThan(0);
   });
 
   it("seeded KYC cases are numbered in the order they were opened", () => {
