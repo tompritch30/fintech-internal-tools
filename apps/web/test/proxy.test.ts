@@ -1,11 +1,29 @@
 import { NextRequest } from "next/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { SESSION_COOKIE } from "@fit/core/cookie";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { sessionCookie } from "@fit/core/cookie";
 import { proxy } from "../proxy.ts";
 import { isPrefetchRequest } from "../lib/prefetch.ts";
 
+const SESSION_COOKIE = sessionCookie("http://localhost:3000").name;
+beforeEach(() => vi.stubEnv("APP_URL", "http://localhost:3000"));
+afterEach(() => vi.unstubAllEnvs());
+
 const request = (path: string, headers: Record<string, string> = {}) =>
   new NextRequest(new URL(path, "http://localhost:3000"), { headers });
+
+describe("proxy reads the session cookie name for the APP_URL scheme", () => {
+  it("on local http, lets through the plain fit_session cookie and not the __Host- one", () => {
+    vi.stubEnv("APP_URL", "http://localhost:3000");
+    expect(proxy(request("/audit", { cookie: "fit_session=abc" })).status).toBe(200);
+    expect(proxy(request("/audit", { cookie: "__Host-fit_session=abc" })).status).toBe(307);
+  });
+
+  it("on https, lets through only the __Host- cookie", () => {
+    vi.stubEnv("APP_URL", "https://tools.example.test");
+    expect(proxy(request("/audit", { cookie: "__Host-fit_session=abc" })).status).toBe(200);
+    expect(proxy(request("/audit", { cookie: "fit_session=abc" })).status).toBe(307);
+  });
+});
 
 describe("proxy route gating", () => {
   it("redirects an unauthenticated request for a protected page to /login", () => {
