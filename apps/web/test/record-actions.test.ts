@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { permissionsFor } from "@fit/core";
+import { flagActions } from "../app/(platform)/flags/record-actions.ts";
 import { caseActions } from "../app/(platform)/kyc/record-actions.ts";
 import { paymentActions, refundActions } from "../app/(platform)/refunds/record-actions.ts";
 
@@ -68,5 +69,45 @@ describe("KYC case record: only actions the user can take, otherwise a waiting l
     expect(caseActions(approver, { ...base, status: "approved" }).actions).toEqual([]);
     expect(caseActions(analyst, { ...base, status: "rejected" }).actions).toEqual([]);
     expect(caseActions(admin, { ...base, status: "open" }).actions).toEqual([]);
+  });
+});
+
+describe("feature flag record: only actions the user can take, otherwise a waiting line", () => {
+  const pendingBy = (id: string) => ({ prodEnabled: false, prodVersion: 3, pending: { requestedBy: id, baseVersion: 3 } });
+
+  it("offers approve and reject on a pending prod change to an approver who did not request it", () => {
+    expect(flagActions(approver, pendingBy(analyst.id)).actions).toEqual(["approve", "reject"]);
+    expect(flagActions(senior, pendingBy(analyst.id)).actions).toEqual(["change", "approve", "reject"]);
+  });
+
+  it("offers no decision to the requester, even with approver rights, and says who it waits for", () => {
+    const r = flagActions(senior, pendingBy(senior.id));
+    expect(r.actions).toEqual(["change"]);
+    expect(r.waiting).toBe("You requested this prod change. Waiting for a different approver.");
+  });
+
+  it("offers changes to analysts, the kill switch only while prod is on, and no decision without a pending change", () => {
+    expect(flagActions(analyst, { prodEnabled: false, prodVersion: 3, pending: null }).actions).toEqual(["change"]);
+    expect(flagActions(analyst, { prodEnabled: true, prodVersion: 3, pending: null }).actions).toEqual(["change", "kill"]);
+    expect(flagActions(approver, { prodEnabled: true, prodVersion: 3, pending: null }).actions).toEqual([]);
+    expect(flagActions(analyst, pendingBy(senior.id)).actions).toEqual(["change"]);
+  });
+
+  it("offers only reject on a pending prod change that prod has moved past, since approving it would be refused", () => {
+    const stale = { prodEnabled: false, prodVersion: 4, pending: { requestedBy: analyst.id, baseVersion: 3 } };
+    const r = flagActions(approver, stale);
+    expect(r.actions).toEqual(["reject"]);
+    expect(r.waiting).toBe("Prod changed after this was requested, so it can't be approved. Reject it so it can be requested again.");
+    // Positive control: the same request on an unchanged prod can be approved.
+    expect(flagActions(approver, { ...stale, prodVersion: 3 }).actions).toEqual(["approve", "reject"]);
+  });
+
+  it("mentions the kill switch next to a pending change only when the user has one", () => {
+    const pending = { requestedBy: senior.id, baseVersion: 3 };
+    expect(flagActions(analyst, { prodEnabled: true, prodVersion: 3, pending }).waiting).toBe(
+      "A prod change is waiting for approval. You can still turn the flag off in prod.",
+    );
+    expect(flagActions(analyst, { prodEnabled: false, prodVersion: 3, pending }).waiting).toBe("A prod change is waiting for approval.");
+    expect(flagActions(approver, { prodEnabled: true, prodVersion: 3, pending }).waiting).toBe("A prod change is waiting for your decision.");
   });
 });

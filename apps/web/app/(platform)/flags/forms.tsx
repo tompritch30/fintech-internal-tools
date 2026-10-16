@@ -83,21 +83,23 @@ export function KillSwitchForm({ flagId }: { flagId: string }) {
   );
 }
 
-export function DecisionForms({ changeId, version }: { changeId: string; version: number }) {
+export function DecisionForms({ changeId, version, canApprove = true }: { changeId: string; version: number; canApprove?: boolean }) {
   const [approved, approve, approving] = useActionState(approveFlagChangeAction, initial);
   const [rejected, reject, rejecting] = useActionState(rejectFlagChangeAction, initial);
   const pending = approving || rejecting;
   return (
     <div className="flex w-full flex-col gap-3">
-      <form action={approve} className={formClass} aria-label="Approve prod change">
-        <input type="hidden" name="changeId" value={changeId} />
-        <input type="hidden" name="expectedVersion" value={version} />
-        <Input id="approve-note" name="note" label="Approval note (optional)" maxLength={500} className="w-64" />
-        <Button type="submit" variant="primary" disabled={pending}>
-          Approve prod change
-        </Button>
-        <Feedback state={approved} />
-      </form>
+      {canApprove ? (
+        <form action={approve} className={formClass} aria-label="Approve prod change">
+          <input type="hidden" name="changeId" value={changeId} />
+          <input type="hidden" name="expectedVersion" value={version} />
+          <Input id="approve-note" name="note" label="Approval note (optional)" maxLength={500} className="w-64" />
+          <Button type="submit" variant="primary" disabled={pending}>
+            Approve prod change
+          </Button>
+          <Feedback state={approved} />
+        </form>
+      ) : null}
       <form action={reject} className={formClass} aria-label="Reject prod change">
         <input type="hidden" name="changeId" value={changeId} />
         <input type="hidden" name="expectedVersion" value={version} />

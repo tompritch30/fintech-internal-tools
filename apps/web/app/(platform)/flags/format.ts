@@ -23,5 +23,5 @@ export function describeFlagAudit(after: unknown): string | undefined {
   return `${environment}: ${describeFlagValue(previous)} → ${describeFlagValue(after)}`;
 }
 
-export const formatWhen = (d: Date) =>
-  d.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/London" });
+/** Same format as the other apps: "2026-10-16 05:06 UTC". */
+export const formatWhen = (d: Date) => `${d.toISOString().slice(0, 16).replace("T", " ")} UTC`;
