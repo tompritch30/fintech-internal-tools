@@ -573,6 +573,42 @@ describe("rule 7: services read current values from a read-only endpoint", () =>
     expect((await handleFlagsServiceRequest(db, serviceRequest("?environment=prod"), config)).status).toBe(200);
   });
 
+  const serviceDenials = async () =>
+    db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.action, "access.denied"), eq(auditLog.entityType, "resource"), eq(auditLog.entityId, "api:flags")));
+
+  it("records a refused service call as an access.denied row, without the presented token", async () => {
+    const before = (await serviceDenials()).length;
+    const guess = "guessed-token-0123456789abcdef";
+    expect((await handleFlagsServiceRequest(db, serviceRequest("?environment=prod", guess), config)).status).toBe(401);
+    expect((await handleFlagsServiceRequest(db, serviceRequest("?environment=prod", null), config)).status).toBe(401);
+    const rows = (await serviceDenials()).slice(before);
+    expect(rows.map((r) => r.metadata)).toEqual([
+      { required: "flags:service-token", token: "invalid" },
+      { required: "flags:service-token", token: "missing" },
+    ]);
+    expect(rows.every((r) => r.actorUserId === null)).toBe(true);
+    expect(JSON.stringify(rows)).not.toContain(guess);
+    // positive control: an accepted call writes no denial
+    expect((await handleFlagsServiceRequest(db, serviceRequest("?environment=prod"), config)).status).toBe(200);
+    expect((await serviceDenials()).length).toBe(before + 2);
+  });
+
+  it("caps refused-call audit rows per minute so an unauthenticated caller can't flood the log", async () => {
+    const recent = (await serviceDenials()).filter((r) => r.occurredAt.getTime() > Date.now() - 50_000).length;
+    const before = (await serviceDenials()).length;
+    const options = { deniedAuditPerMinute: recent + 2 };
+    for (let i = 0; i < 5; i++) {
+      const res = await handleFlagsServiceRequest(db, serviceRequest("?environment=prod", `wrong-${i}-0123456789abcdef`), config, options);
+      expect(res.status).toBe(401);
+    }
+    expect((await serviceDenials()).length - before).toBe(2);
+    // positive control: the right token still works once the cap is hit
+    expect((await handleFlagsServiceRequest(db, serviceRequest("?environment=prod"), config, options)).status).toBe(200);
+  });
+
   it("is switched off (503) when no token is configured, even for a request that sends one", async () => {
     const res = await handleFlagsServiceRequest(db, serviceRequest("?environment=prod"), { serviceToken: null });
     expect(res.status).toBe(503);
