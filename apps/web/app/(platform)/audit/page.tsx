@@ -1,16 +1,17 @@
 import Link from "next/link";
+import type { SessionUser } from "@fit/core";
 import { FilterBar, ListView, PageHeader, StatusBadge, linkClass, type ListColumn } from "@fit/ui";
 import { getDb, requirePagePermission } from "../../../lib/auth.ts";
-import { auditFilterOptions, first, parseAuditFilters, searchAudit, type AuditFilters, type AuditRow, type SearchParam } from "./query.ts";
+import { auditFilterOptions, first, parseAuditFilters, recordLink, searchAudit, type AuditFilters, type AuditRow, type SearchParam } from "./query.ts";
 import { parsePageParam } from "../../../lib/page-param.ts";
 
 const PAGE_SIZE = 25;
 
-function RecordCell({ row }: { row: AuditRow }) {
+function RecordCell({ row, href }: { row: AuditRow; href: string | null }) {
   const raw = `${row.entityType} ${row.entityId}`;
   if (!row.recordLabel) return <>{raw}</>;
-  return row.recordHref ? (
-    <Link href={row.recordHref} className={linkClass} title={raw}>
+  return href ? (
+    <Link href={href} className={linkClass} title={raw}>
       {row.recordLabel}
     </Link>
   ) : (
@@ -23,18 +24,18 @@ function exportHref(filters: AuditFilters): string {
   return qs ? `/audit/export?${qs}` : "/audit/export";
 }
 
-const columns: ListColumn<AuditRow>[] = [
+const columnsFor = (permissions: SessionUser["permissions"]): ListColumn<AuditRow>[] => [
   { key: "occurredAt", label: "When (UTC)", sortable: true, render: (r) => r.occurredAt.toISOString().replace("T", " ").slice(0, 19) },
   { key: "actor", label: "Who", render: (r) => <span title={r.actorUsername ?? undefined}>{r.actorName ?? "system"}</span> },
   { key: "action", label: "Action", render: (r) => <StatusBadge label={r.action} /> },
-  { key: "entity", label: "Record", render: (r) => <RecordCell row={r} /> },
+  { key: "entity", label: "Record", render: (r) => <RecordCell row={r} href={recordLink(r, permissions)} /> },
   { key: "reason", label: "Reason", render: (r) => r.reason ?? "" },
 ];
 
 const opts = (values: string[]) => values.map((v) => ({ value: v, label: v }));
 
 export default async function AuditPage({ searchParams }: { searchParams: Promise<Record<string, SearchParam>> }) {
-  await requirePagePermission("audit:read", "/audit");
+  const user = await requirePagePermission("audit:read", "/audit");
   const params = await searchParams;
   const filters = parseAuditFilters(params);
   const query = {
@@ -75,7 +76,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
         basePath="/audit"
         search={false}
         params={values}
-        columns={columns}
+        columns={columnsFor(user.permissions)}
         rows={rows}
         rowKey={(r) => String(r.id)}
         query={query}

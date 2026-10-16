@@ -1,6 +1,6 @@
 import "server-only";
 import { and, asc, count, desc, eq, gte, ilike, lt, or, sql, type SQL } from "drizzle-orm";
-import { requirePermission, withAudit, type AuditListItem, type SessionUser } from "@fit/core";
+import { requirePermission, withAudit, type AuditListItem, type Permission, type SessionUser } from "@fit/core";
 import { auditLog, users, type Db, type Executor } from "@fit/db";
 
 /** Audit log filters, as they appear in the URL. Dates are UTC days (YYYY-MM-DD), both ends inclusive. */
@@ -155,14 +155,33 @@ export async function searchAudit(
   return { rows, total: total?.n ?? 0 };
 }
 
-/** One CSV cell: always quoted, and a leading = + - @ tab or CR is defused so spreadsheets don't run it. */
+/**
+ * One CSV cell: always quoted. Line breaks become \n, and any line starting with = + - @ or a tab
+ * gets a leading ' so spreadsheets don't run it as a formula.
+ */
 export function csvCell(value: string | number | null | undefined): string {
-  let s = value == null ? "" : String(value);
-  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
-  return `"${s.replace(/"/g, '""')}"`;
+  const lines = (value == null ? "" : String(value)).split(/\r\n|\r|\n/).map((l) => (/^[=+\-@\t]/.test(l) ? `'${l}` : l));
+  return `"${lines.join("\n").replace(/"/g, '""')}"`;
 }
 
 const csvLine = (cells: (string | number | null | undefined)[]) => cells.map(csvCell).join(",");
+
+const CSV_HEADER = ["When (UTC)", "Who", "Username", "Action", "Record type", "Record", "Record ID", "Reason"];
+
+/** Which permission opens each record page; links are shown only to viewers who have it. */
+const LINK_PERMISSIONS: [prefix: string, permission: Permission][] = [
+  ["/refunds/", "refunds:read"],
+  ["/kyc/", "kyc:read"],
+  ["/flags/", "flags:read"],
+];
+
+/** The record's link, or null if there is none or this viewer can't open that page. */
+export function recordLink(row: Pick<AuditRow, "recordHref">, permissions: SessionUser["permissions"]): string | null {
+  const href = row.recordHref;
+  if (!href) return null;
+  const match = LINK_PERMISSIONS.find(([prefix]) => href.startsWith(prefix));
+  return match && permissions.has(match[1]) ? href : null;
+}
 
 /** Most rows one export holds; past that the file says it was cut off. */
 export const EXPORT_LIMIT = 10_000;
@@ -186,13 +205,14 @@ export async function exportAudit(
     async (tx) => {
       const { rows, total } = await searchAudit(tx, filters, { page: 1, pageSize: limit, dir: "desc" });
       const lines = [
-        csvLine(["When (UTC)", "Who", "Username", "Action", "Record type", "Record", "Record ID", "Reason"]),
+        csvLine(CSV_HEADER),
         ...rows.map((r) =>
-          csvLine([r.occurredAt.toISOString().replace("T", " ").slice(0, 19), r.actorName ?? "system", r.actorUsername, r.action, r.entityType, r.recordLabel, r.entityId, r.reason]),
+          csvLine([r.occurredAt.toISOString().replace("T", " ").slice(0, 19), r.actorName ?? "system", r.actorUsername, r.action, r.entityType, r.recordLabel ?? `${r.entityType} ${r.entityId}`, r.entityId, r.reason]),
         ),
       ];
       const truncated = total > rows.length;
-      if (truncated) lines.push(csvLine([`Cut off: these are the newest ${rows.length} of ${total} rows. Narrow the filters to export the rest.`]));
+      const notice = `Cut off: these are the newest ${rows.length} of ${total} rows. Narrow the filters to export the rest.`;
+      if (truncated) lines.push(csvLine(CSV_HEADER.map((_, i) => (i === 0 ? notice : ""))));
       return { csv: `${lines.join("\r\n")}\r\n`, rowCount: rows.length, truncated };
     },
   );
