@@ -1,0 +1,60 @@
+{
+  "repo_notes": [
+    {
+      "content": "This repo is a proof of concept for one client question: keep paying for Power Apps, or build the internal apps that move money (refunds, KYC, feature flags) on a shared TypeScript/Postgres platform with Devin. Write for a reviewer reading it cold. Lead with that question and the evidence. Point to the existing docs (README.md, docs/ARCHITECTURE.md, docs/ADDING-AN-APP.md, docs/GOVERNANCE.md, docs/SECURITY-REVIEW.md, docs/DEVIN-LOG.md, docs/submission/KEY-DECISIONS.md, docs/submission/EVIDENCE.md, docs/submission/deck.pdf) instead of restating them. Never invent or estimate numbers (costs, counts, times). Quote a number only if it appears in those files, and name the file. All data is dummy data; the demo passwords are fake and local only.",
+      "author": "Thomas"
+    }
+  ],
+  "pages": [
+    {
+      "title": "What this repo answers",
+      "purpose": "The Power Apps vs build-with-Devin question, the recommendation, and where the evidence lives. Use README.md (The question, Recommendation), docs/submission/KEY-DECISIONS.md and docs/submission/deck.pdf with presentation/slides.md. Say what is production-shaped and what is mocked (README 'What's real and what's mocked').",
+      "parent": null
+    },
+    {
+      "title": "Run it in one command",
+      "purpose": "How to start the whole stack with `docker compose up --build` (Postgres, Keycloak, web app, migrations and seed), the URL to open, and the demo users table from README.md (analyst, approver, senior, admin, norole) with what each one shows. Link to the AGENTS.md command table for dev, lint, test and e2e.",
+      "parent": null
+    },
+    {
+      "title": "Shared platform and its controls",
+      "purpose": "packages/core and packages/db: sign-in (OIDC, Keycloak standing in for Entra), permissions registry and RBAC, approvals (maker-checker), masking with reasoned reveal, and the append-only audit log. For each rule, say where it is enforced: server-side checks (defineAction, requirePermission, withAudit), and database rules in the migrations (the *_guard.sql files, the audit append-only trigger, infra/postgres roles app_owner and app_runtime). Follow docs/ARCHITECTURE.md sections 3 and 4 and AGENTS.md section 1.",
+      "parent": null
+    },
+    {
+      "title": "Where each rule is enforced",
+      "purpose": "A table of the platform's key rules (no self-approval, approval threshold and refund splitting, masked fields and reveal limits, audit in the same transaction, KYC retention), each with the code file and the migration or database trigger that enforces it, plus the named test that proves it. Only list rules that exist in the code and migrations.",
+      "parent": "Shared platform and its controls"
+    },
+    {
+      "title": "The three apps",
+      "purpose": "Refunds, KYC review and feature flags: what each does, its route group in apps/web, its schema and guard migration, and how it uses the shared core. Point to each app's tests rather than restating them.",
+      "parent": null
+    },
+    {
+      "title": "Adding a new app with the playbook",
+      "purpose": "How a new internal tool is added: docs/ADDING-AN-APP.md (permissions needing human review, data, server code, UI, tests, finish) and the Devin playbook docs/playbooks/new-internal-tool.md. Explain that KYC and flags were each built from a GitHub issue and this playbook, as recorded in docs/DEVIN-LOG.md.",
+      "parent": null
+    },
+    {
+      "title": "Governance and review",
+      "purpose": "Repo controls from docs/GOVERNANCE.md and AGENTS.md: branch protection, required CI (verify and e2e), CODEOWNERS paths that need human review (packages/core, playbooks, AGENTS.md, .devin/blueprint.yaml), red-first tests, and how Devin Review is used. Mention the .agents/skills (slides, ui).",
+      "parent": null
+    },
+    {
+      "title": "Security review and what broke",
+      "purpose": "Summarise docs/SECURITY-REVIEW.md: the core and refunds review and the KYC and flags review. Cover which attacks worked, the fix and test for each, what was not tested, and the known limitations. Use only the findings recorded in that file.",
+      "parent": null
+    },
+    {
+      "title": "Devin build log",
+      "purpose": "How the repo was built with Devin, from docs/DEVIN-LOG.md and README 'How it was built with Devin': one row per session (what was asked, what went wrong or was corrected, outcome), plus docs/submission/EVIDENCE.md for test counts and cost. Quote costs only as written in those files.",
+      "parent": null
+    },
+    {
+      "title": "Deck and submission",
+      "purpose": "The presentation/ Marp workspace (slides.md, themes/cognition.css, scripts/check.mjs layout checks, ECharts chart specs) and the submission files in docs/submission/ (deck.pdf, KEY-DECISIONS.md, EVIDENCE.md). Explain how to run the slide check and export.",
+      "parent": null
+    }
+  ]
+}

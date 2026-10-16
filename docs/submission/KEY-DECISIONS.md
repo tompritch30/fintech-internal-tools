@@ -40,4 +40,4 @@ That's the finding I built the recommendation on: Devin moves the constraint fro
 
 ## How I worked
 
-Devin wrote all the code in the repo. I wrote the specs, reviewed every pull request and approved merges. I used Claude for research, planning and help editing the deck. My own time was about [X] hours, over the 3 to 4 hour guide, plus overnight Devin runs; I'd rather say that than leave it to the commit timestamps.
+Devin wrote all the code in the repo. I wrote the specs, reviewed every pull request and approved merges. I used Claude for research, planning and help editing the deck. My own time was about <N> hours, over the 3 to 4 hour guide, plus overnight Devin runs; I'd rather say that than leave it to the commit timestamps.
