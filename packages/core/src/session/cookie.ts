@@ -4,10 +4,12 @@
  * (loopback only), where some browsers reject `__Host-` cookies. Remote http keeps Secure, so the token
  * never travels in clear text; login there fails closed.
  */
-const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
+function isLoopback(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "[::1]" || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
+}
 
 export function sessionCookie(appUrl: string): { name: string; secure: boolean } {
   const url = new URL(appUrl);
-  const secure = !(url.protocol === "http:" && LOOPBACK.has(url.hostname));
+  const secure = !(url.protocol === "http:" && isLoopback(url.hostname));
   return { name: secure ? "__Host-fit_session" : "fit_session", secure };
 }

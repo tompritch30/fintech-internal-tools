@@ -16,7 +16,7 @@ describe("session cookie name and Secure flag follow APP_URL", () => {
   });
 
   it("uses the plain name on every loopback http host", () => {
-    for (const url of ["http://localhost:3000", "http://127.0.0.1:3000", "http://[::1]:3000"]) {
+    for (const url of ["http://localhost:3000", "http://127.0.0.1:3000", "http://127.0.0.2:3000", "http://[::1]:3000"]) {
       expect(sessionCookie(url)).toEqual({ name: "fit_session", secure: false });
     }
   });
