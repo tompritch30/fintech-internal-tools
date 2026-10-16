@@ -405,3 +405,37 @@ A subtitle that goes on far too long to fit on one line beside the art
 <div class="visual"><div style="margin-left: -200px">pushed left</div></div>
 
 <!-- Notes. -->
+
+---
+
+<!-- expect: pass -->
+<!-- _class: appendix -->
+<!-- _footer: "Source: fixture" -->
+
+# A lone en dash in a table cell marks "not in this option"
+
+| Item | A | B |
+|---|---|---|
+| Seats | $1K | – |
+| Build | – | $2K |
+| Run | $1K | $1K |
+| Train | – | $1K |
+
+<!-- Notes. -->
+
+---
+
+<!-- expect: em-dash -->
+<!-- _class: appendix -->
+<!-- _footer: "Source: fixture" -->
+
+# An en dash inside a table cell's text still fails
+
+| Item | A | B |
+|---|---|---|
+| Weeks | 1–4 | 5 |
+| Build | 2 | 3 |
+| Run | 1 | 1 |
+| Train | 2 | 1 |
+
+<!-- Notes. -->

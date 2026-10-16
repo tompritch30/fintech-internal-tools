@@ -28,7 +28,7 @@ The audience is a VP. Every slide must be readable in five seconds.
 | Every number has a source | A plain-words `Source: …` footer on any slide with a number or chart ("Source: client spend figure; Microsoft Power Apps pricing"). No codes like `S22`. **Never invent numbers.** | `number-without-source` |
 | Unmeasured stays unmeasured | Put it in a small table saying it is measured in the pilot. Never an empty box, guessed bar or `[TBD]` bar. | chart generator refuses a bar with no value |
 | Plain words | A VP can read it in five seconds. Banned: leverage, seamless, robust, unlock, game changing (also in notes). | `banned-word` |
-| No en or em dashes | Not in slide text, notes or drawn SVG labels (cover art, charts). Use a comma, colon or "to". | `em-dash` |
+| No en or em dashes | Not in slide text, notes or drawn SVG labels (cover art, charts). Use a comma, colon or "to". The one exception is a table cell holding only "–", meaning "not in this option" (Thomas asked for it in cost tables). | `em-dash` |
 | Evidence on the slide, reasoning in notes | Speaker notes are what Thomas will say. | warns if notes are missing |
 | Fits the slide | Nothing overflows the slide, the margins or the footer. All text ≥24 px. | `overflow`, `text-too-small`, `chart-text-too-small` |
 

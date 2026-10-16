@@ -111,7 +111,7 @@ After the demo: All 43 pull requests were opened by Devin. I set the rules, revi
 <div class="visual cost">
 <img src="assets/charts/three-year-cost.svg" alt="Three-year totals, 2027 to 2029: A about $825K, B $620K to $745K, C $710K to $1.4M">
 <p>Status quo excludes today's Power Apps admin and maker time, which narrows the gap.</p>
-<p>Devin is under 3% of option C; the rest is people and running costs.</p>
+<p>Devin is about 5% of option C; the rest is people and running costs</p>
 </div>
 
 <!--
@@ -251,12 +251,12 @@ A4 Production readiness and rollout: the 11 gaps, each mapped to the phase that 
 | Line item | A | B | C | Basis |
 |---|---|---|---|---|
 | Power Apps seats | $825K | $620K to $745K | $375K to $640K | A: 1,042 x $264 x 3. B: 10 to 25% off from inactive seats and single-app users on pay-as-you-go. C: B minus whole user groups leaving, year 1 nothing |
-| Enforcement exposure | see basis |  |  | zero if everyone is already Premium; unknown otherwise |
-| Licence audit and seat map |  | $0 to $5K | $0 to $5K |  |
-| Devin plan |  |  | about $7K floor | 5 Teams seats x $40 x 12 x 3; Enterprise price comes from Cognition |
-| Devin usage for builds |  |  | $3K to $15K | measured $7 to $24 per prototype app; production apps 10 to 30x that |
-| Devin maintenance automations |  |  | $9K to $45K | two nightly runs capped at 12 and 8 ACUs at $2 per ACU |
-| Engineering ownership |  |  | $210K to $420K | 0.5 to 1 FTE x $140K x 3 |
+| Enforcement exposure | see basis | – | – | zero if everyone is already Premium; unknown otherwise |
+| Licence audit and seat map | – | $0 to $5K | $0 to $5K |  |
+| Devin plan | – | – | about $7K floor | 5 Teams seats x $40 x 12 x 3; Enterprise price comes from Cognition |
+| Devin usage for builds | – | – | $3K to $15K | measured $7 to $24 per prototype app; production apps 10 to 30x that |
+| Devin maintenance automations | – | – | $9K to $45K | two nightly runs capped at 12 and 8 ACUs at $2 per ACU |
+| Engineering ownership | – | – | $210K to $420K | 0.5 to 1 FTE x $140K x 3 |
 
 <!--
 A4 continued: the 3-year TCO detail behind slide 04a, 2027 to 2029. Every number is an estimate unless tagged. A blank cell means the line is not part of that option.
@@ -274,13 +274,13 @@ A4 continued: the 3-year TCO detail behind slide 04a, 2027 to 2029. Every number
 
 | Line item | A | B | C | Basis |
 |---|---|---|---|---|
-| Hosting and monitoring |  |  | $15K to $48K | estimate |
-| External pen test, yearly |  |  | $15K to $36K | estimate |
-| Integrations, one-off |  |  | $18K to $36K | Entra, payment provider, KYC vendor if moved, document storage |
-| Dataverse migration, one-off |  |  | $15K to $50K | estimate |
-| UAT, parallel run, cutover, hypercare |  |  | $30K to $75K | estimate |
-| Training, moved apps only |  |  | $10K to $40K | estimate |
-| Not counted in A and B |  |  |  | today's Power Apps admin and maker time (ask the client) |
+| Hosting and monitoring | – | – | $15K to $48K | estimate |
+| External pen test, yearly | – | – | $15K to $36K | estimate |
+| Integrations, one-off | – | – | $18K to $36K | Entra, payment provider, KYC vendor if moved, document storage |
+| Dataverse migration, one-off | – | – | $15K to $50K | estimate |
+| UAT, parallel run, cutover, hypercare | – | – | $30K to $75K | estimate |
+| Training, moved apps only | – | – | $10K to $40K | estimate |
+| Not counted in A and B | – | – | – | today's Power Apps admin and maker time (ask the client) |
 | Total, 3 years | about $825K | $620K to $745K | $710K to $1.4M | slide 04a |
 
 <!--

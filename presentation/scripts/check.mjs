@@ -277,6 +277,12 @@ export async function checkDeck(mdPath, { outDir } = {}) {
       .map((sec) => [...sec.querySelectorAll("img")].map((i) => i.getAttribute("src")).filter((src) => /^[^:]+\.svg$/.test(src))));
     const svgText = await Promise.all(images.map(async (srcs) =>
       (await Promise.all(srcs.map((src) => readFile(join(ROOT, src), "utf8").catch(() => "")))).join(" ")));
+    // A table cell holding only "–" is the usual "not in this option" mark, so it doesn't count as a dash.
+    const dashText = await page.evaluate(() => [...document.querySelectorAll("svg[data-marpit-svg] > foreignObject > section")].map((sec) => {
+      const copy = sec.cloneNode(true);
+      for (const cell of copy.querySelectorAll("td, th")) if (cell.textContent.trim() === "\u2013") cell.textContent = "";
+      return copy.textContent;
+    }));
     const classes = await page.evaluate(() => [...document.querySelectorAll("svg[data-marpit-svg] > foreignObject > section")].map((sec) => [...sec.classList]));
     for (const [i, s] of slides.entries()) {
       const spoken = notes[i] ?? "";
@@ -285,7 +291,7 @@ export async function checkDeck(mdPath, { outDir } = {}) {
         if (m) s.fail.push(["banned-word", `banned word "${m[0]}"${s.text.match(re) ? "" : " (in speaker notes)"}`]);
       }
       if (!spoken.trim()) s.warn.push("no speaker notes (the reasoning goes there)");
-      if (/[\u2013\u2014]/.test(`${s.text} ${spoken}`)) s.fail.push(["em-dash", "en or em dash in slide text or notes; use a comma, colon or \"to\""]);
+      if (/[\u2013\u2014]/.test(`${dashText[i]} ${spoken}`)) s.fail.push(["em-dash", "en or em dash in slide text or notes; use a comma, colon or \"to\""]);
       else if (/[\u2013\u2014]/.test(svgText[i])) s.fail.push(["em-dash", "en or em dash drawn in an SVG image on this slide"]);
       // A slide may accept named failures with an allow-<code> class, for text Thomas wrote word for word.
       const allowed = classes[i].filter((c) => c.startsWith("allow-")).map((c) => c.slice(6));
