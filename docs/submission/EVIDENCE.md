@@ -123,7 +123,7 @@ From the start of A1 to the third app merging took about 5½ hours of wall-clock
 
 ## 5. Costs
 
-From the Devin Usage page (cost per session), read on 16 Oct 2026 after the last submission sessions. The deck's A3 total ($132.27) and KEY-DECISIONS ("$132 including security review, QA and deck work") were read earlier that day, before the last two sessions finished. The per-app, platform, research, security review and UX lines match; only QA fixes and presentation and docs have grown since.
+From the Devin Usage page (cost per session), read on 16 Oct 2026 after the last submission sessions. The deck's A3 total ($132.27) and KEY-DECISIONS.md ("$132 including security review, QA and deck work") were read earlier that day, before the last two sessions finished. The per-app, platform, research, security review and UX lines match; only QA fixes and presentation and docs have grown since.
 
 | Item | Sessions on the Usage page | Cost |
 |---|---|---|
