@@ -120,7 +120,9 @@ export function barChart(spec, fonts = {}) {
     chart.dispose();
     const c2 = echarts.init(null, null, { renderer: "svg", ssr: true, width, height: h });
     const maxV = Math.max(...bars.map((b) => b.value));
-    const xs = (v) => (v / maxV) * (width - 40);
+    // Leave room on the right for the longest value label, so the biggest bar's value isn't clipped.
+    const valueW = Math.max(0, ...bars.map((b) => (labelOf(b) ? textW(labelOf(b)) + 20 : 0)));
+    const xs = (v) => (v / maxV) * (width - 40 - valueW);
     c2.setOption({
       animation: false,
       series: [{

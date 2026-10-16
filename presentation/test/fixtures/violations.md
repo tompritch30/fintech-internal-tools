@@ -391,3 +391,17 @@ A subtitle that goes on far too long to fit on one line beside the art
 <div class="visual" style="height: 120px"><div style="height: 400px; background: #ddd">tall content</div></div>
 
 <!-- Notes. -->
+
+---
+
+<!-- expect: spills-out -->
+<!-- also: unused-space -->
+<!-- _footer: "Source: fixture" -->
+
+# A visual whose content pushes left into the other column
+
+- Short bullet
+
+<div class="visual"><div style="margin-left: -200px">pushed left</div></div>
+
+<!-- Notes. -->

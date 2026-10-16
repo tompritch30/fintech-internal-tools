@@ -175,8 +175,8 @@ function measure(limits) {
       for (const d of el.querySelectorAll("*")) {
         const dr = d.getBoundingClientRect();
         if (dr.width === 0 && dr.height === 0) continue;
-        if (dr.bottom > r.bottom + 1 || dr.right > r.right + 1 || dr.top < r.top - 1) {
-          fail.push(["spills-out", `<${name(d)}> spills out of <${name(el)}> by ${Math.round(Math.max(dr.bottom - r.bottom, dr.right - r.right, r.top - dr.top))}px`]);
+        if (dr.bottom > r.bottom + 1 || dr.right > r.right + 1 || dr.top < r.top - 1 || dr.left < r.left - 1) {
+          fail.push(["spills-out", `<${name(d)}> spills out of <${name(el)}> by ${Math.round(Math.max(dr.bottom - r.bottom, dr.right - r.right, r.top - dr.top, r.left - dr.left))}px`]);
           break;
         }
       }

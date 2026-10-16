@@ -31,6 +31,7 @@ try {
     { valuePrefix: "£", bars: [{ label: "Long value", value: 123456789 }, { label: "Short", value: 1 }] },
     { bars: [{ label: "WWWWWWWWWWWWWWWWWWWW", value: 10 }, { label: "Short", value: 9, highlight: true }] },
     { valueSuffix: " per user per month", bars: [{ label: "Priced", value: 42 }, { label: "Other", value: 7 }] },
+    { labelsAbove: true, valuePrefix: "$", bars: [{ label: "Biggest bar, labels above", value: 900000 }, { label: "Small", value: 100 }] },
   ];
   for (const spec of specs) {
     await page.setContent(barChart(spec, fonts));
