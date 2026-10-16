@@ -1,7 +1,7 @@
 import "server-only";
 import { and, count, desc, eq, inArray, ne, notLike, sql } from "drizzle-orm";
 import type { SessionUser } from "@fit/core";
-import { approvalRequests, auditLog, flagChanges, flags, kycCases, payments, refunds, users, type Db } from "@fit/db";
+import { approvalRequests, auditLog, flagChanges, flagValues, flags, kycCases, payments, refunds, users, type Db } from "@fit/db";
 import { flagChangeApproval } from "./flags/flags.ts";
 import { describeFlagValue } from "./flags/format.ts";
 import { kycApproval } from "./kyc/kyc.ts";
@@ -83,17 +83,25 @@ export async function awaitingMyApproval(db: Db, user: Viewer, opts: { limit?: n
     }
   }
   if (user.permissions.has(flagChangeApproval.approvePermission)) {
-    const where = pendingFromOthers(flagChangeApproval.kind);
+    // A change prod has moved past can only be rejected now, so it isn't waiting for approval.
+    const where = and(pendingFromOthers(flagChangeApproval.kind), eq(flagValues.version, flagChanges.baseVersion));
+    const prodNow = and(eq(flagValues.flagId, flagChanges.flagId), eq(flagValues.environment, flagChanges.environment));
     const rows = await db
       .select({ change: flagChanges, flagKey: flags.key, requestedByName: requesterName, requestedByUsername: users.username, requestedAt: approvalRequests.requestedAt })
       .from(flagChanges)
       .innerJoin(approvalRequests, eq(approvalRequests.id, flagChanges.approvalRequestId))
       .innerJoin(flags, eq(flags.id, flagChanges.flagId))
+      .innerJoin(flagValues, prodNow)
       .innerJoin(users, eq(users.id, approvalRequests.requestedBy))
       .where(where)
       .orderBy(approvalRequests.requestedAt)
       .limit(limit);
-    const [n] = await db.select({ n: count() }).from(approvalRequests).where(where);
+    const [n] = await db
+      .select({ n: count() })
+      .from(flagChanges)
+      .innerJoin(approvalRequests, eq(approvalRequests.id, flagChanges.approvalRequestId))
+      .innerJoin(flagValues, prodNow)
+      .where(where);
     byKind.flags = n?.n ?? 0;
     for (const { change: c, ...r } of rows) {
       const before = describeFlagValue({ enabled: c.beforeEnabled, rolloutPercentage: c.beforeRolloutPercentage });
