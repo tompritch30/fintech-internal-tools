@@ -195,7 +195,7 @@ This is a paragraph of prose that goes on well past twenty words, which is the l
 
 # A chart squeezed so small its labels can't be read
 
-![w:500](assets/charts/refund-tests.svg)
+![w:500](assets/charts/three-year-cost.svg)
 
 <!-- Notes. -->
 
@@ -331,5 +331,111 @@ A subtitle that goes on far too long to fit on one line beside the art
 # A framed drawing letterboxed in a Markdown image is caught
 
 ![w:600 h:200](assets/title-art-dark.svg)
+
+<!-- Notes. -->
+
+---
+
+<!-- expect: em-dash -->
+<!-- also: unused-space -->
+
+# An em dash in the slide text fails
+
+- Refunds — the first app
+
+<!-- Notes. -->
+
+---
+
+<!-- expect: em-dash -->
+<!-- also: unused-space -->
+
+# An en dash only in the notes still fails
+
+- Refunds first
+
+<!-- Weeks 1–4. -->
+
+---
+
+<!-- expect: em-dash -->
+<!-- also: image-aspect unused-space -->
+
+# A dash drawn inside an SVG image fails
+
+![w:400](test/fixtures/dash.svg)
+
+<!-- Notes. -->
+
+---
+
+<!-- expect: pass -->
+<!-- _class: allow-bullet-too-long allow-unused-space -->
+
+# A slide can accept a named failure
+
+- This bullet is deliberately longer than twelve words so the check would fail it
+
+<!-- Notes. -->
+
+---
+
+<!-- expect: spills-out -->
+<!-- also: unused-space -->
+<!-- _footer: "Source: fixture" -->
+
+# A visual squeezed by its row while its content spills out
+
+- Short bullet
+
+<div class="visual" style="height: 120px"><div style="height: 400px; background: #ddd">tall content</div></div>
+
+<!-- Notes. -->
+
+---
+
+<!-- expect: spills-out -->
+<!-- also: unused-space -->
+<!-- _footer: "Source: fixture" -->
+
+# A visual whose content pushes left into the other column
+
+- Short bullet
+
+<div class="visual"><div style="margin-left: -200px">pushed left</div></div>
+
+<!-- Notes. -->
+
+---
+
+<!-- expect: pass -->
+<!-- _class: appendix -->
+<!-- _footer: "Source: fixture" -->
+
+# A lone en dash in a table cell marks "not in this option"
+
+| Item | A | B |
+|---|---|---|
+| Seats | $1K | – |
+| Build | – | $2K |
+| Run | $1K | $1K |
+| Train | – | $1K |
+
+<!-- Notes. -->
+
+---
+
+<!-- expect: em-dash -->
+<!-- _class: appendix -->
+<!-- _footer: "Source: fixture" -->
+
+# An en dash inside a table cell's text still fails
+
+| Item | A | B |
+|---|---|---|
+| Weeks | 1–4 | 5 |
+| Build | 2 | 3 |
+| Run | 1 | 1 |
+| Train | 2 | 1 |
 
 <!-- Notes. -->

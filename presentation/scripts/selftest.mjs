@@ -31,6 +31,7 @@ try {
     { valuePrefix: "£", bars: [{ label: "Long value", value: 123456789 }, { label: "Short", value: 1 }] },
     { bars: [{ label: "WWWWWWWWWWWWWWWWWWWW", value: 10 }, { label: "Short", value: 9, highlight: true }] },
     { valueSuffix: " per user per month", bars: [{ label: "Priced", value: 42 }, { label: "Other", value: 7 }] },
+    { labelsAbove: true, valuePrefix: "$", bars: [{ label: "Biggest bar, labels above", value: 900000 }, { label: "Small", value: 100 }] },
   ];
   for (const spec of specs) {
     await page.setContent(barChart(spec, fonts));
@@ -63,5 +64,10 @@ try {
 } finally {
   await browser.close();
 }
+const altSvg = barChart({ alt: "C $710K to $1.4M", bars: [{ label: "A", value: 1 }] }, fonts);
+const altOk = altSvg.includes('aria-label="C $710K to $1.4M"');
+ok &&= altOk;
+console.log(`${altOk ? "✓" : "✗"} chart: "$1" in alt text is kept, not read as a capture group`);
+
 console.log(ok ? "\nselftest passed" : "\nselftest FAILED");
 process.exit(ok ? 0 : 1);

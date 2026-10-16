@@ -2,10 +2,10 @@
 // Usage: node scripts/check.mjs [deck.md] [--out dir]
 // Failures: title wraps / missing, text overflows the slide or its margins, more than three
 // bullets, plus the other mechanical rules from .agents/skills/slides/SKILL.md.
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { DIST, HEIGHT, WIDTH, launchBrowser, renderDeckPage } from "./lib.mjs";
+import { DIST, HEIGHT, ROOT, WIDTH, launchBrowser, renderDeckPage } from "./lib.mjs";
 import { CHART_FONT } from "./chart.mjs";
 
 export const BANNED = [
@@ -168,6 +168,20 @@ function measure(limits) {
       }
     }
 
+    // A block's own content must stay inside it: a grid row can squeeze a visual while its chart or
+    // text spills out and draws over the next block, and the block-to-block check can't see that.
+    for (const { el, r } of blocks) {
+      if (chrome(el)) continue;
+      for (const d of el.querySelectorAll("*")) {
+        const dr = d.getBoundingClientRect();
+        if (dr.width === 0 && dr.height === 0) continue;
+        if (dr.bottom > r.bottom + 1 || dr.right > r.right + 1 || dr.top < r.top - 1 || dr.left < r.left - 1) {
+          fail.push(["spills-out", `<${name(d)}> spills out of <${name(el)}> by ${Math.round(Math.max(dr.bottom - r.bottom, dr.right - r.right, r.top - dr.top, r.left - dr.left))}px`]);
+          break;
+        }
+      }
+    }
+
     if (!isTitle) {
       // Slide master: label, title, content and logo share one left edge.
       const edge = box.left;
@@ -258,6 +272,18 @@ export async function checkDeck(mdPath, { outDir } = {}) {
 
     const slides = await page.evaluate(measure, LIMITS);
     const svgs = await page.$$("svg[data-marpit-svg]");
+    // Drawn text counts too: an SVG image's labels are slide text the DOM can't see.
+    const images = await page.evaluate(() => [...document.querySelectorAll("svg[data-marpit-svg] > foreignObject > section")]
+      .map((sec) => [...sec.querySelectorAll("img")].map((i) => i.getAttribute("src")).filter((src) => /^[^:]+\.svg$/.test(src))));
+    const svgText = await Promise.all(images.map(async (srcs) =>
+      (await Promise.all(srcs.map((src) => readFile(join(ROOT, src), "utf8").catch(() => "")))).join(" ")));
+    // A table cell holding only "–" is the usual "not in this option" mark, so it doesn't count as a dash.
+    const dashText = await page.evaluate(() => [...document.querySelectorAll("svg[data-marpit-svg] > foreignObject > section")].map((sec) => {
+      const copy = sec.cloneNode(true);
+      for (const cell of copy.querySelectorAll("td, th")) if (cell.textContent.trim() === "\u2013") cell.textContent = "";
+      return copy.textContent;
+    }));
+    const classes = await page.evaluate(() => [...document.querySelectorAll("svg[data-marpit-svg] > foreignObject > section")].map((sec) => [...sec.classList]));
     for (const [i, s] of slides.entries()) {
       const spoken = notes[i] ?? "";
       for (const re of BANNED) {
@@ -265,6 +291,12 @@ export async function checkDeck(mdPath, { outDir } = {}) {
         if (m) s.fail.push(["banned-word", `banned word "${m[0]}"${s.text.match(re) ? "" : " (in speaker notes)"}`]);
       }
       if (!spoken.trim()) s.warn.push("no speaker notes (the reasoning goes there)");
+      if (/[\u2013\u2014]/.test(`${dashText[i]} ${spoken}`)) s.fail.push(["em-dash", "en or em dash in slide text or notes; use a comma, colon or \"to\""]);
+      else if (/[\u2013\u2014]/.test(svgText[i])) s.fail.push(["em-dash", "en or em dash drawn in an SVG image on this slide"]);
+      // A slide may accept named failures with an allow-<code> class, for text Thomas wrote word for word.
+      const allowed = classes[i].filter((c) => c.startsWith("allow-")).map((c) => c.slice(6));
+      for (const [code, msg] of s.fail.filter(([code]) => allowed.includes(code))) s.warn.push(`allowed ${code}: ${msg}`);
+      s.fail = s.fail.filter(([code]) => !allowed.includes(code));
       s.number = i + 1;
       s.screenshot = join(out, `slide-${String(i + 1).padStart(2, "0")}.png`);
       await svgs[i].screenshot({ path: s.screenshot });

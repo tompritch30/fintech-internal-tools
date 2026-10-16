@@ -37,7 +37,7 @@ for _,s,lift in apps:
 for name,s,lift in apps:
     svg,t=block((s[0],s[1]-lift),44,34,name); out.append(svg)
     out.append(text(t[3][0]-20,t[3][1]+8,name,22,1.0,"end"))   # callout letter beside the cube's left corner
-out.append(text(M,72,"FIG. 01 — PLATFORM CORE",18,0.6))
+out.append(text(M,72,"FIG. 01 · PLATFORM CORE",18,0.6))
 out.append(text(M,692,"A REFUNDS · B KYC REVIEW · C FEATURE FLAGS",18,0.85))
 out.append(text(M,718,"CORE: SIGN-IN · PERMISSIONS · AUDIT",18,0.6))
 out.append(text(M,744,"APPROVALS · MASKING",18,0.6))

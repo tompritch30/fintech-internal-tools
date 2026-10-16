@@ -28,6 +28,7 @@ The audience is a VP. Every slide must be readable in five seconds.
 | Every number has a source | A plain-words `Source: …` footer on any slide with a number or chart ("Source: client spend figure; Microsoft Power Apps pricing"). No codes like `S22`. **Never invent numbers.** | `number-without-source` |
 | Unmeasured stays unmeasured | Put it in a small table saying it is measured in the pilot. Never an empty box, guessed bar or `[TBD]` bar. | chart generator refuses a bar with no value |
 | Plain words | A VP can read it in five seconds. Banned: leverage, seamless, robust, unlock, game changing (also in notes). | `banned-word` |
+| No en or em dashes | Not in slide text, notes or drawn SVG labels (cover art, charts). Use a comma, colon or "to". The one exception is a table cell holding only "–", meaning "not in this option" (Thomas asked for it in cost tables). | `em-dash` |
 | Evidence on the slide, reasoning in notes | Speaker notes are what Thomas will say. | warns if notes are missing |
 | Fits the slide | Nothing overflows the slide, the margins or the footer. All text ≥24 px. | `overflow`, `text-too-small`, `chart-text-too-small` |
 
@@ -78,6 +79,7 @@ rendered PNG, not just the slide you changed. The script catches most of this; t
 | Check | Script code | By eye |
 |---|---|---|
 | Nothing touches or overlaps (≥24 px between blocks); no text over art | `elements-touch` | text over a drawing's own detail |
+| A block's content stays inside the block (a squeezed grid row can let a chart spill over the next block) | `spills-out` | — |
 | One left edge for label, title, content, logo | `off-left-edge` | chart labels and table text start on it too |
 | One spacing step (48 px): label→title equals title→content | `uneven-gaps` | even gaps inside diagrams and between table rows |
 | Content uses the space; no blank band at the bottom | `unused-space` | the slide doesn't look top-heavy |
@@ -92,8 +94,28 @@ rendered PNG, not just the slide you changed. The script catches most of this; t
 Mistakes this checklist came from (2026-10-15): a label indented past the title; uneven header gaps; blue on
 labels, bullets and headers at once; mono, bold, serif and sans on one slide; a clipped source line; "DRAFT" on
 every label; tables that stopped halfway down the slide; the cover title on top of the art; a drawing squashed into
-a box of a different shape, so its corner marks floated; chart labels inset from the left edge. When you find a new
+a box of a different shape, so its corner marks floated; chart labels inset from the left edge. Content pass
+(2026-10-16): an em dash drawn inside the cover art's SVG, invisible to the DOM checks; alt text with "$1.4M"
+silently corrupting the chart SVG (a `$1` capture group in `String.replace`); a two-line chart label crowding the
+bar above it; a screenshot with a 1 px border running past the right margin; a dense cost slide that could not fit
+at 24 px until split, and a one-slide try at it where the chart spilled over the roadmap while every
+block-to-block check still passed (now `spills-out`). When you find a new
 kind of mistake, add a check (with a fixture slide in `test/fixtures/violations.md`) or a by-eye row here.
+
+### When Thomas writes the text himself
+
+- Use it **word for word**: titles, bullets, cells, footers and narration. Change layout, never words or numbers.
+- Before building, check his numbers against the repo and CI (test counts, PR counts, ranges that should match
+  between a slide and its appendix) and send him the mismatches. Use his figures until he answers.
+- If his text breaks a rule (long title, long bullet, a banned word), keep the text and add an
+  `allow-<code>` class to that slide (`<!-- _class: long allow-title-wraps allow-bullet-too-long -->`). The check
+  then prints the failure as an "allowed" warning instead of failing. Never loosen the global limits for one deck.
+  List every allowed exception in the PR so he can decide.
+- Long main-deck text: add the `long` class (30 px body). Still nothing under 24 px.
+- If a slide can't hold everything at 24 px or more, split it ("1 of 2", "2 of 2") and tell him; don't cut words.
+- His narration goes in the slide's HTML comment (presenter notes), unchanged. Label demo notes "Before the demo:" /
+  "After the demo:" when he gives both.
+- Footers keep the `Source: ` prefix the check needs, then his words.
 
 ### Writing a slide
 
@@ -114,7 +136,18 @@ kind of mistake, add a check (with a fixture slide in `test/fixtures/violations.
 ```
 
 - Appendix slides: `<!-- _class: appendix -->`. Cover: `<!-- _class: title -->`.
+- A slide that continues another keeps the label count ("Appendix A4 · 2 of 3") and adds "(continued)" to its title.
+  A main-deck slide split in two gets its own label (04a, 04b) and its own action title.
+- Recommendation without colour: give the chart bar `"tag": "recommended"` (an outlined ink label) and keep every
+  bar grey, so the slide spends no blue.
+- Cost tables: one row per line item, columns line item, A, B, C, basis; amounts don't wrap; a blank cell means
+  the line isn't part of that option (say so in the notes). Split across slides by rows, not by columns.
 - One accent on a table: wrap one header in `*…*` (shows blue). Charts: `"highlight": true` on one bar.
+- Chart specs also take `"from"` (a range: solid to `from`, a thin span with end caps to `value`), `"parts"`
+  (a stacked bar, `"ink": true` for the dark part), `"text"` (the value label), `"labelsAbove"` with `"labelLines"`
+  (labels over the bars, wrapping), and `"width"`, `"barHeight"`, `"bandGap"` to fit a column.
+- Screenshots come from the running app (`docker compose up --build`), signed in as the user the slide is about,
+  cropped to the record header and status. Crop out anything that breaks a deck rule (an em dash in the UI).
 - Screenshots: 1920×1080, dummy data only, cropped to what proves the title. Until one exists, a
   `<div class="visual placeholder">` saying why it's missing.
 - Write appendix facts from the source document, not memory, and keep the sources page in step with every number.

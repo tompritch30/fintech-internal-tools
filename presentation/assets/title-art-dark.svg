@@ -21,7 +21,7 @@
 <text x="311" y="124" text-anchor="end" fill="#f7f6f5" fill-opacity="1.0" font-size="22" font-family="DejaVu Sans Mono, ui-monospace, monospace" letter-spacing="1">B</text>
 <polygon points="469.7,236.0 528.6,270.0 528.6,314.0 469.7,280.0" fill="url(#hatch)" stroke="#f7f6f5" stroke-width="2"/><polygon points="528.6,270.0 587.4,236.0 587.4,280.0 528.6,314.0" fill="#101010" stroke="#f7f6f5" stroke-width="2"/><polygon points="528.6,202.0 587.4,236.0 528.6,270.0 469.7,236.0" fill="#1b1b1b" stroke="#f7f6f5" stroke-width="2"/>
 <text x="450" y="244" text-anchor="end" fill="#f7f6f5" fill-opacity="1.0" font-size="22" font-family="DejaVu Sans Mono, ui-monospace, monospace" letter-spacing="1">C</text>
-<text x="48" y="72" text-anchor="start" fill="#f7f6f5" fill-opacity="0.6" font-size="18" font-family="DejaVu Sans Mono, ui-monospace, monospace" letter-spacing="1">FIG. 01 — PLATFORM CORE</text>
+<text x="48" y="72" text-anchor="start" fill="#f7f6f5" fill-opacity="0.6" font-size="18" font-family="DejaVu Sans Mono, ui-monospace, monospace" letter-spacing="1">FIG. 01 · PLATFORM CORE</text>
 <text x="48" y="692" text-anchor="start" fill="#f7f6f5" fill-opacity="0.85" font-size="18" font-family="DejaVu Sans Mono, ui-monospace, monospace" letter-spacing="1">A REFUNDS · B KYC REVIEW · C FEATURE FLAGS</text>
 <text x="48" y="718" text-anchor="start" fill="#f7f6f5" fill-opacity="0.6" font-size="18" font-family="DejaVu Sans Mono, ui-monospace, monospace" letter-spacing="1">CORE: SIGN-IN · PERMISSIONS · AUDIT</text>
 <text x="48" y="744" text-anchor="start" fill="#f7f6f5" fill-opacity="0.6" font-size="18" font-family="DejaVu Sans Mono, ui-monospace, monospace" letter-spacing="1">APPROVALS · MASKING</text>

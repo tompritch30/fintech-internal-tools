@@ -1,5 +1,7 @@
 # fintech-internal-tools
 
+Video walkthrough: https://www.loom.com/share/956688745216494988acfed0f11fcc13
+
 A working proof of concept: the client's internal business apps (KYC review, refunds,
 feature flags) rebuilt on a small shared platform, written with Devin. It exists to
 answer one question with evidence instead of slides.
