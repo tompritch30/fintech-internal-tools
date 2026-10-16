@@ -4,7 +4,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 import { ConflictError, ForbiddenError, SelfApprovalError, ValidationError, permissionsFor } from "@fit/core";
 import { auditLog, createDb, flagChanges, flagValues, flags, type FlagEnvironment } from "@fit/db";
-import { SEED_FLAGS, seed } from "@fit/db/seed";
+import { SEED_FLAGS, recordSeededFlags, seed } from "@fit/db/seed";
 import { expectDbError, makeUser, ownerDb } from "../../../packages/core/test/helpers/db.ts";
 import { TEST_DATABASE_URL } from "../../../packages/core/test/helpers/env.ts";
 import {
@@ -637,6 +637,26 @@ describe("seeded flags: history starts with their seeded values", () => {
     await seed(owner);
     const ids = await seededFlagIds();
     expect(await seededRows(ids)).toHaveLength(ids.length);
+  });
+
+  it("a backfilled flag.seeded row is dated at the flag's creation, so later changes stay above it", async () => {
+    const flag = await newFlag();
+    await changeFlag(await analyst(), await input(flag.id, "dev", { enabled: true, rolloutPercentage: 40 }));
+    await recordSeededFlags(owner, [{ key: flag.key, description: "Test flag", dev: OFF, staging: OFF, prod: OFF }]);
+    const [row] = await seededRows([flag.id]);
+    expect(row?.occurredAt.getTime()).toBe(flag.createdAt.getTime());
+    const history = await flagHistory(db, flag.id);
+    expect(history.map((h) => h.action)).toEqual(["flag.value_changed", "flag.seeded"]);
+  });
+
+  it("a flag that only shares a seed key gets no starting values", async () => {
+    const flag = await newFlag();
+    const seedEntry = { key: flag.key, description: "Something else", dev: OFF, staging: OFF, prod: OFF };
+    await recordSeededFlags(owner, [seedEntry]);
+    expect(await seededRows([flag.id])).toEqual([]);
+    // Positive control: the same flag counts as seeded when the seed made it (here: same description).
+    await recordSeededFlags(owner, [{ ...seedEntry, description: "Test flag" }]);
+    expect(await seededRows([flag.id])).toHaveLength(1);
   });
 
   it("a flag the seed didn't create gets no flag.seeded row", async () => {
