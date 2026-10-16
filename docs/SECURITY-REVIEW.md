@@ -345,13 +345,13 @@ Same Holds / Breaks / Gap scale and control mappings as above.
 | K6 / F6 | Tamper with approvals (version, payload, stale decisions) | Holds | Holds | — |
 | K7 / F7 | Race conditions | Holds | Holds | — |
 | K8 / F8 | Injection | Holds | Holds | — |
-| K9 / F9 | Audit gaps | Holds (gap) | **Breaks**: refused service calls leave no trace | [#PRNUM](https://github.com/tompritch30/fintech-internal-tools/pull/PRNUM) |
+| K9 / F9 | Audit gaps | Holds (gap) | **Breaks**: refused service calls leave no trace | [#35](https://github.com/tompritch30/fintech-internal-tools/pull/35) |
 | F10 | Service endpoint authentication | — | Holds (gap: one token for every environment) | — |
 | F11 | Production kill switch | — | Holds (gap: approvers can't use it) | — |
 
 Fix PRs (red test first, then fix):
 
-1. [PR #PRNUM](https://github.com/tompritch30/fintech-internal-tools/pull/PRNUM): audit refused `/api/flags` calls, capped per minute (flags app only).
+1. [PR #35](https://github.com/tompritch30/fintech-internal-tools/pull/35): audit refused `/api/flags` calls, capped per minute (flags app only).
 
 No KYC fix PR: no KYC attack worked. The KYC gaps below are tracked here, not fixed.
 
@@ -478,7 +478,7 @@ No KYC fix PR: no KYC attack worked. The KYC gaps below are tracked here, not fi
 - **Cause:** `handleFlagsServiceRequest` in `apps/web/app/(platform)/flags/service.ts` returned 401
   without calling anything else. Service callers aren't platform users, so core's
   `requirePermission` denial path never ran.
-- **Fix ([#PRNUM](https://github.com/tompritch30/fintech-internal-tools/pull/PRNUM), flags app only):** a refused call
+- **Fix ([#35](https://github.com/tompritch30/fintech-internal-tools/pull/35), flags app only):** a refused call
   writes `access.denied` on resource `api:flags` through `withAudit`, with no actor and
   `metadata: { required: "flags:service-token", token: "missing" | "invalid" }`. The presented token
   is never stored. The caller is unauthenticated, so rows are capped at 30 per rolling minute (counted
