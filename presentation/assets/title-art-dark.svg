@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 800" width="780" height="800" role="img" aria-label="Wireframe drawing: one shared platform core with three apps, refunds, KYC review and feature flags, plugging into it">
+<defs>
+<pattern id="minor" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" fill="none" stroke="#f7f6f5" stroke-opacity="0.05"/></pattern>
+<pattern id="major" width="120" height="120" patternUnits="userSpaceOnUse"><rect width="120" height="120" fill="url(#minor)"/><path d="M120 0H0V120" fill="none" stroke="#f7f6f5" stroke-opacity="0.1"/></pattern>
+<pattern id="hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#0b0b0b"/><path d="M0 0V10" stroke="#f7f6f5" stroke-opacity="0.35" stroke-width="1.5"/></pattern>
+<filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.07 0"/></filter>
+</defs>
+<rect width="780" height="800" fill="#121212"/><rect width="780" height="800" fill="url(#major)"/>
+<rect x="0.5" y="0.5" width="779" height="799" fill="none" stroke="#f7f6f5" stroke-opacity="0.18"/>
+<polygon points="182.2,450.0 390.0,570.0 390.0,660.0 182.2,540.0" fill="url(#hatch)" stroke="#f7f6f5" stroke-width="2"/><polygon points="390.0,570.0 597.8,450.0 597.8,540.0 390.0,660.0" fill="#101010" stroke="#f7f6f5" stroke-width="2"/><polygon points="390.0,330.0 597.8,450.0 390.0,570.0 182.2,450.0" fill="#1b1b1b" stroke="#f7f6f5" stroke-width="2"/>
+<polygon points="390.0,380.0 511.2,450.0 390.0,520.0 268.8,450.0" fill="none" stroke="#f7f6f5" stroke-opacity="0.4" stroke-width="1.5" stroke-dasharray="6 6"/>
+<polygon points="251.4,428.0 289.5,450.0 251.4,472.0 213.3,450.0" fill="#0b0b0b" stroke="#f7f6f5" stroke-width="2"/>
+<line x1="251.4" y1="450.0" x2="251.4" y2="314.0" stroke="#f7f6f5" stroke-opacity="0.6" stroke-width="1.5" stroke-dasharray="3 7"/>
+<polygon points="390.0,428.0 428.1,450.0 390.0,472.0 351.9,450.0" fill="#0b0b0b" stroke="#f7f6f5" stroke-width="2"/>
+<line x1="390.0" y1="450.0" x2="390.0" y2="194.0" stroke="#f7f6f5" stroke-opacity="0.6" stroke-width="1.5" stroke-dasharray="3 7"/>
+<polygon points="528.6,428.0 566.7,450.0 528.6,472.0 490.5,450.0" fill="#0b0b0b" stroke="#f7f6f5" stroke-width="2"/>
+<line x1="528.6" y1="450.0" x2="528.6" y2="314.0" stroke="#f7f6f5" stroke-opacity="0.6" stroke-width="1.5" stroke-dasharray="3 7"/>
+<polygon points="192.6,236.0 251.4,270.0 251.4,314.0 192.6,280.0" fill="url(#hatch)" stroke="#f7f6f5" stroke-width="2"/><polygon points="251.4,270.0 310.3,236.0 310.3,280.0 251.4,314.0" fill="#101010" stroke="#f7f6f5" stroke-width="2"/><polygon points="251.4,202.0 310.3,236.0 251.4,270.0 192.6,236.0" fill="#1b1b1b" stroke="#f7f6f5" stroke-width="2"/>
+<text x="173" y="244" text-anchor="end" fill="#f7f6f5" fill-opacity="1.0" font-size="22" font-family="DejaVu Sans Mono, ui-monospace, monospace" letter-spacing="1">A</text>
+<polygon points="331.1,116.0 390.0,150.0 390.0,194.0 331.1,160.0" fill="url(#hatch)" stroke="#f7f6f5" stroke-width="2"/><polygon points="390.0,150.0 448.9,116.0 448.9,160.0 390.0,194.0" fill="#101010" stroke="#f7f6f5" stroke-width="2"/><polygon points="390.0,82.0 448.9,116.0 390.0,150.0 331.1,116.0" fill="#1b1b1b" stroke="#f7f6f5" stroke-width="2"/>
+<text x="311" y="124" text-anchor="end" fill="#f7f6f5" fill-opacity="1.0" font-size="22" font-family="DejaVu Sans Mono, ui-monospace, monospace" letter-spacing="1">B</text>
+<polygon points="469.7,236.0 528.6,270.0 528.6,314.0 469.7,280.0" fill="url(#hatch)" stroke="#f7f6f5" stroke-width="2"/><polygon points="528.6,270.0 587.4,236.0 587.4,280.0 528.6,314.0" fill="#101010" stroke="#f7f6f5" stroke-width="2"/><polygon points="528.6,202.0 587.4,236.0 528.6,270.0 469.7,236.0" fill="#1b1b1b" stroke="#f7f6f5" stroke-width="2"/>
+<text x="450" y="244" text-anchor="end" fill="#f7f6f5" fill-opacity="1.0" font-size="22" font-family="DejaVu Sans Mono, ui-monospace, monospace" letter-spacing="1">C</text>
+<text x="48" y="72" text-anchor="start" fill="#f7f6f5" fill-opacity="0.6" font-size="18" font-family="DejaVu Sans Mono, ui-monospace, monospace" letter-spacing="1">FIG. 01 — PLATFORM CORE</text>
+<text x="48" y="692" text-anchor="start" fill="#f7f6f5" fill-opacity="0.85" font-size="18" font-family="DejaVu Sans Mono, ui-monospace, monospace" letter-spacing="1">A REFUNDS · B KYC REVIEW · C FEATURE FLAGS</text>
+<text x="48" y="718" text-anchor="start" fill="#f7f6f5" fill-opacity="0.6" font-size="18" font-family="DejaVu Sans Mono, ui-monospace, monospace" letter-spacing="1">CORE: SIGN-IN · PERMISSIONS · AUDIT</text>
+<text x="48" y="744" text-anchor="start" fill="#f7f6f5" fill-opacity="0.6" font-size="18" font-family="DejaVu Sans Mono, ui-monospace, monospace" letter-spacing="1">APPROVALS · MASKING</text>
+<rect width="780" height="800" filter="url(#grain)"/>
+<path d="M2.0 44V2.0H44" fill="none" stroke="#2200ff" stroke-width="4"/>
+<path d="M778.0 44V2.0H736" fill="none" stroke="#2200ff" stroke-width="4"/>
+<path d="M2.0 756V798.0H44" fill="none" stroke="#2200ff" stroke-width="4"/>
+<path d="M778.0 756V798.0H736" fill="none" stroke="#2200ff" stroke-width="4"/>
+</svg>
