@@ -650,6 +650,14 @@ describe("seeded flags: history starts with their seeded values", () => {
     expect(row?.after).toMatchObject({ key: flag.key, createdAt: flag.createdAt.toISOString() });
   });
 
+  it("a flag.seeded row backfilled after a change still lists below that change in the flag's history", async () => {
+    const flag = await newFlag();
+    await changeFlag(await analyst(), await input(flag.id, "dev", { enabled: true, rolloutPercentage: 40 }));
+    await recordSeededFlags(owner, [{ key: flag.key, description: "Test flag", dev: OFF, staging: OFF, prod: OFF }]);
+    const history = await flagHistory(db, flag.id);
+    expect(history.map((h) => h.action)).toEqual(["flag.value_changed", "flag.seeded"]);
+  });
+
   it("a flag that only shares a seed key gets no starting values", async () => {
     const flag = await newFlag();
     const seedEntry = { key: flag.key, description: "Something else", dev: OFF, staging: OFF, prod: OFF };
