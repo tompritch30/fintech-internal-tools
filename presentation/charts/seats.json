@@ -1,0 +1,22 @@
+{
+  "output": "assets/charts/seats.svg",
+  "alt": "1,042 Premium seats, of which 60 are engineers",
+  "labelsAbove": true,
+  "bars": [
+    {
+      "label": "1,042 seats",
+      "value": 1042,
+      "text": "",
+      "parts": [
+        {
+          "value": 60,
+          "ink": true
+        },
+        {
+          "value": 982
+        }
+      ]
+    }
+  ],
+  "width": 924
+}

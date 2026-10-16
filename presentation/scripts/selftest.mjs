@@ -63,5 +63,10 @@ try {
 } finally {
   await browser.close();
 }
+const altSvg = barChart({ alt: "C $710K to $1.4M", bars: [{ label: "A", value: 1 }] }, fonts);
+const altOk = altSvg.includes('aria-label="C $710K to $1.4M"');
+ok &&= altOk;
+console.log(`${altOk ? "✓" : "✗"} chart: "$1" in alt text is kept, not read as a capture group`);
+
 console.log(ok ? "\nselftest passed" : "\nselftest FAILED");
 process.exit(ok ? 0 : 1);

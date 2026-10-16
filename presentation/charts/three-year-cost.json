@@ -1,0 +1,28 @@
+{
+  "output": "assets/charts/three-year-cost.svg",
+  "alt": "Three-year totals, 2027 to 2029: A about $825K, B $620K to $745K, C $710K to $1.4M",
+  "width": 924,
+  "labelsAbove": true,
+  "bars": [
+    {
+      "label": "A. Status quo: about $825K, plus enforcement risk",
+      "value": 825,
+      "text": ""
+    },
+    {
+      "label": "B. Right-size only: $620K to $745K",
+      "from": 620,
+      "value": 745,
+      "text": ""
+    },
+    {
+      "label": "C. Right-size and build the money apps: $710K to $1.4M, almost all people",
+      "from": 710,
+      "value": 1400,
+      "text": "",
+      "highlight": true
+    }
+  ],
+  "barHeight": 32,
+  "bandGap": 40
+}
