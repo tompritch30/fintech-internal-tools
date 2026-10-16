@@ -481,13 +481,17 @@ No KYC fix PR: no KYC attack worked. The KYC gaps below are tracked here, not fi
 - **Fix ([#35](https://github.com/tompritch30/fintech-internal-tools/pull/35), flags app only):** a refused call
   writes `access.denied` on resource `api:flags` through `withAudit`, with no actor and
   `metadata: { required: "flags:service-token", token: "missing" | "invalid" }`. The presented token
-  is never stored. The caller is unauthenticated, so rows are capped at 30 per rolling minute (counted
-  under an advisory lock) to stop anyone flooding the append-only log. Past the cap the caller still
-  gets 401. The row that reaches the cap is marked `capped: true`, so the log shows refusals carried on unrecorded (Devin Review on #35 flagged that a silent cap would hide them; logging each one to stdout instead just moves the flood, so it isn't done). The right token always works.
+  is never stored. The caller is unauthenticated, so rows are capped at 30 per minute (fixed window,
+  counted under an advisory lock) to stop anyone flooding the append-only log. Past the cap the caller still
+  gets 401. The row that reaches the cap is marked `capped: true`, and the refusals past it are counted and
+  written as one `access.denied.suppressed` row per window (`metadata.suppressed`, `windowStart`, `windowEnd`),
+  so the log stays bounded and no refusal goes unrecorded (Devin Review on #35 flagged that a silent cap would
+  hide them; Thomas chose the summary row). The count is kept in memory until the window ends, so a crash
+  inside a window loses that window's count. The right token always works.
   Red tests: "records a refused service call as an access.denied row, without the presented token"
   (positive control: an accepted call writes no row) and "caps refused-call audit rows per minute,
   marking the row that hits the cap, so an unauthenticated caller can't flood the log" (positive control: the right token still works past
-  the cap).
+  the cap) and "when the cap is hit, writes one summary row per window with how many refusals it didn't record".
 - **Controls:** CC7.2 · A.8.15, A.8.16 · PCI 10.2.1.4 (invalid access attempts).
 
 ### F10. Service endpoint authentication — holds (gap)
