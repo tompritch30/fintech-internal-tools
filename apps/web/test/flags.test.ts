@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { and, eq, inArray } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 import { ConflictError, ForbiddenError, SelfApprovalError, ValidationError, permissionsFor } from "@fit/core";
-import { auditLog, createDb, flagChanges, flagValues, flags, type FlagEnvironment } from "@fit/db";
+import { auditLog, createDb, flagChanges, flagValues, flags, users, type FlagEnvironment } from "@fit/db";
 import { SEED_FLAGS, recordSeededFlags, seed } from "@fit/db/seed";
 import { expectDbError, makeUser, ownerDb } from "../../../packages/core/test/helpers/db.ts";
 import { TEST_DATABASE_URL } from "../../../packages/core/test/helpers/env.ts";
