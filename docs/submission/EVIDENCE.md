@@ -85,6 +85,16 @@ Security review (`docs/SECURITY-REVIEW.md`, #16) tested 12 attacks. Three broke,
 
 Still open, per SECURITY-REVIEW.md: real alerting, audit tampering by the database owner, and the alias dodge in the audit-write test.
 
+### Known limitations (accepted, no fix for the pilot)
+
+Three review findings on [#35](https://github.com/tompritch30/fintech-internal-tools/pull/35) and [#40](https://github.com/tompritch30/fintech-internal-tools/pull/40) were confirmed and left on purpose. Thomas judged them rare edge cases not worth a migration for the pilot. The full write-up (what can happen, how likely it is, and the migration that would fix it) is in [SECURITY-REVIEW.md › Known limitations (KYC and flags)](../SECURITY-REVIEW.md#known-limitations-kyc-and-flags).
+
+| | Limitation | Likelihood | Later fix (migration) |
+|---|---|---|---|
+| L1 | A worker restart inside a capped minute loses that window's `access.denied.suppressed` count. The first 30 `access.denied` rows and the `capped: true` row are still written. | Low | Per-window counter table, updated in the cap transaction |
+| L2 | One window can get more than one summary row (one per worker, or a refusal that lands after its window was flushed). Counts add up correctly; sum by `windowStart`. | Low | The same table, with each window claimed once |
+| L3 | If a seeded flag's description no longer matches `SEED_FLAGS`, a pre-#40 database doesn't get that flag's `flag.seeded` row backfilled. | Very low | Provenance column on `flags` (`seeded` / `created_by`) |
+
 ## 4. Build timeline (UTC, by merge time; 2026-10-15 unless marked)
 
 | Time | What landed |
