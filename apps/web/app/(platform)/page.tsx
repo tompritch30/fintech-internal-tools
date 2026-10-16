@@ -18,7 +18,7 @@ const awaitingColumns: Column<AwaitingItem>[] = [
       </Link>
     ),
   },
-  { key: "requestedBy", label: "Requested by", render: (r) => r.requestedByName },
+  { key: "requestedBy", label: "Requested by", render: (r) => <span title={r.requestedByUsername}>{r.requestedByName}</span> },
   { key: "requestedAt", label: "Waiting since", render: (r) => when(r.requestedAt) },
 ];
 
@@ -43,7 +43,7 @@ export default async function HomePage() {
   const user = await requirePagePermission("platform:access", "/");
   const db = getDb();
   const can = (p: Permission) => user.permissions.has(p);
-  const approves = can("refunds:approve") || can("kyc:approve");
+  const approves = can("refunds:approve") || can("kyc:approve") || can("flags:approve");
   const [awaiting, activity, claimable] = await Promise.all([
     approves ? awaitingMyApproval(db, user) : Promise.resolve(null),
     myRecentActivity(db, user),
@@ -78,7 +78,13 @@ export default async function HomePage() {
           <AppTile href="/kyc" icon={<IdCard />} title="KYC review" description="Claim and decide customer due-diligence cases." stat={kycStat} />
         ) : null}
         {can("flags:read") ? (
-          <AppTile href="/flags" icon={<ToggleRight />} title="Feature flags" description="See and change flags per environment. Prod changes need a second person." />
+          <AppTile
+            href={can("flags:approve") ? "/flags/approvals" : "/flags"}
+            icon={<ToggleRight />}
+            title="Feature flags"
+            description="See and change flags per environment. Prod changes need a second person."
+            stat={awaiting && can("flags:approve") ? `${awaiting.byKind.flags} waiting for you` : undefined}
+          />
         ) : null}
         {can("audit:read") ? <AppTile href="/audit" icon={<ScrollText />} title="Audit log" description="Who did what, when and why. Read-only." /> : null}
       </TileGrid>

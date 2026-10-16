@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import type { AuditListItem } from "@fit/core";
-import { ActionPanel, RecordHeader, RecordSection, Timeline } from "@fit/ui";
+import { ActionPanel, DangerZone, RecordHeader, RecordSection, Timeline } from "@fit/ui";
+import { withActorNames } from "../../../../lib/actor-names.ts";
 import { getDb, requirePagePermission } from "../../../../lib/auth.ts";
 import { DecisionForms, EnvironmentForm, KillSwitchForm } from "../forms.tsx";
 import { ENVIRONMENTS, flagHistory, getFlagView } from "../flags.ts";
@@ -23,7 +24,7 @@ export default async function FlagPage({ params }: { params: Promise<{ flagId: s
   const db = getDb();
   const flag = await getFlagView(db, flagId);
   if (!flag) notFound();
-  const history = await flagHistory(db, flag.id);
+  const history = await withActorNames(db, await flagHistory(db, flag.id));
   const prod = flag.values.prod;
   const pending = flag.pendingChange;
   const { actions, waiting } = flagActions(user, { prodEnabled: prod.enabled, prodVersion: prod.version, pending });
@@ -34,7 +35,8 @@ export default async function FlagPage({ params }: { params: Promise<{ flagId: s
         back={{ href: "/flags", label: "Feature flags" }}
         title={flag.key}
         status={{ label: prod.enabled ? `Prod on · ${prod.rolloutPercentage}%` : "Prod off" }}
-        owner={pending?.requestedByName ?? "None pending"}
+        owner={pending?.requestedByName}
+        ownerTitle={pending?.requestedByUsername}
         ownerLabel="Prod change requested by"
       />
       <ActionPanel label="Flag actions" waiting={waiting}>
@@ -44,7 +46,6 @@ export default async function FlagPage({ params }: { params: Promise<{ flagId: s
             {actions.includes("reject") && pending ? (
               <DecisionForms changeId={pending.id} version={pending.approval.version} canApprove={actions.includes("approve")} />
             ) : null}
-            {actions.includes("kill") ? <KillSwitchForm flagId={flag.id} /> : null}
             {actions.includes("change")
               ? ENVIRONMENTS.filter((env) => !(env === "prod" && pending)).map((env) => (
                   <EnvironmentForm
@@ -76,19 +77,25 @@ export default async function FlagPage({ params }: { params: Promise<{ flagId: s
           pending
             ? [
                 { label: "Change", value: `${describeFlagValue(pending.before)} → ${describeFlagValue(pending.after)}` },
-                { label: "Requested by", value: pending.requestedByName },
+                { label: "Requested by", value: <span title={pending.requestedByUsername}>{pending.requestedByName}</span> },
                 { label: "Requested", value: formatWhen(pending.requestedAt) },
                 { label: "Reason", value: pending.reason },
               ]
             : [{ label: "Status", value: "None. Prod changes wait here for a different approver." }]
         }
       />
+      {actions.includes("kill") ? (
+        <DangerZone description="Turns the flag off in prod straight away, with no second approver. Use it when a rollout is causing harm.">
+          <KillSwitchForm flagId={flag.id} />
+        </DangerZone>
+      ) : null}
       <RecordSection title="History">
         <Timeline
           items={history.map((h) => ({
             id: h.id,
             occurredAt: h.occurredAt,
-            actor: h.actor,
+            actor: h.actorName,
+            actorTitle: h.actor,
             action: h.action,
             summary: summary(h),
             reason: h.reason,

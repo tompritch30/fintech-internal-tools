@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { MIN_UNMASK_REASON_LENGTH, type AuditListItem } from "@fit/core";
 import { ActionButton, ActionDialog, ActionPanel, Input, RecordHeader, RecordSection, RevealButton, StatusBadge, Timeline } from "@fit/ui";
+import { withActorNames } from "../../../../../lib/actor-names.ts";
 import { getDb, requirePagePermission } from "../../../../../lib/auth.ts";
 import { claimCaseAction, decideCaseAction, openDocumentAction, revealFieldAction, signOffCaseAction } from "../../actions.ts";
 import { MASKED_FIELDS, formatDay, formatWhen, riskBadges, statusOf } from "../../format.ts";
@@ -44,7 +45,7 @@ export default async function KycCasePage({ params }: { params: Promise<{ caseId
   const db = getDb();
   const kase = await getKycCase({ db, user }, caseId);
   if (!kase) notFound();
-  const history = await caseHistory(db, kase.id);
+  const history = await withActorNames(db, await caseHistory(db, kase.id));
   const { actions, waiting } = caseActions(user, kase);
   const canUnmask = user.permissions.has("pii:unmask");
   const masked = (field: KycMaskedField) =>
@@ -154,7 +155,8 @@ export default async function KycCasePage({ params }: { params: Promise<{ caseId
           items={history.map((h) => ({
             id: h.id,
             occurredAt: h.occurredAt,
-            actor: h.actor,
+            actor: h.actorName,
+            actorTitle: h.actor,
             action: h.action,
             summary: summary(h),
             reason: h.reason,

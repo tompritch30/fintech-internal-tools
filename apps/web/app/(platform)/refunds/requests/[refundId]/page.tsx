@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { AuditListItem } from "@fit/core";
 import { ActionDialog, ActionPanel, Input, RecordHeader, RecordSection, Timeline, linkClass } from "@fit/ui";
+import { withActorNames } from "../../../../../lib/actor-names.ts";
 import { getDb, requirePagePermission } from "../../../../../lib/auth.ts";
 import { approveRefundAction, rejectRefundAction } from "../../actions.ts";
 import { formatPence, formatWhen, statusOf } from "../../format.ts";
@@ -38,7 +39,7 @@ export default async function RefundPage({ params }: { params: Promise<{ refundI
   const db = getDb();
   const refund = await getRefundView(db, refundId);
   if (!refund) notFound();
-  const history = await refundHistory(db, refund.id);
+  const history = await withActorNames(db, await refundHistory(db, refund.id));
   const { actions, waiting } = refundActions(user, refund);
   const decision = { refundId: refund.id, expectedVersion: refund.approval?.version ?? 0 };
 
@@ -97,7 +98,8 @@ export default async function RefundPage({ params }: { params: Promise<{ refundI
           items={history.map((h) => ({
             id: h.id,
             occurredAt: h.occurredAt,
-            actor: h.actor,
+            actor: h.actorName,
+            actorTitle: h.actor,
             action: h.action,
             summary: summary(h),
             reason: h.reason,
