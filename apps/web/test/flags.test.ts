@@ -577,7 +577,8 @@ describe("rule 7: services read current values from a read-only endpoint", () =>
     db
       .select()
       .from(auditLog)
-      .where(and(eq(auditLog.action, "access.denied"), eq(auditLog.entityType, "resource"), eq(auditLog.entityId, "api:flags")));
+      .where(and(eq(auditLog.action, "access.denied"), eq(auditLog.entityType, "resource"), eq(auditLog.entityId, "api:flags")))
+      .orderBy(auditLog.id);
 
   it("records a refused service call as an access.denied row, without the presented token", async () => {
     const before = (await serviceDenials()).length;
@@ -597,18 +598,30 @@ describe("rule 7: services read current values from a read-only endpoint", () =>
   });
 
   it("caps refused-call audit rows per minute, marking the row that hits the cap, so an unauthenticated caller can't flood the log", async () => {
-    // same window and clock as the handler, so rows ageing out can't skew the count
-    const [{ n: recent } = { n: 0 }] = await db
-      .select({ n: count() })
-      .from(auditLog)
-      .where(
-        and(
-          eq(auditLog.action, "access.denied"),
-          eq(auditLog.entityType, "resource"),
-          eq(auditLog.entityId, "api:flags"),
-          gt(auditLog.occurredAt, sql`clock_timestamp() - interval '1 minute'`),
-        ),
-      );
+    // same window and clock as the handler; if a row would age out mid-test, wait for it to go first
+    const inWindow = async () => {
+      const [w] = await db
+        .select({
+          n: count(),
+          age: sql<number>`coalesce(extract(epoch from clock_timestamp() - min(${auditLog.occurredAt})), 0)`.mapWith(Number),
+        })
+        .from(auditLog)
+        .where(
+          and(
+            eq(auditLog.action, "access.denied"),
+            eq(auditLog.entityType, "resource"),
+            eq(auditLog.entityId, "api:flags"),
+            gt(auditLog.occurredAt, sql`clock_timestamp() - interval '1 minute'`),
+          ),
+        );
+      return w ?? { n: 0, age: 0 };
+    };
+    let w = await inWindow();
+    if (w.age > 50) {
+      await new Promise((resolve) => setTimeout(resolve, (60 - w.age) * 1000 + 200));
+      w = await inWindow();
+    }
+    const recent = w.n;
     const before = (await serviceDenials()).length;
     const options = { deniedAuditPerMinute: recent + 2 };
     for (let i = 0; i < 5; i++) {
@@ -621,7 +634,7 @@ describe("rule 7: services read current values from a read-only endpoint", () =>
     expect(added.map((r) => (r.metadata as { capped?: boolean }).capped ?? false)).toEqual([false, true]);
     // positive control: the right token still works once the cap is hit
     expect((await handleFlagsServiceRequest(db, serviceRequest("?environment=prod"), config, options)).status).toBe(200);
-  });
+  }, 20_000);
 
   it("is switched off (503) when no token is configured, even for a request that sends one", async () => {
     const res = await handleFlagsServiceRequest(db, serviceRequest("?environment=prod"), { serviceToken: null });
