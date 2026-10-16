@@ -235,7 +235,16 @@ export async function flagHistory(db: Db, flagId: string): Promise<AuditListItem
     .from(flagChanges)
     .where(eq(flagChanges.flagId, flagId));
   const approvalRows = (await Promise.all(approvals.map((a) => listAuditForEntity(db, "approval_request", a.id)))).flat();
-  return [...own, ...approvalRows].sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime() || b.id - a.id);
+  return [...own, ...approvalRows].sort((a, b) => happenedAt(b) - happenedAt(a) || b.id - a.id);
+}
+
+/** A backfilled `flag.seeded` row is written late but describes the flag's creation (`after.createdAt`). */
+function happenedAt(entry: AuditListItem): number {
+  const written = entry.occurredAt.getTime();
+  if (entry.action !== "flag.seeded") return written;
+  const createdAt = (entry.after as { createdAt?: unknown } | null)?.createdAt;
+  const created = typeof createdAt === "string" ? Date.parse(createdAt) : Number.NaN;
+  return Number.isNaN(created) ? written : Math.min(created, written);
 }
 
 export async function listPendingFlagChanges(ctx: ActionContext, query: { q?: string } = {}): Promise<FlagChangeView[]> {

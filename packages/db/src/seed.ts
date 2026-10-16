@@ -1,7 +1,7 @@
 // Dummy data only. Subjects match the user ids in infra/keycloak/internal-tools-realm.json.
 import { fileURLToPath } from "node:url";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { createDb, type Db } from "./index.ts";
+import { createDb, type Db, type Executor } from "./index.ts";
 import { auditLog, flags, flagValues, kycCases, kycDocuments, payments, roles, userRoles, users } from "./schema.ts";
 import { loadRootEnv } from "./root-env.ts";
 
@@ -135,6 +135,50 @@ export const SEED_FLAGS: readonly { key: string; description: string; dev: SeedV
   { key: "e2e-sandbox-flag", description: "Used by the Playwright tests; changes freely", dev: off(), staging: off(), prod: off() },
 ];
 
+/**
+ * Gives each seeded flag one `flag.seeded` row with its starting values, so its history doesn't start
+ * empty. Backfills flags seeded before the row existed; a rerun adds nothing. The row is dated when it is
+ * written (audit_log is never backdated); `after.createdAt` holds when the flag was created.
+ */
+export async function recordSeededFlags(
+  tx: Executor,
+  seedFlags: typeof SEED_FLAGS,
+  createdNow: ReadonlySet<string> = new Set(),
+): Promise<void> {
+  if (seedFlags.length === 0) return;
+  const bySeedKey = new Map(seedFlags.map((f) => [f.key, f]));
+  const existing = await tx
+    .select({ id: flags.id, key: flags.key, description: flags.description, createdAt: flags.createdAt })
+    .from(flags)
+    .where(inArray(flags.key, [...bySeedKey.keys()]));
+  const withRow = new Set(
+    (
+      await tx
+        .select({ entityId: auditLog.entityId })
+        .from(auditLog)
+        .where(and(eq(auditLog.entityType, "flag"), eq(auditLog.action, "flag.seeded")))
+    ).map((r) => r.entityId),
+  );
+  const missing = existing.flatMap((f) => {
+    const s = bySeedKey.get(f.key);
+    // A flag that only shares a seed key wasn't made by the seed: don't claim it started with seed values.
+    const seeded = s !== undefined && (createdNow.has(f.id) || s.description === f.description);
+    return seeded && !withRow.has(f.id) ? [{ flag: f, s }] : [];
+  });
+  if (missing.length === 0) return;
+  await tx.insert(auditLog).values(
+    missing.map(({ flag, s }) => ({
+      actorSubject: "seed",
+      action: "flag.seeded",
+      entityType: "flag",
+      entityId: flag.id,
+      reason: "Starting values (seeded dummy data)",
+      // audit_log is never backdated: occurred_at is when this row was written, createdAt is when the flag was.
+      after: { key: flag.key, createdAt: flag.createdAt.toISOString(), dev: s.dev, staging: s.staging, prod: s.prod },
+    })),
+  );
+}
+
 export async function seed(db: Db): Promise<void> {
   await db.transaction(async (tx) => {
     // One seed at a time, so overlapping runs can't both write the same payment's capture row.
@@ -213,8 +257,14 @@ export async function seed(db: Db): Promise<void> {
     }
 
     // Flags and their per-environment values are inserted once; later changes go through the app.
+    const createdFlags = new Set<string>();
     for (const f of SEED_FLAGS) {
-      await tx.insert(flags).values({ key: f.key, description: f.description }).onConflictDoNothing({ target: flags.key });
+      const [created] = await tx
+        .insert(flags)
+        .values({ key: f.key, description: f.description })
+        .onConflictDoNothing({ target: flags.key })
+        .returning({ id: flags.id });
+      if (created) createdFlags.add(created.id);
       const [flag] = await tx.select({ id: flags.id }).from(flags).where(eq(flags.key, f.key));
       if (!flag) throw new Error(`seed: could not insert flag ${f.key}`);
       await tx
@@ -222,6 +272,8 @@ export async function seed(db: Db): Promise<void> {
         .values((["dev", "staging", "prod"] as const).map((environment) => ({ flagId: flag.id, environment, ...f[environment] })))
         .onConflictDoNothing();
     }
+
+    await recordSeededFlags(tx, SEED_FLAGS, createdFlags);
 
     // audit_log is append-only, so sample rows are inserted once and never replaced.
     const existing = await tx
