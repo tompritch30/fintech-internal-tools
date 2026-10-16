@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ConflictError, ForbiddenError, NotFoundError, SelfApprovalError, ValidationError } from "@fit/core";
 import { defineAction } from "../../../lib/auth.ts";
+import { revealFailure } from "../../../lib/reveal-errors.ts";
 import type { FormState } from "./format.ts";
 import { approveRefund, parsePounds, rejectRefund, requestRefund, revealCustomerEmail, revealCustomerName } from "./refunds.ts";
 
@@ -77,7 +78,7 @@ export const revealEmailAction = defineAction(
       const email = await revealCustomerEmail(ctx, { paymentId: field(form, "paymentId"), reason: field(form, "reason") });
       return { revealed: email ?? "" };
     } catch (err) {
-      return failure(err);
+      return revealFailure(err);
     }
   },
 );
@@ -90,7 +91,7 @@ export const revealNameAction = defineAction(
       const name = await revealCustomerName(ctx, { paymentId: field(form, "paymentId"), reason: field(form, "reason") });
       return { revealed: name ?? "" };
     } catch (err) {
-      return failure(err);
+      return revealFailure(err);
     }
   },
 );

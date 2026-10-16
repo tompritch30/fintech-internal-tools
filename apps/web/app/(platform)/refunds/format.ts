@@ -22,3 +22,10 @@ export const STATUS: Record<string, StatusValue> = {
 };
 
 export const statusOf = (status: string): StatusValue => STATUS[status] ?? { label: status };
+
+/** "Captured", "Partially refunded" once some money has gone back, "Fully refunded" when all of it has. */
+export function paymentStatus(p: { amountPence: number; refundedPence: number }): StatusValue {
+  if (p.refundedPence >= p.amountPence) return { label: "Fully refunded", kind: "done" };
+  if (p.refundedPence > 0) return { label: "Partially refunded" };
+  return { label: "Captured" };
+}

@@ -79,3 +79,20 @@ test("requester with approver rights is not offered approval of their own refund
   await approve(page);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Refunded");
 });
+
+test("revealing a customer name asks for a real reason, then shows the name in place of the masked one", async ({ page }) => {
+  await signIn(page, "approver");
+  await page.getByRole("link", { name: "Refunds", exact: true }).click();
+  await page.getByRole("row").nth(1).getByRole("link").first().click();
+  const masked = page.locator("[data-masked]").first();
+  await expect(masked).toBeVisible();
+  await page.getByRole("button", { name: "Reveal customer name" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Reason").fill("          ");
+  await dialog.getByRole("button", { name: "Reveal" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText("Give a reason for revealing this.");
+  await dialog.getByLabel("Reason").fill("Customer called about a refund");
+  await dialog.getByRole("button", { name: "Reveal" }).click();
+  await expect(page.getByTestId("revealed-customer-name")).toBeVisible();
+  await expect(masked).toBeHidden();
+});
