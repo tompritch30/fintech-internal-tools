@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 import { requirePermission } from "@fit/core";
 import { and, eq } from "drizzle-orm";
-import { createDb, flagValues, flags, kycCases, payments } from "@fit/db";
+import { createDb, flagValues, flags, kycCases, payments, users } from "@fit/db";
 import { makeUser, ownerDb } from "../../../packages/core/test/helpers/db.ts";
 import { TEST_DATABASE_URL } from "../../../packages/core/test/helpers/env.ts";
 import { awaitingMyApproval, myRecentActivity } from "../app/(platform)/dashboard.ts";
@@ -28,6 +28,17 @@ async function pendingRefundBy(roles: string[]) {
   return { maker, refund };
 }
 
+async function pendingFlagChangeBy(roles: string[]) {
+  const [flag] = await owner.insert(flags).values({ key: `dash-${randomUUID().slice(0, 8)}`, description: "Dashboard test flag" }).returning();
+  if (!flag) throw new Error("flag insert failed");
+  await owner.insert(flagValues).values((["dev", "staging", "prod"] as const).map((environment) => ({ flagId: flag.id, environment, enabled: false, rolloutPercentage: 0 })));
+  const [prod] = await owner.select().from(flagValues).where(and(eq(flagValues.flagId, flag.id), eq(flagValues.environment, "prod")));
+  const maker = await as(roles);
+  const result = await changeFlag(maker, { flagId: flag.id, environment: "prod", enabled: true, rolloutPercentage: 25, reason: "Start the rollout", expectedVersion: prod?.version ?? 0, changeId: randomUUID() });
+  if (!result.flag.pendingChange) throw new Error("expected a pending prod change");
+  return { flag, maker, change: result.flag.pendingChange };
+}
+
 const ids = async (user: Awaited<ReturnType<typeof as>>["user"]) => (await awaitingMyApproval(db, user, ALL)).items.map((i) => i.id);
 
 describe("dashboard: items waiting for my approval", () => {
@@ -46,7 +57,8 @@ describe("dashboard: items waiting for my approval", () => {
     expect(one.items).toHaveLength(1);
     const refunds = all.items.filter((i) => i.kind === "Refund").length;
     expect(refunds).toBeGreaterThan(0);
-    expect(one.byKind).toEqual({ refunds, kyc: all.items.length - refunds });
+    const kinds = (kind: string) => all.items.filter((i) => i.kind === kind).length;
+    expect(one.byKind).toEqual({ refunds, kyc: kinds("KYC sign-off"), flags: kinds("Flag change") });
     expect(one.total).toBe(all.items.length);
   });
 
@@ -59,7 +71,7 @@ describe("dashboard: items waiting for my approval", () => {
 
   it("shows nothing to a user without approver rights", async () => {
     await pendingRefundBy(["analyst"]);
-    expect(await awaitingMyApproval(db, (await as(["analyst"])).user, ALL)).toEqual({ items: [], total: 0, byKind: { refunds: 0, kyc: 0 } });
+    expect(await awaitingMyApproval(db, (await as(["analyst"])).user, ALL)).toEqual({ items: [], total: 0, byKind: { refunds: 0, kyc: 0, flags: 0 } });
   });
 
   it("lists a high-risk KYC sign-off for a different approver, not for the analyst-approver who asked", async () => {
@@ -75,6 +87,39 @@ describe("dashboard: items waiting for my approval", () => {
     expect(await ids(senior.user)).not.toContain(kase.id);
     const item = (await awaitingMyApproval(db, (await as(["approver"])).user, ALL)).items.find((i) => i.id === kase.id);
     expect(item).toMatchObject({ kind: "KYC sign-off", href: `/kyc/cases/${kase.id}` });
+  });
+});
+
+describe("dashboard: flag approvals and requester names", () => {
+  it("lists a prod flag change for a different approver, not for the approver who asked", async () => {
+    const { flag, maker, change } = await pendingFlagChangeBy(["analyst", "approver"]);
+    expect(await ids(maker.user)).not.toContain(change.id);
+    const item = (await awaitingMyApproval(db, (await as(["approver"])).user, ALL)).items.find((i) => i.id === change.id);
+    expect(item).toMatchObject({ kind: "Flag change", title: `${flag.key}: prod Off → On · 25%`, href: `/flags/${flag.id}` });
+  });
+
+  it("leaves out a flag change that prod has moved past, since it can only be rejected now", async () => {
+    const { flag } = await pendingFlagChangeBy(["analyst"]);
+    const approver = (await as(["approver"])).user;
+    const listed = async () => (await awaitingMyApproval(db, approver, ALL)).items.some((i) => i.href === `/flags/${flag.id}`);
+    expect(await listed()).toBe(true);
+    const prodRow = and(eq(flagValues.flagId, flag.id), eq(flagValues.environment, "prod"));
+    const [prod] = await owner.select().from(flagValues).where(prodRow);
+    await owner.update(flagValues).set({ version: (prod?.version ?? 0) + 1 }).where(prodRow);
+    expect(await listed()).toBe(false);
+  });
+
+  it("counts waiting flag changes only for users who can approve them", async () => {
+    await pendingFlagChangeBy(["analyst"]);
+    expect((await awaitingMyApproval(db, (await as(["approver"])).user, ALL)).byKind.flags).toBeGreaterThan(0);
+    expect((await awaitingMyApproval(db, (await as(["analyst"])).user, ALL)).byKind.flags).toBe(0);
+  });
+
+  it("names the requester by display name and keeps the username for hover", async () => {
+    const { maker, refund } = await pendingRefundBy(["analyst"]);
+    await owner.update(users).set({ displayName: "Riley Requester" }).where(eq(users.id, maker.user.id));
+    const item = (await awaitingMyApproval(db, (await as(["approver"])).user, ALL)).items.find((i) => i.id === refund.id);
+    expect(item).toMatchObject({ requestedByName: "Riley Requester", requestedByUsername: maker.user.username });
   });
 });
 

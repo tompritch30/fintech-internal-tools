@@ -5,8 +5,9 @@ export interface FormState {
   message?: string;
 }
 
+/** "On · 25%", or just "Off": an Off flag serves no one, whatever rollout it kept. */
 export function describeFlagValue(value: FlagValue): string {
-  return `${value.enabled ? "On" : "Off"} · ${value.rolloutPercentage}%`;
+  return value.enabled ? `On · ${value.rolloutPercentage}%` : "Off";
 }
 
 const isValue = (v: unknown): v is FlagValue =>
@@ -15,7 +16,7 @@ const isValue = (v: unknown): v is FlagValue =>
   typeof (v as FlagValue).enabled === "boolean" &&
   typeof (v as FlagValue).rolloutPercentage === "number";
 
-/** Timeline summary for a flag audit row, e.g. "prod: Off · 0% → On · 25%". */
+/** Timeline summary for a flag audit row, e.g. "prod: Off → On · 25%". */
 export function describeFlagAudit(after: unknown): string | undefined {
   if (!isValue(after)) return undefined;
   const { environment, previous } = after as FlagValue & { environment?: unknown; previous?: unknown };

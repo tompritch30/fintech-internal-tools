@@ -1,4 +1,4 @@
-import { and, asc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 import {
   ConflictError,
   NotFoundError,
@@ -55,7 +55,9 @@ export interface FlagChangeView {
   reason: string;
   status: "pending" | "applied" | "rejected";
   requestedBy: string;
+  /** Display name, falling back to the username. */
   requestedByName: string;
+  requestedByUsername: string;
   requestedAt: Date;
   /** Prod's version when requested; approval is refused once prod has moved past it. */
   baseVersion: number;
@@ -178,7 +180,8 @@ async function loadChanges(db: Executor, where: SQL | undefined): Promise<FlagCh
     .select({
       change: flagChanges,
       flagKey: flags.key,
-      requestedByName: users.username,
+      requestedByName: sql<string>`coalesce(${users.displayName}, ${users.username})`,
+      requestedByUsername: users.username,
       approvalVersion: approvalRequests.version,
       approvalStatus: approvalRequests.status,
     })
@@ -188,7 +191,7 @@ async function loadChanges(db: Executor, where: SQL | undefined): Promise<FlagCh
     .innerJoin(approvalRequests, eq(approvalRequests.id, flagChanges.approvalRequestId))
     .where(where)
     .orderBy(asc(flagChanges.requestedAt));
-  return rows.map(({ change: c, flagKey, requestedByName, approvalVersion, approvalStatus }) => ({
+  return rows.map(({ change: c, flagKey, requestedByName, requestedByUsername, approvalVersion, approvalStatus }) => ({
     id: c.id,
     flagId: c.flagId,
     flagKey,
@@ -199,6 +202,7 @@ async function loadChanges(db: Executor, where: SQL | undefined): Promise<FlagCh
     status: c.status,
     requestedBy: c.requestedBy,
     requestedByName,
+    requestedByUsername,
     requestedAt: c.requestedAt,
     baseVersion: c.baseVersion,
     approval: { id: c.approvalRequestId, version: approvalVersion, status: approvalStatus },
@@ -252,7 +256,7 @@ export async function listPendingFlagChanges(ctx: ActionContext, query: { q?: st
   const pending = await loadChanges(ctx.db, eq(flagChanges.status, "pending"));
   const term = query.q?.trim().toLowerCase();
   if (!term) return pending;
-  return pending.filter((c) => [c.flagKey, c.reason, c.requestedByName].some((v) => v.toLowerCase().includes(term)));
+  return pending.filter((c) => [c.flagKey, c.reason, c.requestedByName, c.requestedByUsername].some((v) => v.toLowerCase().includes(term)));
 }
 
 /** What services see: current values only. Pending prod changes are not visible until applied. */
