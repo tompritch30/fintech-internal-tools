@@ -642,6 +642,38 @@ describe("rule 7: services read current values from a read-only endpoint", () =>
     expect(rows[0]!.actorUserId).toBeNull();
   });
 
+  it("still serves a valid caller when a pending summary row can't be written, and writes it on a later call", async () => {
+    const windowSeconds = 1;
+    const audit = { failing: false };
+    // the same db, except audit writes (withAudit's transaction) fail while `audit.failing` is set
+    const flaky = new Proxy(db, {
+      get(target, prop) {
+        if (prop === "transaction" && audit.failing) return () => Promise.reject(new Error("audit write unavailable"));
+        const value = Reflect.get(target, prop, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) as typeof db;
+    const summaries = async () =>
+      db
+        .select()
+        .from(auditLog)
+        .where(and(eq(auditLog.action, "access.denied.suppressed"), eq(auditLog.entityType, "resource"), eq(auditLog.entityId, "api:flags")))
+        .orderBy(auditLog.id);
+    await new Promise((resolve) => setTimeout(resolve, windowSeconds * 1000 - (Date.now() % (windowSeconds * 1000)) + 50));
+    const windowStart = new Date(Math.floor(Date.now() / (windowSeconds * 1000)) * windowSeconds * 1000).toISOString();
+    const options = { deniedAuditPerMinute: 0, deniedAuditWindowSeconds: windowSeconds };
+    expect((await handleFlagsServiceRequest(flaky, serviceRequest("?environment=prod", "wrong-0123456789abcdef"), config, options)).status).toBe(401);
+    audit.failing = true;
+    await new Promise((resolve) => setTimeout(resolve, windowSeconds * 1000 + 200));
+    expect((await handleFlagsServiceRequest(flaky, serviceRequest("?environment=prod"), config, options)).status).toBe(200);
+    // positive control: once audit writes work again, the next call writes the summary it kept
+    audit.failing = false;
+    expect((await handleFlagsServiceRequest(flaky, serviceRequest("?environment=prod"), config, options)).status).toBe(200);
+    const rows = (await summaries()).filter((r) => (r.metadata as { windowStart?: string }).windowStart === windowStart);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.metadata).toMatchObject({ suppressed: 1 });
+  });
+
   it("is switched off (503) when no token is configured, even for a request that sends one", async () => {
     const res = await handleFlagsServiceRequest(db, serviceRequest("?environment=prod"), { serviceToken: null });
     expect(res.status).toBe(503);
