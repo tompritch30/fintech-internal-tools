@@ -573,6 +573,107 @@ describe("rule 7: services read current values from a read-only endpoint", () =>
     expect((await handleFlagsServiceRequest(db, serviceRequest("?environment=prod"), config)).status).toBe(200);
   });
 
+  const serviceDenials = async () =>
+    db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.action, "access.denied"), eq(auditLog.entityType, "resource"), eq(auditLog.entityId, "api:flags")))
+      .orderBy(auditLog.id);
+
+  it("records a refused service call as an access.denied row, without the presented token", async () => {
+    const before = (await serviceDenials()).length;
+    const guess = "guessed-token-0123456789abcdef";
+    expect((await handleFlagsServiceRequest(db, serviceRequest("?environment=prod", guess), config)).status).toBe(401);
+    expect((await handleFlagsServiceRequest(db, serviceRequest("?environment=prod", null), config)).status).toBe(401);
+    const rows = (await serviceDenials()).slice(before);
+    expect(rows.map((r) => r.metadata)).toEqual([
+      { required: "flags:service-token", token: "invalid" },
+      { required: "flags:service-token", token: "missing" },
+    ]);
+    expect(rows.every((r) => r.actorUserId === null)).toBe(true);
+    expect(JSON.stringify(rows)).not.toContain(guess);
+    // positive control: an accepted call writes no denial
+    expect((await handleFlagsServiceRequest(db, serviceRequest("?environment=prod"), config)).status).toBe(200);
+    expect((await serviceDenials()).length).toBe(before + 2);
+  });
+
+  it("caps refused-call audit rows per minute, marking the row that hits the cap, so an unauthenticated caller can't flood the log", async () => {
+    // start at the top of a fresh 2 s window so the whole burst lands in it
+    await new Promise((resolve) => setTimeout(resolve, 2000 - (Date.now() % 2000) + 50));
+    const before = (await serviceDenials()).length;
+    const options = { deniedAuditPerMinute: 2, deniedAuditWindowSeconds: 2 };
+    for (let i = 0; i < 5; i++) {
+      const res = await handleFlagsServiceRequest(db, serviceRequest("?environment=prod", `wrong-${i}-0123456789abcdef`), config, options);
+      expect(res.status).toBe(401);
+    }
+    const added = (await serviceDenials()).slice(before);
+    expect(added).toHaveLength(2);
+    // the row that hits the cap says so, so the log shows refusals carried on unrecorded
+    expect(added.map((r) => (r.metadata as { capped?: boolean }).capped ?? false)).toEqual([false, true]);
+    // positive control: the right token still works once the cap is hit
+    expect((await handleFlagsServiceRequest(db, serviceRequest("?environment=prod"), config, options)).status).toBe(200);
+  }, 20_000);
+
+  it("when the cap is hit, writes one summary row per window with how many refusals it didn't record", async () => {
+    const windowSeconds = 2;
+    const summaries = async () =>
+      db
+        .select()
+        .from(auditLog)
+        .where(and(eq(auditLog.action, "access.denied.suppressed"), eq(auditLog.entityType, "resource"), eq(auditLog.entityId, "api:flags")))
+        .orderBy(auditLog.id);
+    const before = (await summaries()).length;
+    // start at the top of a fresh window so the whole burst lands in it
+    await new Promise((resolve) => setTimeout(resolve, windowSeconds * 1000 - (Date.now() % (windowSeconds * 1000)) + 50));
+    const windowStart = new Date(Math.floor(Date.now() / (windowSeconds * 1000)) * windowSeconds * 1000).toISOString();
+    const options = { deniedAuditPerMinute: 1, deniedAuditWindowSeconds: windowSeconds };
+    for (let i = 0; i < 4; i++) {
+      const res = await handleFlagsServiceRequest(db, serviceRequest("?environment=prod", `wrong-${i}-0123456789abcdef`), config, options);
+      expect(res.status).toBe(401);
+    }
+    await new Promise((resolve) => setTimeout(resolve, windowSeconds * 1000 + 100));
+    // the next call (here an accepted one) closes the window out
+    expect((await handleFlagsServiceRequest(db, serviceRequest("?environment=prod"), config, options)).status).toBe(200);
+    expect((await handleFlagsServiceRequest(db, serviceRequest("?environment=prod"), config, options)).status).toBe(200);
+    // earlier tests' windows get their own summaries; this window has exactly one
+    const rows = (await summaries()).slice(before).filter((r) => (r.metadata as { windowStart?: string }).windowStart === windowStart);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.metadata).toMatchObject({ required: "flags:service-token", suppressed: 3 });
+    expect(rows[0]!.actorUserId).toBeNull();
+  });
+
+  it("still serves a valid caller when a pending summary row can't be written, and writes it on a later call", async () => {
+    const windowSeconds = 1;
+    const audit = { failing: false };
+    // the same db, except audit writes (withAudit's transaction) fail while `audit.failing` is set
+    const flaky = new Proxy(db, {
+      get(target, prop) {
+        if (prop === "transaction" && audit.failing) return () => Promise.reject(new Error("audit write unavailable"));
+        const value = Reflect.get(target, prop, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) as typeof db;
+    const summaries = async () =>
+      db
+        .select()
+        .from(auditLog)
+        .where(and(eq(auditLog.action, "access.denied.suppressed"), eq(auditLog.entityType, "resource"), eq(auditLog.entityId, "api:flags")))
+        .orderBy(auditLog.id);
+    await new Promise((resolve) => setTimeout(resolve, windowSeconds * 1000 - (Date.now() % (windowSeconds * 1000)) + 50));
+    const windowStart = new Date(Math.floor(Date.now() / (windowSeconds * 1000)) * windowSeconds * 1000).toISOString();
+    const options = { deniedAuditPerMinute: 0, deniedAuditWindowSeconds: windowSeconds };
+    expect((await handleFlagsServiceRequest(flaky, serviceRequest("?environment=prod", "wrong-0123456789abcdef"), config, options)).status).toBe(401);
+    audit.failing = true;
+    await new Promise((resolve) => setTimeout(resolve, windowSeconds * 1000 + 200));
+    expect((await handleFlagsServiceRequest(flaky, serviceRequest("?environment=prod"), config, options)).status).toBe(200);
+    // positive control: once audit writes work again, the next call writes the summary it kept
+    audit.failing = false;
+    expect((await handleFlagsServiceRequest(flaky, serviceRequest("?environment=prod"), config, options)).status).toBe(200);
+    const rows = (await summaries()).filter((r) => (r.metadata as { windowStart?: string }).windowStart === windowStart);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.metadata).toMatchObject({ suppressed: 1 });
+  });
+
   it("is switched off (503) when no token is configured, even for a request that sends one", async () => {
     const res = await handleFlagsServiceRequest(db, serviceRequest("?environment=prod"), { serviceToken: null });
     expect(res.status).toBe(503);

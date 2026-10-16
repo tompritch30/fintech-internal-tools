@@ -298,7 +298,7 @@ Fix PRs (red test first, then fix):
 
 - Production IdP (Entra ID) configuration, network controls, TLS, hosting, secrets management.
 - Dependency CVE scan (`pnpm audit`) and fuzzing.
-- The KYC and feature-flag apps (not built yet).
+- The KYC and feature-flag apps: reviewed separately, see [KYC and feature flags](#security-review--kyc-and-feature-flags) below.
 - Denial of service, beyond noting there's no general rate limiting.
 
 ## Follow-up: hardening
@@ -315,3 +315,218 @@ A.8.5 (secure authentication); SOC 2 CC6.1.
 
 Still open: real alerting; audit tamper by the database owner; the alias-dodge in
 the audit-write test.
+
+---
+
+# Security review — KYC and feature flags
+
+Attacker and malicious-insider review of the KYC app
+([PR #22](https://github.com/tompritch30/fintech-internal-tools/pull/22)) and the feature-flags app
+([PR #24](https://github.com/tompritch30/fintech-internal-tools/pull/24)), both on main at `3b3a239`.
+Done 2026-10-16 by Devin against local Postgres (all migrations applied) with dummy data only.
+
+**Method.** Source review of every guard on each attack path (pages, `actions.ts`, the domain
+modules `kyc/kyc.ts` and `flags/flags.ts`, `flags/service.ts`, `api/flags/route.ts`, migrations
+0008–0011). Then a throwaway probe suite ran the same domain functions the server actions call, as
+fresh analyst, approver and analyst+approver users, against real Postgres, counting audit rows before
+and after. Raw HTTP replays of server actions were not repeated: both apps' actions go through core's
+`defineAction` (enforced by a static test), which part 1, finding 2 already probed over HTTP.
+Same Holds / Breaks / Gap scale and control mappings as above.
+
+## Summary
+
+| # | Attack | KYC | Flags | Fix |
+|---|---|---|---|---|
+| K1 / F1 | Open a record by ID without permission | Holds | Holds | — |
+| K2 / F2 | Call server actions directly to skip checks | Holds | Holds | — |
+| K3 | Unmask without a reason | Holds | n/a (no masked fields) | — |
+| K4 | Unmask beyond the rate limit | Holds | n/a | — |
+| K5 / F5 | Self-approval (including one user holding both roles) | Holds | Holds | — |
+| K6 / F6 | Tamper with approvals (version, payload, stale decisions) | Holds | Holds | — |
+| K7 / F7 | Race conditions | Holds | Holds | — |
+| K8 / F8 | Injection | Holds | Holds | — |
+| K9 / F9 | Audit gaps | Holds (gap) | **Breaks**: refused service calls leave no trace | [#35](https://github.com/tompritch30/fintech-internal-tools/pull/35) |
+| F10 | Service endpoint authentication | — | Holds (gap: one token for every environment) | — |
+| F11 | Production kill switch | — | Holds (gap: approvers can't use it) | — |
+
+Fix PRs (red test first, then fix):
+
+1. [PR #35](https://github.com/tompritch30/fintech-internal-tools/pull/35): audit refused `/api/flags` calls, capped per minute (flags app only).
+
+No KYC fix PR: no KYC attack worked. The KYC gaps below are tracked here, not fixed.
+
+## Findings
+
+### K1 / F1. Opening a record by ID without permission — holds
+
+- **Attack:** a user with no KYC/flags role, or the wrong one, opens `/kyc/cases/<id>`,
+  `/kyc/status/<status>`, `/flags/<id>` or `/flags/approvals` with copied IDs, or calls
+  `getKycCase` / `revealCaseField` / `openCaseDocument` with another case's or document's ID.
+- **Evidence:**
+  - Every page that reads data calls `requirePagePermission` (`kyc:read`, `flags:read`,
+    `flags:approve` for the approvals queue) before the query; a denial writes `access.denied`.
+  - `revealCaseField` and `openCaseDocument` check `kyc:read` on the specific resource
+    (`kyc_case:<id>`, `kyc_document:<id>`) before calling core `unmask`.
+  - Non-UUID IDs are rejected before any query; unknown IDs give `notFound()` / `NotFoundError`
+    (existing tests "rejects malformed and unknown ids").
+  - Detail and list queries never select the raw masked columns; values reach the page already
+    masked through `@fit/core/masking`.
+- **Note:** access is role-based. Any `kyc:read` user can reveal PII on any case, including closed
+  ones, within the unmask rate limit. There is no per-case need-to-know (gap, same design as refunds).
+- **Controls:** CC6.1, CC6.3 · A.5.15, A.8.3 · V4.
+
+### K2 / F2. Calling server actions directly to skip checks — holds
+
+- **Attack:** replay a server action with a session that lacks the permission, or with forged fields
+  (another user's case, a different environment, a stale version).
+- **Evidence:**
+  - All nine actions (`claimCaseAction`, `decideCaseAction`, `signOffCaseAction`, `revealFieldAction`,
+    `openDocumentAction`, `changeFlagAction`, `killFlagAction`, `approveFlagChangeAction`,
+    `rejectFlagChangeAction`) are `defineAction(permission, …)`; the static test enforces it.
+  - The domain functions re-check on the server: KYC ownership runs under a row lock in `asOwner`
+    and a non-owner gets an audited `kyc:case-owner` denial; flags check `flags:request` /
+    `flags:approve`, the environment allow-list and a 0–100 integer rollout.
+  - Probe: an approver calling `killFlag` → `ForbiddenError: permission:flags:request`.
+- **Controls:** CC6.1 · A.8.3 · V4.1, V4.2.
+
+### K3. Unmask without a reason — holds
+
+- **Attack:** reveal a KYC field or open a document with an empty, blank or one-letter reason.
+- **Evidence:** both paths call core `unmask`, which trims and requires at least 10 characters.
+  Probe: reason `"x"` → `ValidationError: unmasking requires a reason of at least 10 characters`.
+  Each reveal writes a `field.unmask` row with the reason.
+- **Controls:** CC6.1, CC7.2 · A.8.11 · PCI 10.2.1.1.
+
+### K4. Unmask beyond the rate limit — holds
+
+- **Attack:** an approver bulk-reveals ID numbers and opens documents across many cases, alternating
+  fields and documents to dodge a per-field limit.
+- **Evidence:** probe ran 21 reveals on 21 different cases, alternating `idNumber` and document
+  content. The first 20 succeeded and the 21st gave `ForbiddenError: unmask:rate-limit`. The budget is
+  per user across fields, documents and apps (core counts every `field.unmask` row in the rolling
+  hour under a per-user advisory lock), and the refusal is audited.
+- **Gap:** still no alert to a human (part 1, finding 12, "still open").
+- **Controls:** CC7.2 · A.8.11, A.8.16 · PCI 10.2.1.1.
+
+### K5 / F5. Self-approval — holds
+
+- **Attack:** one user holding both `analyst` and `approver` claims a high-risk (PEP / sanctions /
+  high-rating) case, approves it, then signs off their own approval; likewise requests a prod flag
+  change and approves it.
+- **Evidence:** probes gave `SelfApprovalError: approval:not-requester` for both. Core `decideApproval`
+  refuses when the decider is the requester. For KYC, the 0009 trigger also refuses to set a high-risk
+  case to `approved` without an approved approval request, so the app can't skip the sign-off.
+  Existing tests show a different approver succeeds (positive control).
+- **Controls:** CC6.1, CC8.1 · A.5.3 (segregation of duties) · PCI 6.5.4.
+
+### K6 / F6. Tampering with approvals — holds
+
+- **Attack:** sign off with a forged or stale `expectedVersion`; approve a stale prod change after a
+  kill to undo it; reject without a note; edit a pending change's contents.
+- **Evidence:**
+  - Probe: KYC sign-off with `expectedVersion + 5` → `ConflictError … changed since version`.
+  - Probe: prod at 10 % on, an analyst requests 90 %, then kills the flag. Approving the 90 % request →
+    `ConflictError: prod changed after this was requested`; prod stays off (version 2). A kill can't be
+    undone by a stale approval.
+  - Probe: reject with note `" "` → `ValidationError: rejecting an approval requires a note`.
+  - The approval payload is built on the server from the locked row. The 0011 trigger makes
+    `flag_changes` contents immutable and only allows `pending →` transitions; 0009 makes case
+    content and documents immutable.
+- **Gap (flags):** after a kill, the stale pending change blocks new prod requests for that flag until
+  an approver rejects it. The requester can't cancel it. This is an operational nuisance, not a bypass.
+- **Controls:** CC8.1 · A.8.32 · V11 (business logic).
+
+### K7 / F7. Race conditions — holds
+
+- **Attack:** two approvers sign off and reject the same case at once; two analysts claim the same case;
+  a kill and an approval of a pending prod change land at the same moment.
+- **Evidence:**
+  - Probe: parallel approve + reject sign-off → one succeeded, the other got `ConflictError: no pending
+    sign-off`; the case ended `approved` with one decision.
+  - Concurrent claims are covered by the existing test (one wins, `FOR UPDATE` lock).
+  - Probe: 10 rounds of parallel `killFlag` + `approveFlagChange` → every round ended with prod off and
+    the stale approval refused. Both paths lock the prod `flag_values` row, and the version trigger
+    allows +1 only.
+- **Controls:** CC8.1 · V11.1.
+
+### K8 / F8. Injection — holds
+
+- **Evidence:** all queries use Drizzle with bound parameters; the only `sql` fragments are constants
+  or parameters. The KYC search uses `ilike` with a bound value. IDs pass a UUID regex first, statuses
+  and environments pass allow-lists, and `?environment=PROD` gives 400. React escapes notes,
+  reasons and descriptions; there is no `dangerouslySetInnerHTML`.
+- **Controls:** V5 · A.8.28.
+
+### K9. KYC audit trail — holds (gap)
+
+- **Evidence:** claim, decide (approve / reject / escalate), sign-off, reveal and document open each
+  write an audit row in the same transaction; non-owner attempts write `access.denied`; KYC audit rows
+  carry no PII (status, reference and risk flags only).
+- **Gap:** an analyst who escalates a standard-risk case can claim it straight back (probe: `claimCase`
+  after own escalation → ok). It doesn't bypass a control, because they could have decided it before
+  escalating, and high-risk cases still need a second person. But "escalate" doesn't guarantee
+  another analyst sees the case; the trail shows it.
+- **Controls:** CC7.2 · A.8.15.
+
+### F9. Refused calls to the flags service endpoint leave no trace — **breaks**
+
+- **Attack:** an outsider, or an insider with a leaked or old token, guesses tokens against
+  `GET /api/flags`. Every attempt is refused with 401, but nothing is recorded, so the guessing is
+  invisible.
+- **Evidence:** probe: 5 refused calls with wrong tokens → **+0** audit rows. This breaks AGENTS.md
+  rule 6 ("A denial writes an `access.denied` audit row"), the same class as part 1, finding 8b.
+- **Cause:** `handleFlagsServiceRequest` in `apps/web/app/(platform)/flags/service.ts` returned 401
+  without calling anything else. Service callers aren't platform users, so core's
+  `requirePermission` denial path never ran.
+- **Fix ([#35](https://github.com/tompritch30/fintech-internal-tools/pull/35), flags app only):** a refused call
+  writes `access.denied` on resource `api:flags` through `withAudit`, with no actor and
+  `metadata: { required: "flags:service-token", token: "missing" | "invalid" }`. The presented token
+  is never stored. The caller is unauthenticated, so rows are capped at 30 per minute (fixed window,
+  counted under an advisory lock) to stop anyone flooding the append-only log. Past the cap the caller still
+  gets 401. The row that reaches the cap is marked `capped: true`, and the refusals past it are counted and
+  written as one `access.denied.suppressed` row per window (`metadata.suppressed`, `windowStart`, `windowEnd`),
+  so the log stays bounded and no refusal goes unrecorded (Devin Review on #35 flagged that a silent cap would
+  hide them; Thomas chose the summary row). The count is kept in memory until the window ends, so a crash
+  inside a window loses that window's count. The right token always works.
+  Red tests: "records a refused service call as an access.denied row, without the presented token"
+  (positive control: an accepted call writes no row) and "caps refused-call audit rows per minute,
+  marking the row that hits the cap, so an unauthenticated caller can't flood the log" (positive control: the right token still works past
+  the cap) and "when the cap is hit, writes one summary row per window with how many refusals it didn't record".
+  A summary that can't be written stays queued for the next call and never blocks a valid read ("still serves a
+  valid caller when a pending summary row can't be written, and writes it on a later call").
+- **Controls:** CC7.2 · A.8.15, A.8.16 · PCI 10.2.1.4 (invalid access attempts).
+
+### F10. Service endpoint authentication — holds (gap)
+
+- **Attack:** call `/api/flags` with no token, a wrong token, the token plus a suffix, an empty bearer,
+  a non-GET method, or no token configured; time the comparison.
+- **Evidence:** 401 for every wrong or missing token, and 405 plus a GET-only route export for other
+  methods (existing tests). It's switched off (503) when `FLAGS_SERVICE_TOKEN` is unset, and tokens
+  under 16 characters are refused at load. The comparison is `timingSafeEqual` over SHA-256 digests,
+  so it doesn't leak length or prefix. Responses are `no-store` and contain only key, enabled and
+  rollout. Pending changes never show.
+- **Gaps:**
+  - One shared token reads every environment, so a dev or staging service holding it can read prod
+    values. It's read-only and the values aren't sensitive. Per-environment tokens would be a config
+    change.
+  - No alert on a burst of refusals. The F9 rows give evidence, not detection.
+- **Controls:** CC6.1, CC6.6 · A.5.17, A.8.5 · V2.10 (service authentication).
+
+### F11. Production kill switch — holds (gap)
+
+- **Attack:** use the kill switch to make an unapproved prod change (turn something *on*, or change
+  rollout), skip the reason, or race it.
+- **Evidence:** `isKill` only matches prod going enabled → disabled with the rollout unchanged.
+  Anything else in prod goes to approval (existing tests). `killFlag` and the immediate path need
+  `flags:request` and a reason, lock the prod row, bump the version and write `flag.killed` in the same
+  transaction. The service endpoint reflects it on the next read. A stale approval can't undo it (F6),
+  and races resolve to off (F7).
+- **Gap:** only `flags:request` holders (analysts) can kill. An on-call user who holds only
+  `approver` can't (probe: `ForbiddenError`). That's a policy choice to confirm, not a bypass.
+- **Controls:** CC7.4 (incident response), CC8.1 · A.5.26.
+
+## Out of scope / not tested (KYC and flags)
+
+- Raw HTTP replays of the new server actions (see Method), browser-level e2e attacks, dependency CVEs.
+- Real document storage and malware scanning: KYC documents are synthetic text in Postgres.
+- Production token distribution and rotation for `FLAGS_SERVICE_TOKEN`.
