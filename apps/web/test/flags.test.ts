@@ -22,7 +22,7 @@ import {
   type FlagChangeInput,
   type FlagValue,
 } from "../app/(platform)/flags/flags.ts";
-import { describeFlagAudit } from "../app/(platform)/flags/format.ts";
+import { describeFlagAudit, describeFlagValue } from "../app/(platform)/flags/format.ts";
 import { handleFlagsServiceRequest } from "../app/(platform)/flags/service.ts";
 
 const db = createDb(TEST_DATABASE_URL, { max: 6 });
@@ -542,7 +542,7 @@ describe("rule 6: every flag has a change history with before and after values",
     const { flag, change } = await pendingProdChange({ enabled: true, rolloutPercentage: 20 });
     await rejectFlagChange(await approver(), { changeId: change.id, expectedVersion: change.approval.version, note: "No" });
     const rejected = (await flagHistory(db, flag.id)).find((h) => h.action === "flag.change_rejected");
-    expect(describeFlagAudit(rejected?.after)).toBe("prod: Off · 0% → On · 20%");
+    expect(describeFlagAudit(rejected?.after)).toBe("prod: Off → On · 20%");
   });
 
   it("returns an empty history for an unknown or malformed flag id", async () => {
@@ -775,5 +775,24 @@ describe("seeded flags: history starts with their seeded values", () => {
     expect(await seededRows([flag.id])).toEqual([]);
     // Positive control: the seeded flags do have theirs.
     expect((await seededRows(await seededFlagIds())).length).toBe(SEED_FLAGS.length);
+  });
+});
+
+describe("flags: how values and people are shown", () => {
+  it("an Off value reads just Off, whatever rollout it kept", () => {
+    expect(describeFlagValue({ enabled: false, rolloutPercentage: 25 })).toBe("Off");
+    expect(describeFlagAudit({ environment: "prod", enabled: false, rolloutPercentage: 25, previous: { enabled: true, rolloutPercentage: 25 } })).toBe("prod: On · 25% → Off");
+    // Positive control: On keeps its rollout.
+    expect(describeFlagValue({ enabled: true, rolloutPercentage: 25 })).toBe("On · 25%");
+  });
+
+  it("a pending change names the requester by display name and keeps the username", async () => {
+    const { flag, maker } = await pendingProdChange();
+    await owner.update(users).set({ displayName: "Dana Developer" }).where(eq(users.id, maker.user.id));
+    const pending = (await getFlagView(db, flag.id))?.pendingChange;
+    expect(pending).toMatchObject({ requestedByName: "Dana Developer", requestedByUsername: maker.user.username });
+    // Positive control: with no display name, the username is shown.
+    const other = await pendingProdChange();
+    expect((await getFlagView(db, other.flag.id))?.pendingChange).toMatchObject({ requestedByName: other.maker.user.username, requestedByUsername: other.maker.user.username });
   });
 });
