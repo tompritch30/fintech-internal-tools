@@ -1,17 +1,17 @@
 import { NextRequest } from "next/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sessionCookie } from "@fit/core/cookie";
 import { proxy } from "../proxy.ts";
 import { isPrefetchRequest } from "../lib/prefetch.ts";
 
-const SESSION_COOKIE = sessionCookie(process.env.APP_URL ?? "http://localhost:3000").name;
+const SESSION_COOKIE = sessionCookie("http://localhost:3000").name;
+beforeEach(() => vi.stubEnv("APP_URL", "http://localhost:3000"));
+afterEach(() => vi.unstubAllEnvs());
 
 const request = (path: string, headers: Record<string, string> = {}) =>
   new NextRequest(new URL(path, "http://localhost:3000"), { headers });
 
 describe("proxy reads the session cookie name for the APP_URL scheme", () => {
-  afterEach(() => vi.unstubAllEnvs());
-
   it("on local http, lets through the plain fit_session cookie and not the __Host- one", () => {
     vi.stubEnv("APP_URL", "http://localhost:3000");
     expect(proxy(request("/audit", { cookie: "fit_session=abc" })).status).toBe(200);

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { buildLogoutUrl, getSessionUser, revokeSession, SESSION_COOKIE, withAudit } from "@fit/core";
-import { getConfig, getDb, getOidc, sessionCookieOptions } from "../../../lib/auth.ts";
+import { buildLogoutUrl, getSessionUser, revokeSession, withAudit } from "@fit/core";
+import { getConfig, getDb, getOidc, sessionCookieName, sessionCookieOptions } from "../../../lib/auth.ts";
 import { isSameOrigin } from "../../../lib/same-origin.ts";
 
 /** POST only, from our own origin, so a link, prefetch or another site's form can't sign someone out. */
@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     return new NextResponse("Forbidden", { status: 403 });
   }
   const db = getDb();
-  const token = request.cookies.get(SESSION_COOKIE)?.value;
+  const token = request.cookies.get(sessionCookieName())?.value;
   let idToken: string | null = null;
 
   if (token) {
@@ -32,6 +32,6 @@ export async function POST(request: NextRequest) {
     console.error("IdP logout URL unavailable", err instanceof Error ? err.message : err);
   }
   const response = NextResponse.redirect(target, 303);
-  response.cookies.set(SESSION_COOKIE, "", { ...sessionCookieOptions(new Date(0)), maxAge: 0 });
+  response.cookies.set(sessionCookieName(), "", { ...sessionCookieOptions(new Date(0)), maxAge: 0 });
   return response;
 }

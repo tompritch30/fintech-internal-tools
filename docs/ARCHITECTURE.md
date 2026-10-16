@@ -118,8 +118,10 @@ flowchart LR
 - Server-side sessions in the `sessions` table. The cookie holds a random 256-bit
   token. The table stores only its SHA-256 hash, so a database read can't be replayed
   as a cookie.
-- Cookie: `__Host-fit_session`, `httpOnly`, `SameSite=Lax`, always `Secure`,
-  `Path=/`, and no `Domain`. Browsers treat `http://localhost` as secure.
+- Cookie: `httpOnly`, `SameSite=Lax`, `Path=/`, and no `Domain`. When `APP_URL` is https it is
+  `__Host-fit_session` and `Secure`. On local http it is plain `fit_session` without `Secure`,
+  because some browsers (desktop Chrome 137) reject `__Host-` over `http://localhost` and login
+  loops (#41). Same approach as Auth.js's secure-cookie prefix (`packages/core/src/session/cookie.ts`).
 - Sessions expire after `SESSION_TTL_HOURS` (absolute) or `SESSION_IDLE_MINUTES`
   (15 minutes by default, PCI DSS 8.2.8) without a request. Each authenticated
   request updates `sessions.last_seen_at`. Logout clears the cookie with matching
