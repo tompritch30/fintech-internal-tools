@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, count, eq, gt, inArray, sql } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 import { ConflictError, ForbiddenError, SelfApprovalError, ValidationError, permissionsFor } from "@fit/core";
 import { auditLog, createDb, flagChanges, flagValues, flags, type FlagEnvironment } from "@fit/db";
@@ -596,15 +596,29 @@ describe("rule 7: services read current values from a read-only endpoint", () =>
     expect((await serviceDenials()).length).toBe(before + 2);
   });
 
-  it("caps refused-call audit rows per minute so an unauthenticated caller can't flood the log", async () => {
-    const recent = (await serviceDenials()).filter((r) => r.occurredAt.getTime() > Date.now() - 50_000).length;
+  it("caps refused-call audit rows per minute, marking the row that hits the cap, so an unauthenticated caller can't flood the log", async () => {
+    // same window and clock as the handler, so rows ageing out can't skew the count
+    const [{ n: recent } = { n: 0 }] = await db
+      .select({ n: count() })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.action, "access.denied"),
+          eq(auditLog.entityType, "resource"),
+          eq(auditLog.entityId, "api:flags"),
+          gt(auditLog.occurredAt, sql`clock_timestamp() - interval '1 minute'`),
+        ),
+      );
     const before = (await serviceDenials()).length;
     const options = { deniedAuditPerMinute: recent + 2 };
     for (let i = 0; i < 5; i++) {
       const res = await handleFlagsServiceRequest(db, serviceRequest("?environment=prod", `wrong-${i}-0123456789abcdef`), config, options);
       expect(res.status).toBe(401);
     }
-    expect((await serviceDenials()).length - before).toBe(2);
+    const added = (await serviceDenials()).slice(before);
+    expect(added).toHaveLength(2);
+    // the row that hits the cap says so, so the log shows refusals carried on unrecorded
+    expect(added.map((r) => (r.metadata as { capped?: boolean }).capped ?? false)).toEqual([false, true]);
     // positive control: the right token still works once the cap is hit
     expect((await handleFlagsServiceRequest(db, serviceRequest("?environment=prod"), config, options)).status).toBe(200);
   });
