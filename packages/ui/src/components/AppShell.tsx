@@ -9,8 +9,14 @@ export interface NavItem {
   icon?: ReactNode;
 }
 
-function isActive(item: NavItem, currentPath: string): boolean {
-  return currentPath === item.href || (item.href !== "/" && currentPath.startsWith(`${item.href}/`));
+const matches = (href: string, currentPath: string) =>
+  currentPath === href || (href !== "/" && currentPath.startsWith(`${href}/`));
+
+/** The one nav item for this path: the longest matching href, so /refunds/approvals marks Approvals, not Refunds too. */
+export function activeNavHref(nav: NavItem[], currentPath: string): string | undefined {
+  return nav
+    .filter((item) => matches(item.href, currentPath))
+    .reduce<string | undefined>((best, item) => (best === undefined || item.href.length > best.length ? item.href : best), undefined);
 }
 
 /** App frame: left navigation, header with the signed-in user, and the main area. Pass only nav items the user may open. */
@@ -32,7 +38,8 @@ export function AppShell({
   headerActions?: ReactNode;
   children: ReactNode;
 }) {
-  const current = nav.find((item) => isActive(item, currentPath));
+  const activeHref = activeNavHref(nav, currentPath);
+  const current = nav.find((item) => item.href === activeHref);
   return (
     <div className="flex min-h-svh bg-background">
       <aside className="sticky top-0 flex h-svh w-14 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:w-60">
@@ -42,7 +49,7 @@ export function AppShell({
         <nav aria-label="Main" className="flex-1 overflow-y-auto px-2 py-2 md:px-3">
           <ul className="flex flex-col gap-0.5">
             {nav.map((item) => {
-              const active = isActive(item, currentPath);
+              const active = item.href === activeHref;
               return (
                 <li key={item.href}>
                   <a
