@@ -620,11 +620,7 @@ Demo users (Keycloak realm `internal-tools`, password `demo-only-change-me`):
 │       │       ├── layout.tsx   # AppShell + requireUser
 │       │       ├── page.tsx     # home: signed-in user and roles
 │       │       ├── no-access/page.tsx
-│       │       ├── audit/page.tsx   # admin-only, read-only audit viewer (ListView)
-│       │       └── demo-record/
-│       │           ├── page.tsx     # UI kit demo: RecordHeader, CommandBar, Timeline
-│       │           ├── actions.ts   # "use server": addDemoNoteAction = defineAction(...)
-│       │           └── note.ts      # testable logic: withAudit
+│       │       └── audit/page.tsx   # admin-only, read-only audit viewer (ListView)
 │       ├── lib/
 │       │   ├── auth.ts          # Next glue: cookies → core session/rbac, defineAction
 │       │   └── prefetch.ts      # isPrefetchRequest

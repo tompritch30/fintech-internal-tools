@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const PASSWORD = "demo-only-change-me"; // local Keycloak demo users only
-const FLAG = "e2e-sandbox-flag"; // seeded off everywhere; the first test leaves prod off again
+const FLAG = "e2e-sandbox-flag"; // added off everywhere by e2e/global-setup.ts; the first test leaves prod off again
 
 async function signIn(page: Page, username: string) {
   await page.goto("/login");

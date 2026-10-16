@@ -22,7 +22,7 @@ Use this for each business app (KYC, refunds, feature flags). One app per sessio
 - [ ] Every server action: `export const x = defineAction(permission, "app.action", async (ctx, ...) => ...)`
       in a `"use server"` file. The test in `apps/web/test/actions-use-define-action.test.ts` enforces it.
 - [ ] Keep business logic in a plain module next to the action (like
-      `app/(platform)/demo-record/note.ts`) so it can be tested with real Postgres.
+      `app/(platform)/refunds/refunds.ts`) so it can be tested with real Postgres.
 - [ ] Every business write goes through `withAudit(db, entry, fn)`. Never insert into `audit_log`
       directly (`audit-writes-only-via-core.test.ts` fails if you do).
 - [ ] Every page that reads data starts with `requirePagePermission(permission, "/route")`.

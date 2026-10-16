@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { headers } from "next/headers";
-import { Banknote, ClipboardCheck, House, IdCard, LogOut, ScrollText, SquareKanban, ToggleRight } from "lucide-react";
+import { Banknote, ClipboardCheck, House, IdCard, LogOut, ScrollText, ToggleRight } from "lucide-react";
 import { AppShell, Button, type NavItem } from "@fit/ui";
 import { requireUser } from "../../lib/auth.ts";
 
@@ -12,10 +12,7 @@ export default async function PlatformLayout({ children }: { children: ReactNode
   // Only link to pages the user may open (no forbidden links, so no denied prefetches).
   const nav: NavItem[] = [];
   if (user.permissions.has("platform:access")) {
-    nav.push(
-      { href: "/", label: "Home", icon: <House /> },
-      { href: "/demo-record", label: "Demo record", icon: <SquareKanban /> },
-    );
+    nav.push({ href: "/", label: "Home", icon: <House /> });
   }
   if (user.permissions.has("refunds:read")) {
     nav.push({ href: "/refunds", label: "Refunds", icon: <Banknote /> });

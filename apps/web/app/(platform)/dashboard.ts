@@ -96,18 +96,17 @@ const RECORD_LABELS: Record<string, string> = {
   kyc_document: "KYC document",
   flag: "Feature flag",
   approval_request: "Approval",
-  demo_record: "Demo record",
 };
 
 /**
- * The user's own latest work: audit rows they wrote, minus sign-ins, sign-outs and denials.
+ * The user's own latest work: audit rows they wrote, minus sign-ins, sign-outs, denials and old demo/sample rows.
  * Only their own, so no one sees others' activity without audit:read.
  */
 export async function myRecentActivity(db: Db, user: Viewer): Promise<ActivityItem[]> {
   const rows = await db
     .select({ id: auditLog.id, occurredAt: auditLog.occurredAt, action: auditLog.action, entityType: auditLog.entityType, entityId: auditLog.entityId })
     .from(auditLog)
-    .where(and(eq(auditLog.actorUserId, user.id), notLike(auditLog.action, "auth.%"), ne(auditLog.action, "access.denied")))
+    .where(and(eq(auditLog.actorUserId, user.id), notLike(auditLog.action, "auth.%"), ne(auditLog.action, "access.denied"), ne(auditLog.action, "seed.sample"), notLike(auditLog.action, "demo.%")))
     .orderBy(desc(auditLog.occurredAt), desc(auditLog.id))
     .limit(LIMIT);
   return rows.map((r) => {

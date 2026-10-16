@@ -6,7 +6,7 @@ description: UI rules for every app page in apps/web (record layout, actions, ba
 # UI rules
 
 Every app uses the components in `packages/ui` (`@fit/ui`). Devin Review checks these rules
-(REVIEW.md, section 6). The demo record (`app/(platform)/demo-record/page.tsx`) is the reference.
+(REVIEW.md, section 6). The refunds payment page (`app/(platform)/refunds/payments/[paymentId]/page.tsx`) is the reference.
 
 ## 1. One record layout
 

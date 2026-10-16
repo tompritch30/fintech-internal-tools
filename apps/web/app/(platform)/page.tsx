@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Permission } from "@fit/core";
-import { Banknote, IdCard, ScrollText, SquareKanban, ToggleRight } from "lucide-react";
+import { Banknote, IdCard, ScrollText, ToggleRight } from "lucide-react";
 import { AppTile, EmptyState, PageHeader, RecordSection, StatusBadge, Table, TileGrid, linkClass, type Column } from "@fit/ui";
 import { getDb, requirePagePermission } from "../../lib/auth.ts";
 import { awaitingMyApproval, claimableKycCases, myRecentActivity, type ActivityItem, type AwaitingItem } from "./dashboard.ts";
@@ -81,7 +81,6 @@ export default async function HomePage() {
           <AppTile href="/flags" icon={<ToggleRight />} title="Feature flags" description="See and change flags per environment. Prod changes need a second person." />
         ) : null}
         {can("audit:read") ? <AppTile href="/audit" icon={<ScrollText />} title="Audit log" description="Who did what, when and why. Read-only." /> : null}
-        <AppTile href="/demo-record" icon={<SquareKanban />} title="Demo record" description="The shared record layout, for reference." />
       </TileGrid>
       {awaiting ? (
         <RecordSection title="Waiting for your approval">
