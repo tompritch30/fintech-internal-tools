@@ -466,7 +466,7 @@ wrappers, `service.ts` + `app/api/flags/route.ts` for services). Tests:
 | Prod off is an immediate kill switch | Off with the rollout unchanged (or `killFlag`) skips approval and ignores the page's version; audited as `flag.killed` |
 | Rollout is 0–100 | `validateValue`/`parseRolloutPercentage`; CHECK `flag_values_rollout_range` is the backstop |
 | History with before and after | Audit rows store `before` and `after` (with `after.previous`, since `listAuditForEntity` returns `after` only); the Timeline merges the flag's rows with its changes' approval rows |
-| Read-only service endpoint | `GET /api/flags?environment=…` with `Authorization: Bearer $FLAGS_SERVICE_TOKEN` (constant-time compare); only `GET` is exported; returns current values with `cache-control: no-store`; `proxy.ts` lets exactly `/api/flags` through without a session |
+| Read-only service endpoint | `GET /api/flags?environment=…` with `Authorization: Bearer $FLAGS_SERVICE_TOKEN` (constant-time compare); only `GET` is exported; returns current values with `cache-control: no-store`; a refused call writes `access.denied` on `api:flags` (no token stored; capped at 30 rows a minute); `proxy.ts` lets exactly `/api/flags` through without a session |
 
 Permissions (in `PERMISSION_REGISTRY`): `flags:read` (analyst, approver) guards the
 pages; `flags:request` (analyst) changes dev/staging, requests prod changes and uses the
