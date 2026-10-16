@@ -140,6 +140,9 @@ export const E2E_FLAGS: typeof SEED_FLAGS = [
   { key: "e2e-sandbox-flag", description: "Used by the Playwright tests; changes freely", dev: off(), staging: off(), prod: off() },
 ];
 
+/** Reason on each seeded flag's `flag.seeded` row. */
+export const FLAG_SEEDED_REASON = "Flag created with its starting values";
+
 /** Reason on each seeded payment's `payment.captured` row. */
 export const PAYMENT_CAPTURED_REASON = "Card payment captured";
 
@@ -180,7 +183,7 @@ export async function recordSeededFlags(
       action: "flag.seeded",
       entityType: "flag",
       entityId: flag.id,
-      reason: "Starting values (seeded dummy data)",
+      reason: FLAG_SEEDED_REASON,
       // audit_log is never backdated: occurred_at is when this row was written, createdAt is when the flag was.
       after: { key: flag.key, createdAt: flag.createdAt.toISOString(), dev: s.dev, staging: s.staging, prod: s.prod },
     })),
