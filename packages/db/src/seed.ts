@@ -101,7 +101,8 @@ export function seedKycCases(count = 30): SeedKycCase[] {
         riskRating,
         sanctionsHit,
         pep,
-        openedAt: new Date(anchor - i * 5 * 3_600_000),
+        // Numbered in the order they were opened: KYC-200001 is the oldest.
+        openedAt: new Date(anchor - (count - 1 - i) * 5 * 3_600_000),
       },
       documents: [
         {
@@ -132,8 +133,15 @@ export const SEED_FLAGS: readonly { key: string; description: string; dev: SeedV
   { key: "fraud-score-shadow", description: "Score payments with the new fraud model without acting on it", dev: on(100), staging: on(25), prod: on(5) },
   { key: "merchant-dashboard-beta", description: "Beta merchant dashboard with live charts", dev: on(50), staging: off(), prod: off() },
   { key: "card-freeze-button", description: "Let cardholders freeze a card from the app", dev: on(100), staging: on(100), prod: off() },
+];
+
+/** Flags only the Playwright tests use; added by the e2e setup (`seedE2eFixtures`), never by the normal seed. */
+export const E2E_FLAGS: typeof SEED_FLAGS = [
   { key: "e2e-sandbox-flag", description: "Used by the Playwright tests; changes freely", dev: off(), staging: off(), prod: off() },
 ];
+
+/** Reason on each seeded payment's `payment.captured` row. */
+export const PAYMENT_CAPTURED_REASON = "Card payment captured";
 
 /**
  * Gives each seeded flag one `flag.seeded` row with its starting values, so its history doesn't start
@@ -177,6 +185,34 @@ export async function recordSeededFlags(
       after: { key: flag.key, createdAt: flag.createdAt.toISOString(), dev: s.dev, staging: s.staging, prod: s.prod },
     })),
   );
+}
+
+/** Flags and their per-environment values are inserted once; later changes go through the app. */
+async function insertFlags(tx: Executor, list: typeof SEED_FLAGS): Promise<void> {
+  const createdFlags = new Set<string>();
+  for (const f of list) {
+    const [created] = await tx
+      .insert(flags)
+      .values({ key: f.key, description: f.description })
+      .onConflictDoNothing({ target: flags.key })
+      .returning({ id: flags.id });
+    if (created) createdFlags.add(created.id);
+    const [flag] = await tx.select({ id: flags.id }).from(flags).where(eq(flags.key, f.key));
+    if (!flag) throw new Error(`seed: could not insert flag ${f.key}`);
+    await tx
+      .insert(flagValues)
+      .values((["dev", "staging", "prod"] as const).map((environment) => ({ flagId: flag.id, environment, ...f[environment] })))
+      .onConflictDoNothing();
+  }
+  await recordSeededFlags(tx, list, createdFlags);
+}
+
+/** Data only the Playwright tests need (run from their global setup). Safe to run again. */
+export async function seedE2eFixtures(db: Db): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('fit-seed'))`);
+    await insertFlags(tx, E2E_FLAGS);
+  });
 }
 
 export async function seed(db: Db): Promise<void> {
@@ -237,7 +273,7 @@ export async function seed(db: Db): Promise<void> {
           action: "payment.captured",
           entityType: "payment",
           entityId: p.id,
-          reason: "Payment captured by the card system (seeded dummy data)",
+          reason: PAYMENT_CAPTURED_REASON,
           after: {
             reference: p.reference,
             merchant: p.merchant,
@@ -256,54 +292,8 @@ export async function seed(db: Db): Promise<void> {
       if (inserted) await tx.insert(kycDocuments).values(documents.map((d) => ({ ...d, caseId: inserted.id })));
     }
 
-    // Flags and their per-environment values are inserted once; later changes go through the app.
-    const createdFlags = new Set<string>();
-    for (const f of SEED_FLAGS) {
-      const [created] = await tx
-        .insert(flags)
-        .values({ key: f.key, description: f.description })
-        .onConflictDoNothing({ target: flags.key })
-        .returning({ id: flags.id });
-      if (created) createdFlags.add(created.id);
-      const [flag] = await tx.select({ id: flags.id }).from(flags).where(eq(flags.key, f.key));
-      if (!flag) throw new Error(`seed: could not insert flag ${f.key}`);
-      await tx
-        .insert(flagValues)
-        .values((["dev", "staging", "prod"] as const).map((environment) => ({ flagId: flag.id, environment, ...f[environment] })))
-        .onConflictDoNothing();
-    }
+    await insertFlags(tx, SEED_FLAGS);
 
-    await recordSeededFlags(tx, SEED_FLAGS, createdFlags);
-
-    // audit_log is append-only, so sample rows are inserted once and never replaced.
-    const existing = await tx
-      .select({ id: auditLog.id })
-      .from(auditLog)
-      .where(eq(auditLog.action, "seed.sample"))
-      .limit(1);
-    if (existing.length === 0) {
-      const [admin] = await tx.select().from(users).where(eq(users.username, "admin"));
-      await tx.insert(auditLog).values([
-        {
-          actorUserId: admin?.id,
-          actorSubject: admin?.subject,
-          action: "seed.sample",
-          entityType: "platform",
-          entityId: "seed",
-          reason: "Sample row written by the seed script (dummy data)",
-          after: { note: "Demo data loaded" },
-        },
-        {
-          actorUserId: admin?.id,
-          actorSubject: admin?.subject,
-          action: "demo.note_added",
-          entityType: "demo_record",
-          entityId: "DEMO-1",
-          reason: "Initial note on the demo record (dummy data)",
-          after: { note: "Customer called about a duplicate charge." },
-        },
-      ]);
-    }
   });
 }
 
