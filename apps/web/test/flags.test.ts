@@ -636,6 +636,32 @@ describe("rule 7: services read current values from a read-only endpoint", () =>
     expect((await handleFlagsServiceRequest(db, serviceRequest("?environment=prod"), config, options)).status).toBe(200);
   }, 20_000);
 
+  it("when the cap is hit, writes one summary row per window with how many refusals it didn't record", async () => {
+    const windowSeconds = 2;
+    const summaries = async () =>
+      db
+        .select()
+        .from(auditLog)
+        .where(and(eq(auditLog.action, "access.denied.suppressed"), eq(auditLog.entityType, "resource"), eq(auditLog.entityId, "api:flags")))
+        .orderBy(auditLog.id);
+    const before = (await summaries()).length;
+    // start at the top of a fresh window so the whole burst lands in it
+    await new Promise((resolve) => setTimeout(resolve, windowSeconds * 1000 - (Date.now() % (windowSeconds * 1000)) + 50));
+    const options = { deniedAuditPerMinute: 1, deniedAuditWindowSeconds: windowSeconds };
+    for (let i = 0; i < 4; i++) {
+      const res = await handleFlagsServiceRequest(db, serviceRequest("?environment=prod", `wrong-${i}-0123456789abcdef`), config, options);
+      expect(res.status).toBe(401);
+    }
+    await new Promise((resolve) => setTimeout(resolve, windowSeconds * 1000 + 100));
+    // the next call (here an accepted one) closes the window out
+    expect((await handleFlagsServiceRequest(db, serviceRequest("?environment=prod"), config, options)).status).toBe(200);
+    expect((await handleFlagsServiceRequest(db, serviceRequest("?environment=prod"), config, options)).status).toBe(200);
+    const rows = (await summaries()).slice(before);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.metadata).toMatchObject({ required: "flags:service-token", suppressed: 3 });
+    expect(rows[0]!.actorUserId).toBeNull();
+  });
+
   it("is switched off (503) when no token is configured, even for a request that sends one", async () => {
     const res = await handleFlagsServiceRequest(db, serviceRequest("?environment=prod"), { serviceToken: null });
     expect(res.status).toBe(503);
