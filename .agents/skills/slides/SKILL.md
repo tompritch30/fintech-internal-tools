@@ -136,6 +136,12 @@ kind of mistake, add a check (with a fixture slide in `test/fixtures/violations.
 ```
 
 - Appendix slides: `<!-- _class: appendix -->`. Cover: `<!-- _class: title -->`.
+- A slide that continues another keeps the label count ("Appendix A4 · 2 of 3") and adds "(continued)" to its title.
+  A main-deck slide split in two gets its own label (04a, 04b) and its own action title.
+- Recommendation without colour: give the chart bar `"tag": "recommended"` (an outlined ink label) and keep every
+  bar grey, so the slide spends no blue.
+- Cost tables: one row per line item, columns line item, A, B, C, basis; amounts don't wrap; a blank cell means
+  the line isn't part of that option (say so in the notes). Split across slides by rows, not by columns.
 - One accent on a table: wrap one header in `*…*` (shows blue). Charts: `"highlight": true` on one bar.
 - Chart specs also take `"from"` (a range: solid to `from`, a thin span with end caps to `value`), `"parts"`
   (a stacked bar, `"ink": true` for the dark part), `"text"` (the value label), `"labelsAbove"` with `"labelLines"`

@@ -1,6 +1,6 @@
 {
   "output": "assets/charts/three-year-cost.svg",
-  "alt": "Three-year totals, 2027 to 2029: A about $825K, B $620K to $745K, C $710K to $1.4M",
+  "alt": "Three-year totals, 2027 to 2029: A about $825K, B $620K to $745K, C $710K to $1.4M; C recommended",
   "width": 924,
   "labelsAbove": true,
   "bars": [
@@ -20,9 +20,9 @@
       "from": 710,
       "value": 1400,
       "text": "",
-      "highlight": true
+      "tag": "recommended"
     }
   ],
   "barHeight": 32,
-  "bandGap": 40
+  "bandGap": 22
 }

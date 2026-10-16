@@ -2,7 +2,8 @@
 // Spec: { "output": "assets/charts/x.svg", "title": "…", "unit": "US$ per year", "valuePrefix": "$",
 //         "bars": [{ "label": "Option A", "value": 120, "highlight": true }, …] }
 // A bar may also give "from" (solid to "from", then a thinner span to "value" with end caps), "text" (its value label),
-// and "parts": [{ "value": 60, "ink": true }, …] (a stacked bar; parts must sum to value).
+// "parts": [{ "value": 60, "ink": true }, …] (a stacked bar; parts must sum to value),
+// and "tag" (a small outlined label after the bar, e.g. "recommended"; labelsAbove charts only).
 // Only chart measured or stated-estimate numbers. A bar without a numeric value is an error: put it in a table instead.
 import { readdir, readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -116,12 +117,16 @@ export function barChart(spec, fonts = {}) {
     const ys = [];
     let y = 0;
     for (const [i] of bars.entries()) { y += lines[i] * lineH + 12; ys.push(y + BAR_H / 2); y += BAR_H + gap; }
-    const h = Math.ceil(y - gap + 4);
+    // A tag is taller than a thin bar, so leave room for it below the last bar.
+    const tagSpill = bars.at(-1)?.tag ? Math.max(0, (Math.round(CHART_FONT * 1.4) - BAR_H) / 2) + 2 : 0;
+    const h = Math.ceil(y - gap + 4 + tagSpill);
     chart.dispose();
     const c2 = echarts.init(null, null, { renderer: "svg", ssr: true, width, height: h });
     const maxV = Math.max(...bars.map((b) => b.value));
     // Leave room on the right for the longest value label, so the biggest bar's value isn't clipped.
-    const valueW = Math.max(0, ...bars.map((b) => (labelOf(b) ? textW(labelOf(b)) + 20 : 0)));
+    // A bar's "tag" (e.g. "recommended") is a small outlined label after the bar, in ink, not the accent.
+    const tagW = (b) => (b.tag ? textW(b.tag) + 32 : 0);
+    const valueW = Math.max(0, ...bars.map((b) => (labelOf(b) ? textW(labelOf(b)) + 20 : 0) + (b.tag ? tagW(b) + 20 : 0)));
     const xs = (v) => (v / maxV) * (width - 40 - valueW);
     c2.setOption({
       animation: false,
@@ -141,6 +146,12 @@ export function barChart(spec, fonts = {}) {
             kids.push({ type: "line", shape: { x1: x1, y1: top, x2: x1, y2: top + BAR_H }, style: cap });
           }
           if (labelOf(b)) kids.push({ type: "text", x: x + 20, y: yc, style: { text: labelOf(b), fontFamily: "Geist", fontSize: CHART_FONT, fill: C.ink, verticalAlign: "middle" } });
+          if (b.tag) {
+            const end = Math.max(x, isRange(b) ? xs(b.value) : x) + 20 + (labelOf(b) ? textW(labelOf(b)) + 20 : 0);
+            const th = Math.round(CHART_FONT * 1.4);
+            kids.push({ type: "rect", shape: { x: end, y: yc - th / 2, width: tagW(b), height: th }, style: { fill: "none", stroke: C.ink, lineWidth: 2 } });
+            kids.push({ type: "text", x: end + 16, y: yc, style: { text: b.tag, fontFamily: "Geist", fontSize: CHART_FONT, fill: C.ink, verticalAlign: "middle" } });
+          }
           return { type: "group", children: kids };
         },
         data: bars.map((b, i) => [i]),

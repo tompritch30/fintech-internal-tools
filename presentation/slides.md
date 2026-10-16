@@ -100,7 +100,7 @@ After the demo: All 43 pull requests were opened by Devin. I set the rules, revi
 <!-- _class: plan long allow-title-wraps allow-bullet-too-long -->
 <!-- _footer: "Source: Devin Usage page, 16 Oct; Microsoft pricing; see A1 and A4" -->
 
-###### 04 · Cost and plan, 1 of 2
+###### 04a · Cost and plan
 
 # Start with refunds: in production in 90 days, about $8 of Devin per app after that
 
@@ -111,6 +111,7 @@ After the demo: All 43 pull requests were opened by Devin. I set the rules, revi
 <div class="visual cost">
 <img src="assets/charts/three-year-cost.svg" alt="Three-year totals, 2027 to 2029: A about $825K, B $620K to $745K, C $710K to $1.4M">
 <p>Status quo excludes today's Power Apps admin and maker time, which narrows the gap.</p>
+<p>Devin is under 3% of option C; the rest is people and running costs.</p>
 </div>
 
 <!--
@@ -122,20 +123,22 @@ Your CFO will look at three years, so here it is. Status quo is about 825K at th
 <!-- _class: plan long allow-title-wraps -->
 <!-- _footer: "Source: Devin Usage page, 16 Oct; Microsoft pricing; see A1 and A4" -->
 
-###### 04 · Cost and plan, 2 of 2
+###### 04b · Cost and plan
 
-# Start with refunds: in production in 90 days, about $8 of Devin per app after that
+# The plan: four phases, each with a gate you can stop at
 
 <div class="visual roadmap">
-<div><small>Step 0, 0 to 30 days</small>right-size and map users to apps (do this anyway)<small>Gate: saving quantified</small></div>
-<div><small>30 to 90 days</small>refunds to production with real Entra, payment provider, pen test, UAT and a parallel run<small>Gate: reconciles and ops sign-off</small></div>
-<div><small>90 to 180 days</small>cut over refunds, app 4 from the playbook<small>Gate: at pilot cost or better</small></div>
-<div><small>180 days on</small>apps 5 to 13 sorted by the 2x2; KYC only after auditor sign-off</div>
-<div class="stop"><small>Kill criterion</small>stop if ownership goes over 1 engineer or review hours break the cap twice</div>
+<div class="steps">
+<div><small>Step 0, 0 to 30 days</small>Right-size and map users to apps (do this anyway)<small>Gate: saving quantified</small></div>
+<div><small>30 to 90 days</small>Refunds to production with real Entra, payment provider, pen test, UAT and a parallel run<small>Gate: reconciles and ops sign‑off</small></div>
+<div><small>90 to 180 days</small>Cut over refunds, app 4 from the playbook<small>Gate: at pilot cost or better</small></div>
+<div><small>180 days on</small>Apps 5 to 13 sorted by the 2x2; KYC only after auditor sign-off<small>Gate: each app at pilot cost or better</small></div>
+</div>
+<p>Kill criterion: stop if ownership goes over 1 engineer or review hours break the cap twice</p>
 </div>
 
 <!--
-(Narration for slide 4 is on the previous slide; keep talking through the phases here.)
+(Narration for 04b is in the 04a notes, from "in phases with gates".)
 -->
 
 ---
@@ -238,49 +241,52 @@ A4 Production readiness and rollout: the 11 gaps, each mapped to the phase that 
 
 ---
 
-<!-- _class: appendix dense -->
-<!-- _footer: "Source: Microsoft pricing; devin.ai pricing; Devin Usage page, 16 Oct; see A1 and A5" -->
+<!-- _class: appendix dense tco -->
+<!-- _footer: "Source: Microsoft pricing; devin.ai pricing; Devin Usage page, 16 Oct; every number an estimate unless tagged; see A1" -->
 
 ###### Appendix A4 · 2 of 3
 
-# Production readiness and rollout: 3-year TCO
+# Production readiness and rollout (continued)
 
-| Every number is an estimate unless tagged | 3 years, 2027 to 2029 |
-|---|---|
-| Power Apps seats | A $825K (1,042 x $264 x 3); B $620K to $745K (10 to 25% off from inactive seats and single-app users on pay-as-you-go); C $375K to $640K (B minus whole user groups leaving, year 1 nothing) |
-| Enforcement exposure | zero if everyone is already Premium; unknown otherwise |
-| Licence audit and seat map | B and C $0 to $5K |
-| Devin plan | C about $7K floor (5 Teams seats x $40 x 12 x 3); Enterprise price comes from Cognition |
-| Devin usage for builds | C $3K to $15K (measured $7 to $24 per prototype app; production apps 10 to 30x that) |
-| Devin maintenance automations | C $9K to $45K (two nightly runs capped at 12 and 8 ACUs at $2 per ACU) |
-| Engineering ownership | C $210K to $420K (0.5 to 1 FTE x $140K x 3) |
+| Line item | A | B | C | Basis |
+|---|---|---|---|---|
+| Power Apps seats | $825K | $620K to $745K | $375K to $640K | A: 1,042 x $264 x 3. B: 10 to 25% off from inactive seats and single-app users on pay-as-you-go. C: B minus whole user groups leaving, year 1 nothing |
+| Enforcement exposure | see basis |  |  | zero if everyone is already Premium; unknown otherwise |
+| Licence audit and seat map |  | $0 to $5K | $0 to $5K |  |
+| Devin plan |  |  | about $7K floor | 5 Teams seats x $40 x 12 x 3; Enterprise price comes from Cognition |
+| Devin usage for builds |  |  | $3K to $15K | measured $7 to $24 per prototype app; production apps 10 to 30x that |
+| Devin maintenance automations |  |  | $9K to $45K | two nightly runs capped at 12 and 8 ACUs at $2 per ACU |
+| Engineering ownership |  |  | $210K to $420K | 0.5 to 1 FTE x $140K x 3 |
 
 <!--
-A4 continued: the 3-year TCO detail behind slide 4. Every number is an estimate unless tagged.
+A4 continued: the 3-year TCO detail behind slide 04a, 2027 to 2029. Every number is an estimate unless tagged. A blank cell means the line is not part of that option.
 -->
+
 
 ---
 
-<!-- _class: appendix dense -->
-<!-- _footer: "Source: Microsoft pricing; devin.ai pricing; Devin Usage page, 16 Oct; see A1 and A5" -->
+<!-- _class: appendix dense tco -->
+<!-- _footer: "Source: Microsoft pricing; devin.ai pricing; Devin Usage page, 16 Oct; every number an estimate unless tagged; see A1" -->
 
 ###### Appendix A4 · 3 of 3
 
-# Production readiness and rollout: 3-year TCO
+# Production readiness and rollout (continued)
 
-| Every number is an estimate unless tagged | 3 years, 2027 to 2029 |
-|---|---|
-| Hosting and monitoring | C $15K to $48K |
-| External pen test, yearly | C $15K to $36K |
-| Integrations, one-off (Entra, payment provider, KYC vendor if moved, document storage) | C $18K to $36K |
-| Dataverse migration, one-off | C $15K to $50K |
-| UAT, parallel run, cutover, hypercare | C $30K to $75K |
-| Training, moved apps only | C $10K to $40K |
-| Not counted in A and B | today's Power Apps admin and maker time (ask the client) |
+| Line item | A | B | C | Basis |
+|---|---|---|---|---|
+| Hosting and monitoring |  |  | $15K to $48K | estimate |
+| External pen test, yearly |  |  | $15K to $36K | estimate |
+| Integrations, one-off |  |  | $18K to $36K | Entra, payment provider, KYC vendor if moved, document storage |
+| Dataverse migration, one-off |  |  | $15K to $50K | estimate |
+| UAT, parallel run, cutover, hypercare |  |  | $30K to $75K | estimate |
+| Training, moved apps only |  |  | $10K to $40K | estimate |
+| Not counted in A and B |  |  |  | today's Power Apps admin and maker time (ask the client) |
+| Total, 3 years | about $825K | $620K to $745K | $710K to $1.4M | slide 04a |
 
 <!--
-A4 continued: the 3-year TCO detail behind slide 4. Every number is an estimate unless tagged.
+A4 continued: the 3-year TCO detail behind slide 04a, 2027 to 2029. Every number is an estimate unless tagged. A blank cell means the line is not part of that option.
 -->
+
 
 ---
 
@@ -312,7 +318,7 @@ A5 Sources, part 1: every source with URL, date read and whether it's official, 
 
 ###### Appendix A5 · 2 of 3
 
-# Sources
+# Sources (continued)
 
 | Source (type, date read) | Link |
 |---|---|
@@ -335,7 +341,7 @@ A5 Sources, part 2: every source with URL, date read and whether it's official, 
 
 ###### Appendix A5 · 3 of 3
 
-# Sources
+# Sources (continued)
 
 | Source (type, date read) | Link |
 |---|---|
