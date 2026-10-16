@@ -20,6 +20,7 @@ import {
   revealCustomerName,
   searchPayments,
 } from "../app/(platform)/refunds/refunds.ts";
+import { paymentStatus } from "../app/(platform)/refunds/format.ts";
 
 // app_runtime with enough connections for the concurrency tests.
 const db = createDb(TEST_DATABASE_URL, { max: 6 });
@@ -589,5 +590,32 @@ describe("seeded payments have an audit history", () => {
     // Positive control: the payment's history is read from the audit log.
     await revealCustomerName(await approver(), { paymentId: payment.id, reason: "Matching the bank statement" });
     expect(await paymentHistory(db, payment.id)).toMatchObject([{ action: "field.unmask", entityId: payment.id }]);
+  });
+});
+
+describe("payment page: partial refunds and a full history (QA 3, 9)", () => {
+  it("a part-refunded payment reads Partially refunded, not Captured", () => {
+    expect(paymentStatus({ amountPence: 5_000, refundedPence: 0 })).toEqual({ label: "Captured" });
+    expect(paymentStatus({ amountPence: 5_000, refundedPence: 1_000 })).toEqual({ label: "Partially refunded" });
+    expect(paymentStatus({ amountPence: 5_000, refundedPence: 5_000 })).toEqual({ label: "Fully refunded", kind: "done" });
+  });
+
+  it("the payment history includes reveals, its refunds and their approvals, and nothing from other payments", async () => {
+    const payment = await newPayment(50_000);
+    const other = await newPayment(50_000);
+    await revealCustomerName(await approver(), { paymentId: payment.id, reason: "Customer called about the refund" });
+    const small = await requestRefund(await analyst(), refundInput(payment.id, 1_000), config);
+    const large = await requestRefund(await analyst(), refundInput(payment.id, 30_000), config);
+    const elsewhere = await requestRefund(await analyst(), refundInput(other.id, 1_000), config);
+    const history = await paymentHistory(db, payment.id);
+    const seen = history.map((h) => `${h.entityType}:${h.action}`);
+    expect(seen).toContain("payment:field.unmask");
+    expect(seen).toContain("refund:refund.requested");
+    expect(seen).toContain("refund:refund.succeeded");
+    expect(seen).toContain("approval_request:approval.requested");
+    expect(history.filter((h) => h.entityType === "refund").map((h) => h.entityId)).toEqual(expect.arrayContaining([small.id, large.id]));
+    expect(history.some((h) => h.entityId === elsewhere.id)).toBe(false);
+    const times = history.map((h) => h.occurredAt.getTime());
+    expect(times).toEqual([...times].sort((a, b) => b - a));
   });
 });
