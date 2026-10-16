@@ -13,7 +13,10 @@ function tokenMatches(header: string | null, expected: string): boolean {
 }
 
 const DENIED_RESOURCE = "api:flags";
-/** Refusals audited per rolling minute; past this the caller still gets 401 but no new row. */
+/**
+ * Refusals audited per rolling minute. The row that reaches it is marked `capped: true`; past it the
+ * caller still gets 401 and the refusal goes to the server log instead of a new row.
+ */
 export const DENIED_AUDIT_PER_MINUTE = 30;
 
 /**
@@ -34,7 +37,11 @@ async function auditRefusal(db: Db, token: "missing" | "invalid", limit: number)
           gt(auditLog.occurredAt, sql`clock_timestamp() - interval '1 minute'`),
         ),
       );
-    if ((recent?.n ?? 0) >= limit) return;
+    const n = recent?.n ?? 0;
+    if (n >= limit) {
+      console.warn(`flags service: refused call not audited (${limit} refusals already recorded this minute)`);
+      return;
+    }
     await withAudit(
       tx,
       {
@@ -42,7 +49,7 @@ async function auditRefusal(db: Db, token: "missing" | "invalid", limit: number)
         action: "access.denied",
         entityType: "resource",
         entityId: DENIED_RESOURCE,
-        metadata: { required: "flags:service-token", token },
+        metadata: { required: "flags:service-token", token, ...(n + 1 >= limit ? { capped: true } : {}) },
       },
       async () => undefined,
     );
