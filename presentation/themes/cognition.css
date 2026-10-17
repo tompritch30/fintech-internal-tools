@@ -334,3 +334,10 @@ section.pg-v > footer::after { content: "v"; }
 /* Owner edit: lighter main slides, boxes sized to content, bigger text. */
 .visual.compare { align-items: stretch; align-self: start; height: auto; font-size: 30px; }
 section.big > table { font-size: 32px; }
+/* v6: licence layers, the bottom two carry the value; Devin line under each roadmap step. */
+.visual.compare > div.layers > p.value { border-left: 4px solid var(--ink); padding-left: 12px; }
+section.plan > .visual.roadmap small.devin { color: var(--ink); }
+/* v6: demo divider, centred: big line, then a smaller grey line. */
+section.divider.demo { align-items: center; text-align: center; }
+section.divider.demo > h1 { font-size: 112px; }
+section.divider.demo > p { font-size: 88px; line-height: 1.1; font-family: "Newsreader", serif; }
