@@ -1,6 +1,6 @@
 # Key decisions
 
-Thomas Pritchard · Power Apps or build with Devin · Repo: https://github.com/tompritch30/fintech-internal-tools · Video: https://www.loom.com/share/956688745216494988acfed0f11fcc13
+Thomas Pritchard · Power Apps or build with Devin · Repo: https://github.com/tompritch30/fintech-internal-tools · Video: https://www.loom.com/share/17c212910537479ba3b874e62666115b
 
 ## The question I answered
 
