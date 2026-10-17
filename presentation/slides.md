@@ -18,7 +18,7 @@ Build with Devin in phases, refunds dashboard first
 
 <img class="art" src="assets/title-art-dark.svg" alt="Wireframe of the shared platform core with three apps plugged in">
 
-<!-- _footer: "Prepared for the VP of Engineering · October 2026" -->
+<!-- _footer: "Thomas Pritchard · Prepared for the VP of Engineering · October 2026" -->
 
 <!--
 You asked whether your team can use Devin to build your internal tools instead of paying for Power Apps. Short answer: yes, build, but in phases, starting with the refunds dashboard, and keep the KYC queue on Power Apps for now. Here's why, in under five minutes.
@@ -31,17 +31,17 @@ You asked whether your team can use Devin to build your internal tools instead o
 
 # Power Apps secures the platform, not each app's own controls
 
-- Today: 3 tools, approx. 1,000 seats, $250K a year
+- Today: $250K a year, approx. 1,000 users at $20 a month each (our estimate)
 - 2027: approx. $275K; the 10+ new tools add no licence cost
-- Real value: governance, and ops editing their own apps
+- Real value: the bottom two layers, and ops editing their own apps
 
 <div class="visual compare">
-<div><small>Built into Power Apps</small><p>Entra sign-in and access rules</p><p>Rules on what data can leave</p><p>Microsoft's SOC 2 and ISO scope</p></div>
+<div class="layers"><small>What the licence covers</small><p>Build: canvas and model-driven apps</p><p>Logic: Power Fx and Power Automate</p><p>Connectors: 1,000+, Teams and Outlook</p><p class="value">Data: Dataverse, row security, audit</p><p class="value">Governance: Entra, data loss rules, SOC 2 and ISO</p></div>
 <div class="gap"><small>Left to each app to build</small><p>Blocking self-approval</p><p>Hiding customer data</p><p>An exportable audit trail</p></div>
 </div>
 
 <!--
-Today you run three tools on Power Apps: the KYC review queue, the refunds dashboard and the feature-flag admin. At list price your $250K is about 1,000 seats, so most users are ops, compliance and support, not engineers.
+Today you run three tools on Power Apps: the KYC review queue, the refunds dashboard and the feature-flag admin. We don't know your seat count, but at the $20 list price your $250K is about 1,000 users, so most of them are ops, compliance and support, not engineers.
 Power Apps is priced per person with unlimited apps, so the ten new tools add no licence cost. But a price rise to about $275K is reported for 2027.
 What you really pay for is governance: Entra sign-in, data loss rules, Dataverse security and Microsoft's compliance scope, and ops can change their own apps without engineering.
 Power Apps secures the platform. But whether each app is compliant, blocking self-approval, masking customer data, keeping an audit trail, depends on whoever built that app, every time. With three apps that's manageable. With thirteen, it's a risk.
@@ -49,26 +49,39 @@ Power Apps secures the platform. But whether each app is compliant, blocking sel
 
 ---
 
-<!-- _class: long allow-title-wraps allow-bullet-too-long allow-orphan-word -->
-<!-- _footer: "Source: this repo; built 15 Oct 2026; live demo follows" -->
+<!-- _class: long allow-title-wraps allow-bullet-too-long allow-orphan-word allow-too-many-bullets -->
+<!-- _footer: "Source: this repo, docs/DEVIN-LOG.md and docs/SECURITY-REVIEW.md; see A3" -->
 
 
-# Devin builds the controls once; every new tool inherits them
+# One core platform, lightweight tools on top
 
-- Refunds: Devin, with an engineer steering
-- KYC queue and flag admin: one Devin session each, from a playbook
-- Every new tool inherits the controls
+- Refunds first, with an engineer steering; Devin then wrote the playbook
+- KYC queue and flag admin from the playbook: one Devin session each, under $10 each
+- A separate Devin session attacked the build: 4 holes found, all fixed before merge
+- Every change is a pull request, gated by tests, Devin Review and code owners
 
 <div class="visual arch">
-<div class="apps"><div>Refunds dashboard</div><div>KYC review queue</div><div>Feature-flag admin</div><div class="next">Next tools, from the playbook</div></div>
-<div class="core"><p>Shared platform, built once by Devin</p><div class="blocks"><div>Sign-in</div><div>Permissions</div><div>Approvals</div><div>Data masking</div><div>Audit</div></div></div>
+<div class="apps"><div>Refunds dashboard</div><div>KYC review queue</div><div>Feature-flag admin</div><div class="next">Next 10 tools, from the playbook</div></div>
+<div class="core"><p>Core platform, built once by Devin</p><div class="blocks"><div>Sign-in</div><div>Permissions</div><div>Approvals</div><div>Data masking</div><div>Audit</div></div></div>
 <div class="db">Key rules also enforced in the database</div>
 </div>
 
 <!--
-Before the demo: Devin built one shared platform first, with the controls every tool needs. Each tool sits on top of it. Devin built the refunds dashboard with me steering, then the KYC queue and the flag admin each from a GitHub issue and a playbook, in one session each. That playbook is how your next ten tools would get built. Let me show you.
-[Live demo, about 90 seconds]
-After the demo: Devin opened every pull request. I set the rules, reviewed the platform and ran a hostile security review. Four attacks worked, and each got a test and a fix before merge.
+So here's the alternative: one core platform that holds every control, and lightweight tools on top that only carry their own business logic. Devin built the core once. I steered the refunds dashboard, Devin turned that session into a playbook, and the KYC queue and flag admin were one session each from it, under ten dollars each. Then a separate Devin session attacked the build: four holes, all fixed before merge. Every change went through a pull request with tests and review.
+-->
+
+---
+
+<!-- _class: divider demo allow-paragraph allow-number-without-source allow-unused-space allow-off-left-edge -->
+<!-- _paginate: skip -->
+<!-- _footer: "" -->
+
+# Three tools.
+
+One core platform.
+
+<!--
+Switch to the browser. Refunds as Sam (masking, reveal with a reason, request, blocked self-approval), then KYC (claim, approve, needs a second sign-off; escalate), then flags (prod change needs approval; kill switch). Sign out, sign in as admin, audit log and export. Then: built the way you'd build it for production; going live is integration work, not a rewrite.
 -->
 
 ---
@@ -128,22 +141,22 @@ Devin itself is the small part: about $100 built all three prototypes. Productio
 
 <div class="visual roadmap">
 <div class="steps">
-<div><small>First 30 days</small>Check app usage, unused seats and renewal date<small>Gate: savings known</small></div>
-<div><small>30 to 90 days</small>Refunds dashboard to production, alongside the Power App<small>Gate: results match, ops sign off</small></div>
-<div><small>90 to 180 days</small>Switch refunds; build next tools from the playbook<small>Gate: each tool on budget</small></div>
-<div><small>After 180 days</small>Move KYC after compliance sign-off; buy a flag product<small>Gate: auditor sign-off</small></div>
+<div><small>Weeks 1 to 2</small>Discovery with your team: apps, connectors, compliance, seats<small>Gate: savings known</small><small class="devin">Devin: documents your current apps</small></div>
+<div><small>Weeks 3 to 12</small>Refunds to production, alongside the Power App<small>Gate: results match, ops sign off</small><small class="devin">Devin: builds and tests from the playbook</small></div>
+<div><small>Months 3 to 6</small>Switch refunds; next tools from the playbook<small>Gate: each tool on budget</small><small class="devin">Devin: one session per tool, in parallel</small></div>
+<div><small>After 6 months</small>KYC after compliance sign-off; buy a flag product<small>Gate: auditor sign-off</small><small class="devin">Devin: scheduled upkeep and security reviews</small></div>
 </div>
-<p>Stop at any gate if it needs more than one engineer. Staying on Power Apps? Devin still writes tests and migrations.</p>
+<p>Stop at any gate if it needs more than one engineer. Staying on Power Apps? Devin still writes tests and migrations. Next step: a working session on your stack.</p>
 </div>
 
 <!--
 So my recommendation is build, but in phases, and you can stop at any gate.
-First 30 days: find out who uses which app, what seats are unused, and when your renewal is. That saves money whatever you decide.
+First two weeks: discovery with your team, finding out who uses which app and connector, your compliance needs, unused seats and your renewal date. That saves money whatever you decide.
 Then 90 days to take the refunds dashboard to production, with your real Entra sign-in, your payment provider, a pen test and testing with ops, running alongside the Power App until the results match.
 Then switch refunds over and build the next planned tools from the playbook.
 KYC moves only once compliance signs off, and for feature flags I'd buy a dedicated tool rather than maintain ours.
 If ownership ever needs more than one engineer, stop and keep Power Apps for the rest. And if you decide to stay on Power Apps, Devin still helps with automated testing and data migration.
-Next step: 30 days with your Power Platform admin.
+Next step: a working session on your stack.
 -->
 
 ---
